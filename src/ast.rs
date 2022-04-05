@@ -7,6 +7,22 @@ pub(crate) enum Ast {
     Unquote(Box<Ast>),
 }
 
+impl Ast {
+    pub fn each_subtree(self, mut f: impl FnMut(Ast) -> Ast) -> Ast {
+        match self {
+            Ast::Num(_) | Ast::String(_) | Ast::Sym(_) => self,
+            Ast::Node(mut head, tail) => {
+                *head = f(*head);
+                Ast::Node(head, tail.into_iter().map(f).collect())
+            }
+            Ast::Unquote(mut unquoted) => {
+                *unquoted = f(*unquoted);
+                Ast::Unquote(unquoted)
+            }
+        }
+    }
+}
+
 impl Default for Ast {
     fn default() -> Self {
         Self::Num(0.0)

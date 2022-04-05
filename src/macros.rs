@@ -4,6 +4,7 @@ use std::{collections::HashMap, mem::take};
 pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
     let mut ctx = MacroContext {
         symbols: HashMap::new(),
+        functions: HashMap::new(),
     };
     program
         .into_iter()
@@ -13,6 +14,7 @@ pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
 
 struct MacroContext {
     symbols: HashMap<String, Ast>,
+    functions: HashMap<String, FunctionMacro>,
 }
 
 impl MacroContext {
@@ -21,34 +23,58 @@ impl MacroContext {
             [Ast::Sym(macro_name), body] => {
                 self.symbols.insert(take(macro_name), take(body));
             }
+            [Ast::Node(box Ast::Sym(macro_name), params), body] => {
+                let params = take(params)
+                    .into_iter()
+                    .map(|param| match param {
+                        Ast::Sym(param) => param,
+                        // TODO: Error handling
+                        _ => todo!(),
+                    })
+                    .collect();
+                self.functions.insert(
+                    take(macro_name),
+                    FunctionMacro {
+                        params,
+                        body: take(body),
+                    },
+                );
+            }
             // TODO: Error handling
             _ => todo!(),
         }
     }
 
     fn transform_shallow(&self, ast: Ast) -> Ast {
-        if let Ast::Sym(sym) = &ast {
-            if let Some(body) = self.symbols.get(sym) {
-                return body.clone();
+        match &ast {
+            Ast::Sym(sym) => {
+                if let Some(body) = self.symbols.get(sym) {
+                    body.clone()
+                } else {
+                    ast
+                }
             }
+            Ast::Node(box Ast::Sym(sym), args) => {
+                if let Some(func_macro) = self.functions.get(sym) {
+                    let params = &func_macro.params;
+                    // TODO: Error handling
+                    assert_eq!(args.len(), params.len());
+                    let bindings = params
+                        .iter()
+                        .map(String::as_str)
+                        .zip(args.iter())
+                        .collect();
+                    interpolate(func_macro.body.clone(), &bindings)
+                } else {
+                    ast
+                }
+            }
+            _ => ast,
         }
-
-        ast
     }
 
     fn transform_deep(&self, ast: Ast) -> Ast {
-        let ast = match ast {
-            Ast::Node(mut head, tail) => {
-                *head = self.transform_deep(*head);
-                Ast::Node(
-                    head,
-                    tail.into_iter().map(|t| self.transform_deep(t)).collect(),
-                )
-            }
-            Ast::Unquote(unquoted) => *unquoted,
-            Ast::Num(_) | Ast::String(_) | Ast::Sym(_) => ast,
-        };
-
+        let ast = ast.each_subtree(|tree| self.transform_deep(tree));
         self.transform_shallow(ast)
     }
 
@@ -63,4 +89,20 @@ impl MacroContext {
             _ => Some(ast),
         }
     }
+}
+
+fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Ast {
+    match body {
+        Ast::Unquote(box Ast::Sym(sym)) => {
+            // TODO: Error handling
+            bindings.get(&*sym).copied().unwrap().clone()
+        }
+        Ast::Unquote(unquoted) => *unquoted,
+        _ => body.each_subtree(|tree| interpolate(tree, bindings)),
+    }
+}
+
+struct FunctionMacro {
+    params: Vec<String>,
+    body: Ast,
 }
