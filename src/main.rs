@@ -1,10 +1,11 @@
 #![feature(box_patterns)]
 
 mod ast;
+mod ir;
 mod macros;
 mod parser;
 
-use crate::macros::expand;
+use crate::{ir::Program, macros::expand};
 
 fn main() {
     loop {
@@ -14,7 +15,8 @@ fn main() {
         match parsed {
             Ok((_, ast)) => {
                 let expanded = expand(ast);
-                println!("{expanded:#?}");
+                let program = Program::from_asts(expanded);
+                println!("{program:#?}");
             }
             Err(err) => eprintln!("{err}"),
         }

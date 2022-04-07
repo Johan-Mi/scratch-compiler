@@ -28,3 +28,13 @@ impl Default for Ast {
         Self::Num(0.0)
     }
 }
+
+pub(crate) fn all_symbols(asts: Vec<Ast>) -> Vec<String> {
+    asts.into_iter()
+        .map(|ast| match ast {
+            Ast::Sym(sym) => sym,
+            // TODO: Error handling
+            _ => todo!(),
+        })
+        .collect()
+}

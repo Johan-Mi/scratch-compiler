@@ -1,4 +1,4 @@
-use crate::ast::Ast;
+use crate::ast::{all_symbols, Ast};
 use std::{collections::HashMap, mem::take};
 
 pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
@@ -24,14 +24,7 @@ impl MacroContext {
                 self.symbols.insert(take(macro_name), take(body));
             }
             [Ast::Node(box Ast::Sym(macro_name), params), body] => {
-                let params = take(params)
-                    .into_iter()
-                    .map(|param| match param {
-                        Ast::Sym(param) => param,
-                        // TODO: Error handling
-                        _ => todo!(),
-                    })
-                    .collect();
+                let params = all_symbols(take(params));
                 self.functions.insert(
                     take(macro_name),
                     FunctionMacro {
