@@ -3,7 +3,7 @@ mod proc;
 mod sprite;
 
 use crate::{ast::Ast, ir::sprite::Sprite};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug)]
 pub(crate) struct Program {
@@ -14,12 +14,18 @@ pub(crate) struct Program {
 impl Program {
     pub fn from_asts(asts: Vec<Ast>) -> Program {
         // TODO: Error handling
-        let mut sprites = HashMap::new();
+        let mut sprites = HashMap::<String, Sprite>::new();
 
         for ast in asts {
             let (name, sprite) = Sprite::from_ast(ast);
-            // TODO: Sprite merging
-            sprites.insert(name, sprite);
+            match sprites.entry(name) {
+                Entry::Occupied(mut merging_existing_sprite) => {
+                    merging_existing_sprite.get_mut().merge(sprite);
+                }
+                Entry::Vacant(new_sprite) => {
+                    new_sprite.insert(sprite);
+                }
+            }
         }
 
         let stage = sprites.remove("Stage").unwrap();

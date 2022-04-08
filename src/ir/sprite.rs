@@ -61,4 +61,17 @@ impl Sprite {
             },
         )
     }
+
+    pub fn merge(&mut self, other: Self) {
+        let Self {
+            costumes,
+            variables,
+            lists,
+            procedures,
+        } = other;
+        self.costumes.extend(costumes);
+        self.variables.extend(variables);
+        self.lists.extend(lists);
+        self.procedures.extend(procedures);
+    }
 }
