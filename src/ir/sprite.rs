@@ -74,4 +74,10 @@ impl Sprite {
         self.lists.extend(lists);
         self.procedures.extend(procedures);
     }
+
+    pub fn optimize(&mut self) {
+        for proc in self.procedures.values_mut() {
+            proc.optimize();
+        }
+    }
 }

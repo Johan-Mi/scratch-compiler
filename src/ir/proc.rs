@@ -46,6 +46,10 @@ impl Procedure {
             },
         )
     }
+
+    pub fn optimize(&mut self) {
+        self.body.optimize();
+    }
 }
 
 fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
@@ -60,7 +64,7 @@ fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
 }
 
 #[derive(Debug)]
-enum Statement {
+pub(crate) enum Statement {
     ProcCall {
         proc_name: String,
         args: Vec<Expr>,
@@ -174,5 +178,9 @@ impl Statement {
             },
             _ => todo!(),
         }
+    }
+
+    fn optimize(&mut self) {
+        // TODO
     }
 }

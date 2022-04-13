@@ -15,7 +15,8 @@ fn main() {
         match parsed {
             Ok((_, ast)) => {
                 let expanded = expand(ast);
-                let program = Program::from_asts(expanded);
+                let mut program = Program::from_asts(expanded);
+                program.optimize();
                 println!("{program:#?}");
             }
             Err(err) => eprintln!("{err}"),

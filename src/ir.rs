@@ -31,4 +31,11 @@ impl Program {
         let stage = sprites.remove("Stage").unwrap();
         Program { stage, sprites }
     }
+
+    pub fn optimize(&mut self) {
+        self.stage.optimize();
+        for sprite in self.sprites.values_mut() {
+            sprite.optimize();
+        }
+    }
 }
