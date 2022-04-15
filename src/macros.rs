@@ -1,4 +1,7 @@
-use crate::ast::{all_symbols, Ast};
+use crate::{
+    ast::{all_symbols, Ast},
+    rewrite::TreeWalk,
+};
 use std::{collections::HashMap, mem::take};
 
 pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
@@ -67,8 +70,7 @@ impl MacroContext {
     }
 
     fn transform_deep(&self, ast: Ast) -> Ast {
-        let ast = ast.each_subtree(|tree| self.transform_deep(tree));
-        self.transform_shallow(ast)
+        ast.bottom_up(|tree| self.transform_shallow(tree))
     }
 
     fn transform_top_level(&mut self, ast: Ast) -> Option<Ast> {
@@ -91,7 +93,7 @@ fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Ast {
             bindings.get(&*sym).copied().unwrap().clone()
         }
         Ast::Unquote(unquoted) => *unquoted,
-        _ => body.each_subtree(|tree| interpolate(tree, bindings)),
+        _ => body.each_branch(|tree| interpolate(tree, bindings)),
     }
 }
 

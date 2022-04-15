@@ -4,6 +4,7 @@ mod ast;
 mod ir;
 mod macros;
 mod parser;
+mod rewrite;
 
 use crate::{ir::Program, macros::expand};
 

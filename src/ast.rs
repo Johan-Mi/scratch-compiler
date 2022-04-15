@@ -1,3 +1,5 @@
+use crate::rewrite::TreeWalk;
+
 #[derive(Debug, Clone)]
 pub(crate) enum Ast {
     Num(f64),
@@ -7,8 +9,14 @@ pub(crate) enum Ast {
     Unquote(Box<Ast>),
 }
 
-impl Ast {
-    pub fn each_subtree(self, mut f: impl FnMut(Ast) -> Ast) -> Ast {
+impl Default for Ast {
+    fn default() -> Self {
+        Self::Num(0.0)
+    }
+}
+
+impl TreeWalk<Ast> for Ast {
+    fn each_branch(self, mut f: impl FnMut(Self) -> Self) -> Self {
         match self {
             Ast::Num(_) | Ast::String(_) | Ast::Sym(_) => self,
             Ast::Node(mut head, tail) => {
@@ -20,12 +28,6 @@ impl Ast {
                 Ast::Unquote(unquoted)
             }
         }
-    }
-}
-
-impl Default for Ast {
-    fn default() -> Self {
-        Self::Num(0.0)
     }
 }
 
