@@ -2,6 +2,7 @@ use crate::{
     ast::{all_symbols, Ast},
     rewrite::TreeWalk,
 };
+use fancy_match::fancy_match;
 use std::{collections::HashMap, mem::take};
 
 pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
@@ -76,8 +77,9 @@ impl MacroContext {
     fn transform_top_level(&mut self, ast: Ast) -> Option<Ast> {
         let ast = self.transform_deep(ast);
 
+        #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym(sym), args) if sym == "macro" => {
+            Ast::Node(box Ast::Sym("macro"), args) => {
                 self.define(args);
                 None
             }

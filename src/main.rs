@@ -1,4 +1,6 @@
 #![feature(box_patterns)]
+#![feature(stmt_expr_attributes)]
+#![feature(proc_macro_hygiene)]
 
 mod ast;
 mod ir;

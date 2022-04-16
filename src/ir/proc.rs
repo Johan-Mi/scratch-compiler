@@ -2,6 +2,7 @@ use crate::{
     ast::{all_symbols, Ast},
     ir::expr::Expr,
 };
+use fancy_match::fancy_match;
 use std::collections::HashSet;
 
 #[derive(Debug)]
@@ -23,13 +24,12 @@ impl Procedure {
         let mut lists = HashSet::new();
 
         for stmt_or_decl in args {
+            #[fancy_match]
             match stmt_or_decl {
-                Ast::Node(box Ast::Sym(sym), var_decls)
-                    if sym == "variables" =>
-                {
+                Ast::Node(box Ast::Sym("variables"), var_decls) => {
                     variables.extend(all_symbols(var_decls));
                 }
-                Ast::Node(box Ast::Sym(sym), list_decls) if sym == "lists" => {
+                Ast::Node(box Ast::Sym("lists"), list_decls) => {
                     lists.extend(all_symbols(list_decls));
                 }
                 _ => body.push(Statement::from_ast(stmt_or_decl)),

@@ -2,6 +2,7 @@ use crate::{
     ast::{all_symbols, Ast},
     ir::proc::Procedure,
 };
+use fancy_match::fancy_match;
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
@@ -18,10 +19,9 @@ pub(crate) struct Sprite {
 impl Sprite {
     pub fn from_ast(ast: Ast) -> (String, Self) {
         // TODO: Error handling
-        let mut tail = match ast {
-            Ast::Node(box Ast::Sym(sym), tail) if sym == "sprite" => {
-                tail.into_iter()
-            }
+        let mut tail = #[fancy_match]
+        match ast {
+            Ast::Node(box Ast::Sym("sprite"), tail) => tail.into_iter(),
             _ => todo!(),
         };
 
