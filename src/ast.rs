@@ -9,12 +9,6 @@ pub(crate) enum Ast {
     Unquote(Box<Ast>),
 }
 
-impl Default for Ast {
-    fn default() -> Self {
-        Self::Num(0.0)
-    }
-}
-
 impl TreeWalk<Ast> for Ast {
     fn each_branch(self, mut f: impl FnMut(Self) -> Self) -> Self {
         match self {

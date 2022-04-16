@@ -3,7 +3,7 @@ use crate::{
     rewrite::TreeWalk,
 };
 use fancy_match::fancy_match;
-use std::{collections::HashMap, mem::take};
+use std::collections::HashMap;
 
 pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
     let mut ctx = MacroContext {
@@ -22,22 +22,23 @@ struct MacroContext {
 }
 
 impl MacroContext {
-    fn define(&mut self, mut args: Vec<Ast>) {
-        match &mut args[..] {
-            [Ast::Sym(macro_name), body] => {
-                self.symbols.insert(take(macro_name), take(body));
+    fn define(&mut self, args: Vec<Ast>) {
+        // TODO: Error handling
+        let mut args = args.into_iter();
+        let signature = args.next().unwrap();
+        match signature {
+            Ast::Sym(macro_name) => {
+                let body = args.next().unwrap();
+                assert!(args.next().is_none());
+                self.symbols.insert(macro_name, body);
             }
-            [Ast::Node(box Ast::Sym(macro_name), params), body] => {
-                let params = all_symbols(take(params));
-                self.functions.insert(
-                    take(macro_name),
-                    FunctionMacro {
-                        params,
-                        body: take(body),
-                    },
-                );
+            Ast::Node(box Ast::Sym(macro_name), params) => {
+                let params = all_symbols(params);
+                let body = args.next().unwrap();
+                assert!(args.next().is_none());
+                self.functions
+                    .insert(macro_name, FunctionMacro { params, body });
             }
-            // TODO: Error handling
             _ => todo!(),
         }
     }
