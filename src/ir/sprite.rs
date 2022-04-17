@@ -40,7 +40,7 @@ impl Sprite {
                 Ast::Node(box Ast::Sym(sym), tail) => match &*sym {
                     "variables" => variables.extend(all_symbols(tail)),
                     "lists" => lists.extend(all_symbols(tail)),
-                    "costumes" => todo!(),
+                    "costumes" => parse_costume_decl(&mut costumes, tail),
                     "proc" => {
                         let (name, proc) = Procedure::from_asts(tail);
                         procedures.insert(name, proc);
@@ -79,5 +79,22 @@ impl Sprite {
         for proc in self.procedures.values_mut() {
             proc.optimize();
         }
+    }
+}
+
+fn parse_costume_decl(costumes: &mut HashMap<String, PathBuf>, args: Vec<Ast>) {
+    // TODO: Error handling
+    let mut args = args.into_iter();
+    while let Some(name) = args.next() {
+        let name = match name {
+            Ast::String(name) => name,
+            _ => todo!(),
+        };
+        let path = args.next().unwrap();
+        let path = match path {
+            Ast::String(path) => path,
+            _ => todo!(),
+        };
+        costumes.insert(name, path.into());
     }
 }
