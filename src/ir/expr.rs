@@ -1,4 +1,7 @@
-use crate::ast::Ast;
+use crate::{
+    ast::Ast,
+    rewrite::{Clean, Rewrite, TreeWalk},
+};
 
 #[derive(Debug)]
 pub(crate) enum Expr {
@@ -19,6 +22,22 @@ impl Expr {
                 args.into_iter().map(Self::from_ast).collect(),
             ),
             _ => todo!(),
+        }
+    }
+}
+
+impl TreeWalk<Rewrite<Self>> for Expr {
+    fn each_branch(
+        self,
+        f: impl FnMut(Self) -> Rewrite<Self>,
+    ) -> Rewrite<Self> {
+        match self {
+            Expr::Lit(_) | Expr::Sym(_) => Clean(self),
+            Expr::FuncCall(func_name, args) => args
+                .into_iter()
+                .map(f)
+                .collect::<Rewrite<_>>()
+                .map(|new_args| Expr::FuncCall(func_name, new_args)),
         }
     }
 }
