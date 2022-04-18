@@ -2,7 +2,9 @@
 ///
 /// `FS` is the type of `Self` wrapped in some effect.
 pub(crate) trait Bind<FS>: Sized {
-    /// Binds an effectful [FnMut] to an already wrapped value.
+    /// Binds an effectful [`FnMut`] to an already wrapped value.
+    ///
+    /// [`FnMut`]: std::ops::FnMut
     fn bind_mut(wrapped: FS, f: impl FnMut(Self) -> FS) -> FS;
 }
 
