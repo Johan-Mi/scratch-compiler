@@ -89,7 +89,7 @@ pub(crate) enum Statement {
         body: Box<Statement>,
     },
     For {
-        counter: Expr,
+        counter: String,
         times: Expr,
         body: Box<Statement>,
     },
@@ -140,9 +140,13 @@ impl Statement {
                 "for" => {
                     let mut tail = tail.into_iter();
                     let counter = tail.next().unwrap();
+                    let counter = match counter {
+                        Ast::Sym(sym) => sym,
+                        _ => todo!(),
+                    };
                     let times = tail.next().unwrap();
                     Statement::For {
-                        counter: Expr::from_ast(counter),
+                        counter,
                         times: Expr::from_ast(times),
                         body: Box::new(Statement::Do(
                             tail.map(Statement::from_ast).collect(),
