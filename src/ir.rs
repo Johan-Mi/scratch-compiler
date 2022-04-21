@@ -1,6 +1,6 @@
-mod expr;
-mod proc;
-mod sprite;
+pub(crate) mod expr;
+pub(crate) mod proc;
+pub(crate) mod sprite;
 
 use crate::{ast::Ast, ir::sprite::Sprite};
 use std::collections::{hash_map::Entry, HashMap};

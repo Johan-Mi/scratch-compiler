@@ -5,6 +5,7 @@
 mod ast;
 mod ir;
 mod macros;
+mod optimize;
 mod parser;
 mod rewrite;
 

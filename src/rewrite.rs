@@ -87,6 +87,16 @@ impl<T> Rewrite<T> {
             }
         }
     }
+
+    /// Binds an [`FnOnce`] to `self`.
+    ///
+    /// [`FnOnce`]: std::ops::FnOnce
+    pub fn bind(self, f: impl FnOnce(T) -> Self) -> Self {
+        match self {
+            Clean(clean) => f(clean),
+            Dirty(dirty) => Dirty(f(dirty).into_inner()),
+        }
+    }
 }
 
 impl<T> Rewrite<Rewrite<T>> {
@@ -104,12 +114,9 @@ impl<T> Rewrite<Rewrite<T>> {
 impl<T> Bind<Rewrite<Self>> for T {
     fn bind_mut(
         wrapped: Rewrite<Self>,
-        mut f: impl FnMut(Self) -> Rewrite<Self>,
+        f: impl FnMut(Self) -> Rewrite<Self>,
     ) -> Rewrite<Self> {
-        match wrapped {
-            Clean(clean) => f(clean),
-            Dirty(dirty) => Dirty(f(dirty).into_inner()),
-        }
+        wrapped.bind(f)
     }
 }
 

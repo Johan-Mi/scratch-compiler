@@ -1,9 +1,11 @@
 use crate::{
     ast::{all_symbols, Ast},
     ir::expr::Expr,
+    optimize::statement::optimize_stmt,
+    rewrite::{Clean, Rewrite, TreeWalk},
 };
 use fancy_match::fancy_match;
-use std::collections::HashSet;
+use std::{collections::HashSet, mem};
 
 #[derive(Debug)]
 pub(crate) struct Procedure {
@@ -185,6 +187,63 @@ impl Statement {
     }
 
     fn optimize(&mut self) {
-        // TODO
+        let placeholder = Self::Do(Vec::new());
+        let this = mem::replace(self, placeholder);
+        *self = optimize_stmt(this).into_inner()
+    }
+}
+
+impl TreeWalk<Rewrite<Self>> for Statement {
+    fn each_branch(
+        self,
+        mut f: impl FnMut(Self) -> Rewrite<Self>,
+    ) -> Rewrite<Self> {
+        match self {
+            Self::ProcCall { .. } => Clean(self),
+            Self::Do(body) => body
+                .into_iter()
+                .map(f)
+                .collect::<Rewrite<_>>()
+                .map(Self::Do),
+            Self::IfElse {
+                condition,
+                if_true,
+                if_false,
+            } => f(*if_true).bind(|if_true| {
+                f(*if_false).map(|if_false| Self::IfElse {
+                    condition,
+                    if_true: Box::new(if_true),
+                    if_false: Box::new(if_false),
+                })
+            }),
+            Self::Repeat { times, body } => f(*body).map(|body| Self::Repeat {
+                times,
+                body: Box::new(body),
+            }),
+            Self::Forever(body) => {
+                f(*body).map(|body| Self::Forever(Box::new(body)))
+            }
+            Self::Until { condition, body } => {
+                f(*body).map(|body| Self::Until {
+                    condition,
+                    body: Box::new(body),
+                })
+            }
+            Self::While { condition, body } => {
+                f(*body).map(|body| Self::While {
+                    condition,
+                    body: Box::new(body),
+                })
+            }
+            Self::For {
+                counter,
+                times,
+                body,
+            } => f(*body).map(|body| Self::For {
+                counter,
+                times,
+                body: Box::new(body),
+            }),
+        }
     }
 }
