@@ -45,12 +45,7 @@ fn and_two(left: &Expr, right: &Expr) -> Expr {
 }
 
 fn and_all(conds: Vec<Expr>) -> Option<Expr> {
-    conds.into_iter().fold(None, |acc, cond| {
-        Some(match acc {
-            Some(acc) => and_two(&acc, &cond),
-            None => cond,
-        })
-    })
+    conds.into_iter().reduce(|acc, cond| and_two(&acc, &cond))
 }
 
 struct PatVisitor<'a> {
