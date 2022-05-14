@@ -10,10 +10,10 @@ use std::{
 
 #[derive(Debug)]
 pub(crate) struct Sprite {
-    costumes: HashMap<String, PathBuf>,
-    variables: HashSet<String>,
-    lists: HashSet<String>,
-    procedures: HashMap<String, Procedure>,
+    pub costumes: HashMap<String, PathBuf>,
+    pub variables: HashSet<String>,
+    pub lists: HashSet<String>,
+    pub procedures: HashMap<String, Procedure>,
 }
 
 impl Sprite {

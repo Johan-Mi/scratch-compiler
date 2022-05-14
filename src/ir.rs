@@ -7,8 +7,8 @@ use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug)]
 pub(crate) struct Program {
-    stage: Sprite,
-    sprites: HashMap<String, Sprite>,
+    pub stage: Sprite,
+    pub sprites: HashMap<String, Sprite>,
 }
 
 impl Program {

@@ -9,10 +9,10 @@ use std::{collections::HashSet, mem};
 
 #[derive(Debug)]
 pub(crate) struct Procedure {
-    params: Vec<Expr>,
-    body: Statement,
-    variables: HashSet<String>,
-    lists: HashSet<String>,
+    pub params: Vec<Expr>,
+    pub body: Statement,
+    pub variables: HashSet<String>,
+    pub lists: HashSet<String>,
 }
 
 impl Procedure {
