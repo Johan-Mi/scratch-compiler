@@ -1,3 +1,5 @@
+use std::{borrow::Cow, fmt};
+
 use crate::{
     ast::Ast,
     rewrite::{Clean, Rewrite, TreeWalk},
@@ -47,4 +49,32 @@ pub(crate) enum Value {
     Num(f64),
     String(String),
     Bool(bool),
+}
+
+impl Value {
+    pub(crate) fn to_cow_str(&self) -> Cow<str> {
+        match self {
+            Value::Num(num) => Cow::Owned(number_to_string(*num)),
+            Value::String(s) => Cow::Borrowed(s),
+            Value::Bool(true) => Cow::Borrowed("true"),
+            Value::Bool(false) => Cow::Borrowed("false"),
+        }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_cow_str().fmt(f)
+    }
+}
+
+fn number_to_string(num: f64) -> String {
+    // FIXME: Rust does not format floats the same way as JavaScript.
+    if num == f64::INFINITY {
+        "Infinity".to_owned()
+    } else if num == f64::NEG_INFINITY {
+        "-Infinity".to_owned()
+    } else {
+        num.to_string()
+    }
 }
