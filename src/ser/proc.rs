@@ -10,7 +10,7 @@ use serde_json::{json, Value as Json};
 use std::{cell::RefCell, collections::HashMap};
 
 pub(super) fn serialize_procs(
-    ctx: &mut ProgramCtx,
+    ctx: &ProgramCtx,
     procs: &HashMap<String, Procedure>,
 ) -> HashMap<Uid, Json> {
     let ctx = ProcCtx {

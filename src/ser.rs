@@ -49,7 +49,7 @@ impl ProgramCtx {
 }
 
 impl ProgramCtx {
-    fn serialize_sprite(&mut self, name: &str, sprite: &Sprite) -> Json {
+    fn serialize_sprite(&self, name: &str, sprite: &Sprite) -> Json {
         let variables = sprite
             .variables
             .iter()
