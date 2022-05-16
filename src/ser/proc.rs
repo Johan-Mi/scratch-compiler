@@ -34,8 +34,7 @@ impl<'a> ProcCtx<'a> {
             "when-flag-clicked" => {
                 assert!(proc.params.is_empty());
                 let this = self.new_uid();
-                let (body, _) =
-                    self.serialize_stmt(&proc.body, Some(this), None);
+                let (body, _) = self.serialize_stmt(&proc.body, this, None);
                 self.emit_block(
                     this,
                     json!({
@@ -57,13 +56,13 @@ impl<'a> ProcCtx<'a> {
     fn serialize_stmt(
         &self,
         stmt: &Statement,
-        parent: Option<Uid>,
+        parent: Uid,
         next: Option<Uid>,
     ) -> (Option<Uid>, Option<Uid>) {
         match stmt {
             Statement::ProcCall { proc_name, args } => todo!(),
             Statement::Do(stmts) => match &stmts[..] {
-                [] => (None, parent),
+                [] => (None, Some(parent)),
                 [single] => self.serialize_stmt(single, parent, next),
                 _ => {
                     todo!() // How can we do this without ugly hacks?
@@ -122,7 +121,7 @@ impl<'a> ProcCtx<'a> {
         }
     }
 
-    fn serialize_expr(&self, expr: &Expr, parent: Option<Uid>) -> Json {
+    fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Json {
         match expr {
             Expr::Lit(_) => todo!(),
             Expr::Sym(_) => todo!(),
@@ -133,24 +132,21 @@ impl<'a> ProcCtx<'a> {
     fn stmt_input<'s>(
         &'s self,
         stmt: &'s Statement,
-    ) -> impl Fn(Option<Uid>) -> Json + 's {
+    ) -> impl Fn(Uid) -> Json + 's {
         |this| json!(self.serialize_stmt(stmt, this, None).0)
     }
 
-    fn expr_input<'s>(
-        &'s self,
-        expr: &'s Expr,
-    ) -> impl Fn(Option<Uid>) -> Json + 's {
+    fn expr_input<'s>(&'s self, expr: &'s Expr) -> impl Fn(Uid) -> Json + 's {
         |this| self.serialize_expr(expr, this)
     }
 
     fn emit_stacking(
         &self,
         opcode: &str,
-        parent: Option<Uid>,
+        parent: Uid,
         next: Option<Uid>,
-        inputs: &[(&str, &dyn Fn(Option<Uid>) -> Json)],
-        fields: &[(&str, &dyn Fn(Option<Uid>) -> Json)],
+        inputs: &[(&str, &dyn Fn(Uid) -> Json)],
+        fields: &[(&str, &dyn Fn(Uid) -> Json)],
     ) -> (Option<Uid>, Option<Uid>) {
         let this = self.new_uid();
 
@@ -158,14 +154,14 @@ impl<'a> ProcCtx<'a> {
             inputs
                 .iter()
                 .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(Some(this))))
+                .map(|(name, fun)| (name.to_owned(), fun(this)))
                 .collect(),
         );
         let fields = Json::Object(
             fields
                 .iter()
                 .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(Some(this))))
+                .map(|(name, fun)| (name.to_owned(), fun(this)))
                 .collect(),
         );
 
