@@ -123,7 +123,7 @@ impl<'a> ProcCtx<'a> {
 
     fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Json {
         match expr {
-            Expr::Lit(_) => todo!(),
+            Expr::Lit(lit) => json!([10, lit.to_cow_str()]),
             Expr::Sym(_) => todo!(),
             Expr::FuncCall(_, _) => todo!(),
         }
