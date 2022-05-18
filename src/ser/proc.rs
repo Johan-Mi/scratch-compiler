@@ -84,7 +84,7 @@ impl<'a> ProcCtx<'a> {
                 &[],
             ),
             Statement::Forever(body) => {
-                assert!(next.is_some());
+                assert!(next.is_none());
                 self.emit_stacking(
                     "control_forever",
                     parent,
