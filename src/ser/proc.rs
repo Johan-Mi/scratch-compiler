@@ -1,6 +1,6 @@
 use crate::{
     ir::{
-        expr::Expr,
+        expr::{Expr, Value},
         proc::{Procedure, Statement},
     },
     ser::ProgramCtx,
@@ -60,7 +60,9 @@ impl<'a> ProcCtx<'a> {
         next: Option<Uid>,
     ) -> (Option<Uid>, Option<Uid>) {
         match stmt {
-            Statement::ProcCall { proc_name, args } => todo!(),
+            Statement::ProcCall { proc_name, args } => {
+                self.serialize_proc_call(proc_name, args, parent)
+            }
             Statement::Do(stmts) => match &stmts[..] {
                 [] => (None, Some(parent)),
                 [single] => self.serialize_stmt(single, parent, next),
@@ -123,9 +125,131 @@ impl<'a> ProcCtx<'a> {
 
     fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Json {
         match expr {
-            Expr::Lit(lit) => json!([10, lit.to_cow_str()]),
+            Expr::Lit(lit) => serialize_lit(lit),
             Expr::Sym(_) => todo!(),
-            Expr::FuncCall(_, _) => todo!(),
+            Expr::FuncCall(func_name, args) => {
+                self.serialize_func_call(func_name, args, parent)
+            }
+        }
+    }
+
+    fn serialize_func_call(
+        &self,
+        func_name: &str,
+        args: &[Expr],
+        parent: Uid,
+    ) -> Json {
+        match func_name {
+            "+" => self.associative0(
+                "operator_add",
+                "NUM1",
+                "NUM2",
+                &Value::Num(0.0),
+                args,
+                parent,
+            ),
+            "-" => todo!(),
+            "*" => self.associative0(
+                "operator_multiply",
+                "NUM1",
+                "NUM2",
+                &Value::Num(1.0),
+                args,
+                parent,
+            ),
+            "/" => todo!(),
+            "!!" => todo!(),
+            "++" => self.associative0(
+                "operator_join",
+                "STRING1",
+                "STRING2",
+                &Value::String(String::new()),
+                args,
+                parent,
+            ),
+            "and" => self.associative0(
+                "operator_and",
+                "OPERAND1",
+                "OPERAND2",
+                &Value::Bool(true),
+                args,
+                parent,
+            ),
+            "or" => self.associative0(
+                "operator_or",
+                "OPERAND1",
+                "OPERAND2",
+                &Value::Bool(false),
+                args,
+                parent,
+            ),
+            "not" => todo!(),
+            "=" => todo!(),
+            "<" => todo!(),
+            ">" => todo!(),
+            "length" => todo!(),
+            "str-length" => todo!(),
+            "char-at" => todo!(),
+            "mod" => todo!(),
+            "abs" => todo!(),
+            "floor" => todo!(),
+            "ceil" => todo!(),
+            "sqrt" => todo!(),
+            "ln" => todo!(),
+            "log" => todo!(),
+            "e^" => todo!(),
+            "ten^" => todo!(),
+            "sin" => todo!(),
+            "cos" => todo!(),
+            "tan" => todo!(),
+            "asin" => todo!(),
+            "acos" => todo!(),
+            "atan" => todo!(),
+            _ => todo!("unknown function `{func_name}`"),
+        }
+    }
+
+    fn associative0(
+        &self,
+        opcode: &str,
+        lhs_name: &str,
+        rhs_name: &str,
+        neutral: &Value,
+        args: &[Expr],
+        parent: Uid,
+    ) -> Json {
+        match args {
+            [] => serialize_lit(neutral),
+            [single] => self.serialize_expr(single, parent),
+            [lhs, rhs] => {
+                let this = self.new_uid();
+                let lhs = self.serialize_expr(lhs, this);
+                let rhs = self.serialize_expr(rhs, this);
+                self.emit_block(
+                    this,
+                    json!({
+                        "opcode": opcode,
+                        "parent": parent,
+                        "inputs": {
+                            lhs_name: lhs,
+                            rhs_name: rhs,
+                        },
+                    }),
+                );
+                json!(this)
+            }
+            _ => todo!("variadic argument counts"),
+        }
+    }
+
+    fn serialize_proc_call(
+        &self,
+        proc_name: &str,
+        args: &[Expr],
+        parent: Uid,
+    ) -> (Option<Uid>, Option<Uid>) {
+        match proc_name {
+            _ => todo!("unknown procedure `{proc_name}`"),
         }
     }
 
@@ -186,4 +310,8 @@ impl<'a> ProcCtx<'a> {
     fn new_uid(&self) -> Uid {
         self.inner.new_uid()
     }
+}
+
+fn serialize_lit(lit: &Value) -> Json {
+    json!([10, lit.to_cow_str()])
 }
