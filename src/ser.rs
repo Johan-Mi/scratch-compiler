@@ -1,4 +1,5 @@
 mod proc;
+mod reporter;
 
 use self::proc::serialize_procs;
 use crate::{

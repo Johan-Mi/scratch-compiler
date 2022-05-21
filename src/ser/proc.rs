@@ -3,7 +3,7 @@ use crate::{
         expr::{Expr, Value},
         proc::{Procedure, Statement},
     },
-    ser::ProgramCtx,
+    ser::{reporter::Reporter, ProgramCtx},
     uid::Uid,
 };
 use serde_json::{json, Value as Json};
@@ -61,7 +61,7 @@ impl<'a> ProcCtx<'a> {
     ) -> (Option<Uid>, Option<Uid>) {
         match stmt {
             Statement::ProcCall { proc_name, args } => {
-                self.serialize_proc_call(proc_name, args, parent)
+                self.serialize_proc_call(proc_name, args, parent, next)
             }
             Statement::Do(stmts) => match &stmts[..] {
                 [] => (None, Some(parent)),
@@ -80,7 +80,7 @@ impl<'a> ProcCtx<'a> {
                 parent,
                 next,
                 &[
-                    ("TIMES", &self.expr_input(times)),
+                    ("TIMES", &self.empty_shadow_input(times)),
                     ("SUBSTACK", &self.stmt_input(body)),
                 ],
                 &[],
@@ -100,7 +100,7 @@ impl<'a> ProcCtx<'a> {
                 parent,
                 next,
                 &[
-                    ("CONDITION", &self.expr_input(condition)),
+                    ("CONDITION", &self.shadowless_input(condition)),
                     ("SUBSTACK", &self.stmt_input(body)),
                 ],
                 &[],
@@ -110,7 +110,7 @@ impl<'a> ProcCtx<'a> {
                 parent,
                 next,
                 &[
-                    ("CONDITION", &self.expr_input(condition)),
+                    ("CONDITION", &self.shadowless_input(condition)),
                     ("SUBSTACK", &self.stmt_input(body)),
                 ],
                 &[],
@@ -123,7 +123,7 @@ impl<'a> ProcCtx<'a> {
         }
     }
 
-    fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Json {
+    fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Reporter {
         match expr {
             Expr::Lit(lit) => serialize_lit(lit),
             Expr::Sym(_) => todo!(),
@@ -138,7 +138,7 @@ impl<'a> ProcCtx<'a> {
         func_name: &str,
         args: &[Expr],
         parent: Uid,
-    ) -> Json {
+    ) -> Reporter {
         match func_name {
             "+" => self.associative0(
                 "operator_add",
@@ -217,14 +217,14 @@ impl<'a> ProcCtx<'a> {
         neutral: &Value,
         args: &[Expr],
         parent: Uid,
-    ) -> Json {
+    ) -> Reporter {
         match args {
             [] => serialize_lit(neutral),
             [single] => self.serialize_expr(single, parent),
             [lhs, rhs] => {
                 let this = self.new_uid();
-                let lhs = self.serialize_expr(lhs, this);
-                let rhs = self.serialize_expr(rhs, this);
+                let lhs = self.serialize_expr(lhs, this).with_empty_shadow();
+                let rhs = self.serialize_expr(rhs, this).with_empty_shadow();
                 self.emit_block(
                     this,
                     json!({
@@ -236,7 +236,7 @@ impl<'a> ProcCtx<'a> {
                         },
                     }),
                 );
-                json!(this)
+                Reporter::from_uid(this)
             }
             _ => todo!("variadic argument counts"),
         }
@@ -247,6 +247,7 @@ impl<'a> ProcCtx<'a> {
         proc_name: &str,
         args: &[Expr],
         parent: Uid,
+        next: Option<Uid>,
     ) -> (Option<Uid>, Option<Uid>) {
         match proc_name {
             _ => todo!("unknown procedure `{proc_name}`"),
@@ -257,11 +258,21 @@ impl<'a> ProcCtx<'a> {
         &'s self,
         stmt: &'s Statement,
     ) -> impl Fn(Uid) -> Json + 's {
-        |this| json!(self.serialize_stmt(stmt, this, None).0)
+        |this| json!([2, self.serialize_stmt(stmt, this, None).0])
     }
 
-    fn expr_input<'s>(&'s self, expr: &'s Expr) -> impl Fn(Uid) -> Json + 's {
-        |this| self.serialize_expr(expr, this)
+    fn empty_shadow_input<'s>(
+        &'s self,
+        expr: &'s Expr,
+    ) -> impl Fn(Uid) -> Json + 's {
+        |this| self.serialize_expr(expr, this).with_empty_shadow()
+    }
+
+    fn shadowless_input<'s>(
+        &'s self,
+        expr: &'s Expr,
+    ) -> impl Fn(Uid) -> Json + 's {
+        |this| self.serialize_expr(expr, this).without_shadow()
     }
 
     fn emit_stacking(
@@ -312,6 +323,6 @@ impl<'a> ProcCtx<'a> {
     }
 }
 
-fn serialize_lit(lit: &Value) -> Json {
-    json!([10, lit.to_cow_str()])
+fn serialize_lit(lit: &Value) -> Reporter {
+    Reporter::shadow(json!([10, lit.to_cow_str()]))
 }
