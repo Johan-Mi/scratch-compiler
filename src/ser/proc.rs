@@ -250,6 +250,16 @@ impl<'a> ProcCtx<'a> {
         next: Option<Uid>,
     ) -> (Option<Uid>, Option<Uid>) {
         match proc_name {
+            "say" => match args {
+                [message] => self.emit_stacking(
+                    "looks_say",
+                    parent,
+                    next,
+                    &[("MESSAGE", &self.empty_shadow_input(message))],
+                    &[],
+                ),
+                _ => todo!(),
+            },
             _ => todo!("unknown procedure `{proc_name}`"),
         }
     }
