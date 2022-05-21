@@ -1,18 +1,18 @@
-pub(crate) mod expr;
-pub(crate) mod proc;
-pub(crate) mod sprite;
+pub mod expr;
+pub mod proc;
+pub mod sprite;
 
 use crate::{ast::Ast, ir::sprite::Sprite};
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug)]
-pub(crate) struct Program {
+pub struct Program {
     pub stage: Sprite,
     pub sprites: HashMap<String, Sprite>,
 }
 
 impl Program {
-    pub fn from_asts(asts: Vec<Ast>) -> Program {
+    pub fn from_asts(asts: Vec<Ast>) -> Self {
         // TODO: Error handling
         let mut sprites = HashMap::<String, Sprite>::new();
 
@@ -29,7 +29,7 @@ impl Program {
         }
 
         let stage = sprites.remove("Stage").unwrap();
-        Program { stage, sprites }
+        Self { stage, sprites }
     }
 
     pub fn optimize(&mut self) {

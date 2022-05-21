@@ -11,14 +11,14 @@ use serde_json::{json, Value as Json};
 use std::{fs::File, iter, path::Path};
 use zip::{write::FileOptions, ZipWriter};
 
-pub(crate) fn write_sb3_file(program: &Program, path: &Path) {
+pub fn write_sb3_file(program: &Program, path: &Path) {
     // TODO: Error handling
     let file = File::create(path).unwrap();
     let mut zip = ZipWriter::new(file);
     zip.start_file("project.json", FileOptions::default())
         .unwrap();
 
-    let mut ctx = ProgramCtx {
+    let ctx = ProgramCtx {
         uid_gen: UidGenerator::new(),
     };
     let targets = iter::once(("Stage", &program.stage))

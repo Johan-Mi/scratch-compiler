@@ -8,7 +8,7 @@ use fancy_match::fancy_match;
 use std::{collections::HashSet, mem};
 
 #[derive(Debug)]
-pub(crate) struct Procedure {
+pub struct Procedure {
     pub params: Vec<Expr>,
     pub body: Statement,
     pub variables: HashSet<String>,
@@ -66,7 +66,7 @@ fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
 }
 
 #[derive(Debug)]
-pub(crate) enum Statement {
+pub enum Statement {
     ProcCall {
         proc_name: String,
         args: Vec<Expr>,
@@ -98,44 +98,44 @@ pub(crate) enum Statement {
 }
 
 impl Statement {
-    fn from_ast(ast: Ast) -> Statement {
+    fn from_ast(ast: Ast) -> Self {
         // TODO: Error handling
         match ast {
             Ast::Node(box Ast::Sym(sym), tail) => match &*sym {
-                "do" => Statement::Do(
-                    tail.into_iter().map(Statement::from_ast).collect(),
+                "do" => Self::Do(
+                    tail.into_iter().map(Self::from_ast).collect(),
                 ),
                 "if" => todo!(),
                 "repeat" => {
                     let mut tail = tail.into_iter();
                     let times = tail.next().unwrap();
-                    Statement::Repeat {
+                    Self::Repeat {
                         times: Expr::from_ast(times),
-                        body: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        body: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
                     }
                 }
-                "forever" => Statement::Forever(Box::new(Statement::Do(
-                    tail.into_iter().map(Statement::from_ast).collect(),
+                "forever" => Self::Forever(Box::new(Self::Do(
+                    tail.into_iter().map(Self::from_ast).collect(),
                 ))),
                 "until" => {
                     let mut tail = tail.into_iter();
                     let condition = tail.next().unwrap();
-                    Statement::Until {
+                    Self::Until {
                         condition: Expr::from_ast(condition),
-                        body: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        body: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
                     }
                 }
                 "while" => {
                     let mut tail = tail.into_iter();
                     let condition = tail.next().unwrap();
-                    Statement::While {
+                    Self::While {
                         condition: Expr::from_ast(condition),
-                        body: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        body: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
                     }
                 }
@@ -147,37 +147,37 @@ impl Statement {
                         _ => todo!(),
                     };
                     let times = tail.next().unwrap();
-                    Statement::For {
+                    Self::For {
                         counter,
                         times: Expr::from_ast(times),
-                        body: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        body: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
                     }
                 }
                 "when" => {
                     let mut tail = tail.into_iter();
                     let condition = tail.next().unwrap();
-                    Statement::IfElse {
+                    Self::IfElse {
                         condition: Expr::from_ast(condition),
-                        if_true: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        if_true: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
-                        if_false: Box::new(Statement::Do(Vec::new())),
+                        if_false: Box::new(Self::Do(Vec::new())),
                     }
                 }
                 "unless" => {
                     let mut tail = tail.into_iter();
                     let condition = tail.next().unwrap();
-                    Statement::IfElse {
+                    Self::IfElse {
                         condition: Expr::from_ast(condition),
-                        if_true: Box::new(Statement::Do(Vec::new())),
-                        if_false: Box::new(Statement::Do(
-                            tail.map(Statement::from_ast).collect(),
+                        if_true: Box::new(Self::Do(Vec::new())),
+                        if_false: Box::new(Self::Do(
+                            tail.map(Self::from_ast).collect(),
                         )),
                     }
                 }
-                _ => Statement::ProcCall {
+                _ => Self::ProcCall {
                     proc_name: sym,
                     args: tail.into_iter().map(Expr::from_ast).collect(),
                 },

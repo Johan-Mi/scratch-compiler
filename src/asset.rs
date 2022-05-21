@@ -1,7 +1,7 @@
 use serde_json::{json, Value as Json};
 use std::{fs::File, io::Read, path::Path};
 
-pub(crate) fn asset_json(name: &str, path: &Path) -> Json {
+pub fn asset_json(name: &str, path: &Path) -> Json {
     // TODO: Error handling
     let mut file = File::open(path).unwrap();
     let mut buf = Vec::new();

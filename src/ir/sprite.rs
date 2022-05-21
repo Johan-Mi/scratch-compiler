@@ -9,7 +9,7 @@ use std::{
 };
 
 #[derive(Debug)]
-pub(crate) struct Sprite {
+pub struct Sprite {
     pub costumes: HashMap<String, PathBuf>,
     pub variables: HashSet<String>,
     pub lists: HashSet<String>,

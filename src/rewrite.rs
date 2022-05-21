@@ -1,9 +1,9 @@
-pub(crate) use Rewrite::{Clean, Dirty};
+pub use Rewrite::{Clean, Dirty};
 
 /// Trait for types that support a monad-like bind operation.
 ///
 /// `FS` is the type of `Self` wrapped in some effect.
-pub(crate) trait Bind<FS>: Sized {
+pub trait Bind<FS>: Sized {
     /// Binds an effectful [`FnMut`] to an already wrapped value.
     ///
     /// [`FnMut`]: std::ops::FnMut
@@ -20,7 +20,7 @@ impl<T> Bind<Self> for T {
 
 /// Trait for tree-like structures that can be recursively transformed with
 /// effectful computations.
-pub(crate) trait TreeWalk<FS>: Bind<FS> {
+pub trait TreeWalk<FS>: Bind<FS> {
     /// Applies an effectful function to each branch of the tree, wrapping the
     /// final value in the same type of effect.
     fn each_branch(self, f: impl FnMut(Self) -> FS) -> FS;
@@ -35,7 +35,7 @@ pub(crate) trait TreeWalk<FS>: Bind<FS> {
 
 /// Enum representing a value that has passed through a transformation that may
 /// or may not have affected it.
-pub(crate) enum Rewrite<T> {
+pub enum Rewrite<T> {
     /// The contained value *was not* affected by the transformation.
     Clean(T),
     /// The contained value *was* affected by the transformation.

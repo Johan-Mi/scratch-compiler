@@ -1,7 +1,7 @@
 use crate::uid::Uid;
 use serde_json::{json, Value as Json};
 
-pub(crate) struct Reporter {
+pub struct Reporter {
     json: Json,
     shape: Shape,
 }

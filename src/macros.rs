@@ -5,7 +5,7 @@ use crate::{
 use fancy_match::fancy_match;
 use std::collections::HashMap;
 
-pub(crate) fn expand(program: Vec<Ast>) -> Vec<Ast> {
+pub fn expand(program: Vec<Ast>) -> Vec<Ast> {
     let mut ctx = MacroContext {
         symbols: HashMap::new(),
         functions: HashMap::new(),

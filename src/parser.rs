@@ -16,7 +16,7 @@ use nom::{
 };
 use std::borrow::Cow;
 
-pub(crate) fn program(input: &str) -> IResult<&str, Vec<Ast>> {
+pub fn program(input: &str) -> IResult<&str, Vec<Ast>> {
     all_consuming(delimited(ws, separated_list0(ws, expr), ws))(input)
 }
 

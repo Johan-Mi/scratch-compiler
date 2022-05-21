@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::{cell::Cell, fmt, num::NonZeroU32};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct Uid(NonZeroU32);
+pub struct Uid(NonZeroU32);
 
 impl fmt::Display for Uid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -19,7 +19,7 @@ impl Serialize for Uid {
     }
 }
 
-pub(crate) struct UidGenerator {
+pub struct UidGenerator {
     counter: Cell<NonZeroU32>,
 }
 

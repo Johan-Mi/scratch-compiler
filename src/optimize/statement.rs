@@ -4,7 +4,7 @@ use crate::{
     rewrite::{Bind, Clean, Rewrite, TreeWalk},
 };
 
-pub(crate) fn optimize_stmt(stmt: Statement) -> Rewrite<Statement> {
+pub fn optimize_stmt(stmt: Statement) -> Rewrite<Statement> {
     stmt.bottom_up(|s| {
         Rewrite::repeat(s, |s| {
             STMT_OPTIMIZATIONS.iter().fold(Clean(s), Bind::bind_mut)

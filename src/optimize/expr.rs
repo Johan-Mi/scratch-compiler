@@ -3,7 +3,7 @@ use crate::{
     rewrite::{Clean, Rewrite},
 };
 
-pub(crate) fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
+pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
     // TODO
     Clean(expr)
 }

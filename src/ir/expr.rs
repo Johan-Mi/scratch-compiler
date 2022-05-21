@@ -6,7 +6,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub(crate) enum Expr {
+pub enum Expr {
     Lit(Value),
     Sym(String),
     FuncCall(String, Vec<Expr>),
@@ -39,13 +39,13 @@ impl TreeWalk<Rewrite<Self>> for Expr {
                 .into_iter()
                 .map(f)
                 .collect::<Rewrite<_>>()
-                .map(|new_args| Expr::FuncCall(func_name, new_args)),
+                .map(|new_args| Self::FuncCall(func_name, new_args)),
         }
     }
 }
 
 #[derive(Debug)]
-pub(crate) enum Value {
+pub enum Value {
     Num(f64),
     String(String),
     Bool(bool),
