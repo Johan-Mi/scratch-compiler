@@ -102,9 +102,9 @@ impl Statement {
         // TODO: Error handling
         match ast {
             Ast::Node(box Ast::Sym(sym), tail) => match &*sym {
-                "do" => Self::Do(
-                    tail.into_iter().map(Self::from_ast).collect(),
-                ),
+                "do" => {
+                    Self::Do(tail.into_iter().map(Self::from_ast).collect())
+                }
                 "if" => todo!(),
                 "repeat" => {
                     let mut tail = tail.into_iter();
