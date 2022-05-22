@@ -16,16 +16,27 @@ use crate::{ir::Program, macros::expand, ser::write_sb3_file};
 use std::{fs, path::Path};
 
 fn main() {
-    // TODO: Error handling
-    let input = fs::read_to_string("program.scratch").unwrap();
-    let parsed = parser::program(&input);
-    match parsed {
-        Ok((_, ast)) => {
-            let expanded = expand(ast);
-            let mut program = Program::from_asts(expanded);
-            program.optimize();
-            write_sb3_file(&program, Path::new("project.sb3"));
+    let mut args = std::env::args().skip(1);
+    let source_path = args.next();
+    let source_path = source_path.as_deref().unwrap_or("program.scratch");
+    let input = match fs::read_to_string(source_path) {
+        Ok(input) => input,
+        Err(err) => {
+            eprintln!("IO error: {err}");
+            return;
         }
-        Err(err) => eprintln!("{err}"),
-    }
+    };
+
+    let asts = match parser::program(&input) {
+        Ok((_, asts)) => asts,
+        Err(err) => {
+            eprintln!("{err}");
+            return;
+        }
+    };
+
+    let expanded = expand(asts);
+    let mut program = Program::from_asts(expanded);
+    program.optimize();
+    write_sb3_file(&program, Path::new("project.sb3"));
 }
