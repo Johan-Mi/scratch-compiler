@@ -66,9 +66,28 @@ impl<'a> ProcCtx<'a> {
             Statement::Do(stmts) => match &stmts[..] {
                 [] => (None, Some(parent)),
                 [single] => self.serialize_stmt(single, parent, next),
-                _ => {
-                    todo!() // How can we do this without ugly hacks?
-                }
+                stmts => stmts.iter().rfold(
+                    (next, None),
+                    |(old_start, old_end), stmt| {
+                        let (new_start, new_end) =
+                            self.serialize_stmt(stmt, parent, old_start);
+                        if let Some(old_start) = &old_start {
+                            self.blocks
+                                .borrow_mut()
+                                .get_mut(old_start)
+                                .and_then(|block| {
+                                    block.as_object_mut()?.insert(
+                                        "parent".to_owned(),
+                                        json!(new_end),
+                                    )
+                                })
+                                .expect(
+                                    "couldn't replace parent in `do` block",
+                                );
+                        }
+                        (new_start.or(old_start), old_end.or(new_end))
+                    },
+                ),
             },
             Statement::IfElse {
                 condition,
