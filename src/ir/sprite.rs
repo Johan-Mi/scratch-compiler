@@ -22,7 +22,7 @@ impl Sprite {
         let mut tail = #[fancy_match]
         match ast {
             Ast::Node(box Ast::Sym("sprite"), tail) => tail.into_iter(),
-            _ => todo!(),
+            _ => todo!("invalid sprite definition:\n{ast:#?}"),
         };
 
         let name = match tail.next() {
