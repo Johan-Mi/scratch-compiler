@@ -57,11 +57,8 @@ impl MacroContext {
                     let params = &func_macro.params;
                     // TODO: Error handling
                     assert_eq!(args.len(), params.len());
-                    let bindings = params
-                        .iter()
-                        .map(String::as_str)
-                        .zip(args.iter())
-                        .collect();
+                    let bindings =
+                        params.iter().map(String::as_str).zip(args).collect();
                     interpolate(func_macro.body.clone(), &bindings)
                 } else {
                     ast
