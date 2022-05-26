@@ -1,22 +1,22 @@
 use crate::{
     ast::{all_symbols, Ast},
+    parser::program,
     rewrite::TreeWalk,
 };
 use fancy_match::fancy_match;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs};
 
 pub fn expand(program: Vec<Ast>) -> Vec<Ast> {
-    let mut ctx = MacroContext {
-        symbols: HashMap::new(),
-        functions: HashMap::new(),
-    };
-    program
-        .into_iter()
-        .filter_map(|ast| ctx.transform_top_level(ast))
-        .collect()
+    let mut ctx = MacroContext::default();
+    for ast in program {
+        ctx.transform_top_level(ast);
+    }
+    ctx.asts
 }
 
+#[derive(Default)]
 struct MacroContext {
+    asts: Vec<Ast>,
     symbols: HashMap<String, Ast>,
     functions: HashMap<String, FunctionMacro>,
 }
@@ -39,12 +39,35 @@ impl MacroContext {
                 self.functions
                     .insert(macro_name, FunctionMacro { params, body });
             }
-            _ => todo!(),
+            _ => todo!("invalid macro signature:\n{signature:#?}"),
         }
     }
 
     fn transform_shallow(&self, ast: Ast) -> Ast {
+        #[fancy_match]
         match &ast {
+            Ast::Node(box Ast::Sym("str-concat!"), args) => Ast::String(
+                args.iter()
+                    .map(|arg| match arg {
+                        Ast::String(s) => &**s,
+                        _ => todo!(),
+                    })
+                    .collect(),
+            ),
+            Ast::Node(box Ast::Sym("sym-concat!"), args) => {
+                assert!(
+                    !args.is_empty(),
+                    "`sym-concat!` cannot create an empty symbol"
+                );
+                Ast::Sym(
+                    args.iter()
+                        .map(|arg| match arg {
+                            Ast::Sym(sym) => &**sym,
+                            _ => todo!(),
+                        })
+                        .collect(),
+                )
+            }
             Ast::Sym(sym) => {
                 if let Some(body) = self.symbols.get(sym) {
                     body.clone()
@@ -72,16 +95,27 @@ impl MacroContext {
         ast.bottom_up(|tree| self.transform_shallow(tree))
     }
 
-    fn transform_top_level(&mut self, ast: Ast) -> Option<Ast> {
+    fn transform_top_level(&mut self, ast: Ast) {
         let ast = self.transform_deep(ast);
 
         #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym("macro"), args) => {
-                self.define(args);
-                None
+            Ast::Node(box Ast::Sym("macro"), args) => self.define(args),
+            Ast::Node(box Ast::Sym("include"), args) => self.include(args),
+            _ => self.asts.push(ast),
+        }
+    }
+
+    fn include(&mut self, args: Vec<Ast>) {
+        match &args[..] {
+            [Ast::String(path)] => {
+                let source = fs::read_to_string(path).unwrap();
+                let (_, parsed) = program(&source).unwrap();
+                for ast in parsed {
+                    self.transform_top_level(ast);
+                }
             }
-            _ => Some(ast),
+            _ => todo!(),
         }
     }
 }
