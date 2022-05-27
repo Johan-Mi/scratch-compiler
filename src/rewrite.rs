@@ -28,8 +28,14 @@ pub trait TreeWalk<FS>: Bind<FS> {
     /// Applies an effectful function to every node of a tree, including the
     /// root itself, in a bottom-up manner.
     fn bottom_up(self, mut f: impl FnMut(Self) -> FS) -> FS {
-        let rest_transformed = self.each_branch(&mut f);
-        Bind::bind_mut(rest_transformed, f)
+        fn go<S: TreeWalk<FS>, FS>(
+            branch: S,
+            f: &mut impl FnMut(S) -> FS,
+        ) -> FS {
+            let rest_transformed = branch.each_branch(|branch| go(branch, f));
+            Bind::bind_mut(rest_transformed, f)
+        }
+        go(self, &mut f)
     }
 }
 
