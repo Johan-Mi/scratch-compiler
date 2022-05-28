@@ -1,7 +1,5 @@
-use crate::{
-    ir::expr::Expr,
-    rewrite::{Clean, Rewrite},
-};
+use crate::ir::expr::Expr;
+use trexp::{Clean, Rewrite};
 
 pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
     // TODO

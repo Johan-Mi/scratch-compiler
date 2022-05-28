@@ -114,6 +114,7 @@ dependencies = [
  "nom",
  "serde",
  "serde_json",
+ "trexp",
  "zip",
 ]
 
@@ -158,6 +159,11 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "trexp"
+version = "0.1.0"
+source = "git+https://github.com/Johan-Mi/trexp#3d3ffbed5634c2ca9adba90d09578c45cf3bc1b6"
 
 [[package]]
 name = "unicode-ident"

@@ -1,8 +1,8 @@
 use crate::{
     ir::proc::Statement::{self, *},
     optimize::expr::optimize_expr,
-    rewrite::{Bind, Clean, Rewrite, TreeWalk},
 };
+use trexp::{Bind, Clean, Rewrite, TreeWalk};
 
 pub fn optimize_stmt(stmt: Statement) -> Rewrite<Statement> {
     stmt.bottom_up(|s| {

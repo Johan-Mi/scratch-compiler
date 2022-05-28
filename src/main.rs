@@ -8,7 +8,6 @@ mod ir;
 mod macros;
 mod optimize;
 mod parser;
-mod rewrite;
 mod ser;
 mod uid;
 

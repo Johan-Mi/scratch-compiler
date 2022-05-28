@@ -2,10 +2,10 @@ use crate::{
     ast::{all_symbols, Ast},
     ir::expr::Expr,
     optimize::statement::optimize_stmt,
-    rewrite::{Clean, Rewrite, TreeWalk},
 };
 use fancy_match::fancy_match;
 use std::{collections::HashSet, mem};
+use trexp::{Clean, Rewrite, TreeWalk};
 
 #[derive(Debug)]
 pub struct Procedure {

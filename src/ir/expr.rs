@@ -1,9 +1,6 @@
+use crate::ast::Ast;
 use std::{borrow::Cow, fmt};
-
-use crate::{
-    ast::Ast,
-    rewrite::{Clean, Rewrite, TreeWalk},
-};
+use trexp::{Clean, Rewrite, TreeWalk};
 
 #[derive(Debug)]
 pub enum Expr {

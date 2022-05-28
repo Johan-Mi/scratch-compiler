@@ -1,10 +1,10 @@
 use crate::{
     ast::{all_symbols, Ast},
     parser::program,
-    rewrite::TreeWalk,
 };
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs};
+use trexp::TreeWalk;
 
 pub fn expand(program: Vec<Ast>) -> Vec<Ast> {
     let mut ctx = MacroContext::default();

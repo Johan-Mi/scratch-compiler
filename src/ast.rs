@@ -1,4 +1,4 @@
-use crate::rewrite::TreeWalk;
+use trexp::TreeWalk;
 
 #[derive(Debug, Clone)]
 pub enum Ast {
