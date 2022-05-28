@@ -50,7 +50,9 @@ impl MacroContext {
                 args.iter()
                     .map(|arg| match arg {
                         Ast::String(s) => &**s,
-                        _ => todo!(),
+                        _ => todo!(
+                            "invalid argument to `str-concat!`:\n{arg:#?}"
+                        ),
                     })
                     .collect(),
             ),
@@ -63,7 +65,9 @@ impl MacroContext {
                     args.iter()
                         .map(|arg| match arg {
                             Ast::Sym(sym) => &**sym,
-                            _ => todo!(),
+                            _ => todo!(
+                                "invalid argument to `sym-concat!`:\n{arg:#?}"
+                            ),
                         })
                         .collect(),
                 )
@@ -78,8 +82,13 @@ impl MacroContext {
             Ast::Node(box Ast::Sym(sym), args) => {
                 if let Some(func_macro) = self.functions.get(sym) {
                     let params = &func_macro.params;
-                    // TODO: Error handling
-                    assert_eq!(args.len(), params.len());
+                    let num_args = args.len();
+                    let num_params = params.len();
+                    assert_eq!(
+                        num_args, num_params,
+                        "function macro `{sym}` expected {num_params}\
+                        arguments but got {num_args}"
+                    );
                     let bindings =
                         params.iter().map(String::as_str).zip(args).collect();
                     interpolate(func_macro.body.clone(), &bindings)
@@ -115,7 +124,7 @@ impl MacroContext {
                     self.transform_top_level(ast);
                 }
             }
-            _ => todo!(),
+            _ => todo!("invalid arguments for `include`:\n{args:#?}"),
         }
     }
 }
