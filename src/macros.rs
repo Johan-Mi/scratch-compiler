@@ -46,31 +46,29 @@ impl MacroContext {
     fn transform_shallow(&self, ast: Ast) -> Ast {
         #[fancy_match]
         match &ast {
-            Ast::Node(box Ast::Sym("str-concat!"), args) => Ast::String(
-                args.iter()
+            Ast::Node(box Ast::Sym("str-concat!"), args) => {
+                let strs = args
+                    .iter()
                     .map(|arg| match arg {
-                        Ast::String(s) => &**s,
-                        _ => todo!(
-                            "invalid argument to `str-concat!`:\n{arg:#?}"
-                        ),
+                        Ast::String(s) => Some(&**s),
+                        _ => None,
                     })
-                    .collect(),
-            ),
+                    .collect::<Option<_>>();
+                strs.map_or(ast, Ast::String)
+            }
             Ast::Node(box Ast::Sym("sym-concat!"), args) => {
                 assert!(
                     !args.is_empty(),
                     "`sym-concat!` cannot create an empty symbol"
                 );
-                Ast::Sym(
-                    args.iter()
-                        .map(|arg| match arg {
-                            Ast::Sym(sym) => &**sym,
-                            _ => todo!(
-                                "invalid argument to `sym-concat!`:\n{arg:#?}"
-                            ),
-                        })
-                        .collect(),
-                )
+                let syms = args
+                    .iter()
+                    .map(|arg| match arg {
+                        Ast::Sym(sym) => Some(&**sym),
+                        _ => None,
+                    })
+                    .collect::<Option<_>>();
+                syms.map_or(ast, Ast::Sym)
             }
             Ast::Sym(sym) => {
                 if let Some(body) = self.symbols.get(sym) {
@@ -91,7 +89,10 @@ impl MacroContext {
                     );
                     let bindings =
                         params.iter().map(String::as_str).zip(args).collect();
-                    interpolate(func_macro.body.clone(), &bindings)
+                    self.transform_deep(interpolate(
+                        func_macro.body.clone(),
+                        &bindings,
+                    ))
                 } else {
                     ast
                 }
