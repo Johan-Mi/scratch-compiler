@@ -146,7 +146,7 @@ fn unquote(input: &str) -> IResult<&str, Ast> {
 }
 
 fn eol_comment(input: &str) -> IResult<&str, ()> {
-    unit(pair(char(';'), is_not("\n\r")))(input)
+    unit(pair(char(';'), opt(is_not("\n\r"))))(input)
 }
 
 fn ws(input: &str) -> IResult<&str, ()> {
