@@ -45,7 +45,7 @@ impl Sprite {
                         let (name, proc) = Procedure::from_asts(tail);
                         procedures.insert(name, proc);
                     }
-                    _ => todo!(),
+                    _ => todo!("invalid item in sprite `{name}`: `{sym}`"),
                 },
                 _ => todo!(),
             }
