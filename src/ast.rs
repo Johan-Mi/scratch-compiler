@@ -1,4 +1,4 @@
-use trexp::TreeWalk;
+use trexp::{Clean, Rewrite, TreeWalk};
 
 #[derive(Debug, Clone)]
 pub enum Ast {
@@ -20,6 +20,26 @@ impl TreeWalk<Self> for Ast {
             Ast::Unquote(mut unquoted) => {
                 *unquoted = f(*unquoted);
                 Self::Unquote(unquoted)
+            }
+        }
+    }
+}
+
+impl TreeWalk<Rewrite<Self>> for Ast {
+    fn each_branch(
+        self,
+        mut f: impl FnMut(Self) -> Rewrite<Self>,
+    ) -> Rewrite<Self> {
+        match self {
+            Ast::Num(_) | Ast::String(_) | Ast::Sym(_) => Clean(self),
+            Ast::Node(head, tail) => f(*head).bind(|head| {
+                tail.into_iter()
+                    .map(f)
+                    .collect::<Rewrite<_>>()
+                    .map(|tail| Self::Node(Box::new(head), tail))
+            }),
+            Ast::Unquote(unquoted) => {
+                f(*unquoted).map(|unquoted| Self::Unquote(Box::new(unquoted)))
             }
         }
     }

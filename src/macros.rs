@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs};
-use trexp::TreeWalk;
+use trexp::{Clean, Dirty, Rewrite, TreeWalk};
 
 pub fn expand(program: Vec<Ast>) -> Vec<Ast> {
     let mut ctx = MacroContext::default();
@@ -43,7 +43,7 @@ impl MacroContext {
         }
     }
 
-    fn transform_shallow(&self, ast: Ast) -> Ast {
+    fn transform_shallow(&self, ast: Ast) -> Rewrite<Ast> {
         #[fancy_match]
         match &ast {
             Ast::Node(box Ast::Sym("str-concat!"), args) => {
@@ -54,7 +54,9 @@ impl MacroContext {
                         _ => None,
                     })
                     .collect::<Option<_>>();
-                strs.map_or(ast, Ast::String)
+                strs.map_or(Clean(ast), |concatenated| {
+                    Dirty(Ast::String(concatenated))
+                })
             }
             Ast::Node(box Ast::Sym("sym-concat!"), args) => {
                 assert!(
@@ -68,13 +70,15 @@ impl MacroContext {
                         _ => None,
                     })
                     .collect::<Option<_>>();
-                syms.map_or(ast, Ast::Sym)
+                syms.map_or(Clean(ast), |concatenated| {
+                    Dirty(Ast::Sym(concatenated))
+                })
             }
             Ast::Sym(sym) => {
                 if let Some(body) = self.symbols.get(sym) {
-                    body.clone()
+                    Dirty(body.clone())
                 } else {
-                    ast
+                    Clean(ast)
                 }
             }
             Ast::Node(box Ast::Sym(sym), args) => {
@@ -89,24 +93,23 @@ impl MacroContext {
                     );
                     let bindings =
                         params.iter().map(String::as_str).zip(args).collect();
-                    self.transform_deep(interpolate(
-                        func_macro.body.clone(),
-                        &bindings,
-                    ))
+                    Dirty(interpolate(func_macro.body.clone(), &bindings))
                 } else {
-                    ast
+                    Clean(ast)
                 }
             }
-            _ => ast,
+            _ => Clean(ast),
         }
     }
 
-    fn transform_deep(&self, ast: Ast) -> Ast {
-        ast.bottom_up(|tree| self.transform_shallow(tree))
+    fn transform_deep(&self, ast: Ast) -> Rewrite<Ast> {
+        Rewrite::repeat(ast, |ast| {
+            ast.bottom_up(|branch| self.transform_shallow(branch))
+        })
     }
 
     fn transform_top_level(&mut self, ast: Ast) {
-        let ast = self.transform_deep(ast);
+        let ast = self.transform_deep(ast).into_inner();
 
         #[fancy_match]
         match ast {
