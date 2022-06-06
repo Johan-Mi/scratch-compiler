@@ -9,6 +9,12 @@ pub enum Ast {
     Unquote(Box<Ast>),
 }
 
+impl Ast {
+    pub fn is_the_function_call(&self, func_name: &str) -> bool {
+        matches!(self, Self::Node(box Ast::Sym(sym), _) if sym == func_name)
+    }
+}
+
 impl TreeWalk<Self> for Ast {
     fn each_branch(self, mut f: impl FnMut(Self) -> Self) -> Self {
         match self {

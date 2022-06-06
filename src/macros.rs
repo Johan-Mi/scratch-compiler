@@ -43,66 +43,17 @@ impl MacroContext {
         }
     }
 
-    fn transform_shallow(&self, ast: Ast) -> Rewrite<Ast> {
-        #[fancy_match]
-        match &ast {
-            Ast::Node(box Ast::Sym("str-concat!"), args) => {
-                let strs = args
-                    .iter()
-                    .map(|arg| match arg {
-                        Ast::String(s) => Some(&**s),
-                        _ => None,
-                    })
-                    .collect::<Option<_>>();
-                strs.map_or(Clean(ast), |concatenated| {
-                    Dirty(Ast::String(concatenated))
-                })
-            }
-            Ast::Node(box Ast::Sym("sym-concat!"), args) => {
-                assert!(
-                    !args.is_empty(),
-                    "`sym-concat!` cannot create an empty symbol"
-                );
-                let syms = args
-                    .iter()
-                    .map(|arg| match arg {
-                        Ast::Sym(sym) => Some(&**sym),
-                        _ => None,
-                    })
-                    .collect::<Option<_>>();
-                syms.map_or(Clean(ast), |concatenated| {
-                    Dirty(Ast::Sym(concatenated))
-                })
-            }
-            Ast::Sym(sym) => {
-                if let Some(body) = self.symbols.get(sym) {
-                    Dirty(body.clone())
-                } else {
-                    Clean(ast)
-                }
-            }
-            Ast::Node(box Ast::Sym(sym), args) => {
-                if let Some(func_macro) = self.functions.get(sym) {
-                    let params = &func_macro.params;
-                    let num_args = args.len();
-                    let num_params = params.len();
-                    assert_eq!(
-                        num_args, num_params,
-                        "function macro `{sym}` expected {num_params}\
-                        arguments but got {num_args}"
-                    );
-                    let bindings =
-                        params.iter().map(String::as_str).zip(args).collect();
-                    Dirty(interpolate(func_macro.body.clone(), &bindings))
-                } else {
-                    Clean(ast)
-                }
-            }
-            _ => Clean(ast),
-        }
+    fn transform_shallow(&mut self, ast: Ast) -> Rewrite<Ast> {
+        [
+            |this: &mut Self, ast| Self::use_builtin_macros(this, ast),
+            |this: &mut Self, ast| Self::use_user_defined_macros(this, ast),
+            Self::use_inline_include,
+        ]
+        .iter()
+        .fold(Clean(ast), |ast, f| ast.bind(|ast| f(self, ast)))
     }
 
-    fn transform_deep(&self, ast: Ast) -> Rewrite<Ast> {
+    fn transform_deep(&mut self, ast: Ast) -> Rewrite<Ast> {
         Rewrite::repeat(ast, |ast| {
             ast.bottom_up(|branch| self.transform_shallow(branch))
         })
@@ -114,22 +65,105 @@ impl MacroContext {
         #[fancy_match]
         match ast {
             Ast::Node(box Ast::Sym("macro"), args) => self.define(args),
-            Ast::Node(box Ast::Sym("include"), args) => self.include(args),
+            Ast::Node(box Ast::Sym("include"), args) => {
+                for item in self.include(&args) {
+                    self.transform_top_level(item)
+                }
+            }
             _ => self.asts.push(ast),
         }
     }
 
-    fn include(&mut self, args: Vec<Ast>) {
-        match &args[..] {
+    fn include(&mut self, args: &[Ast]) -> Vec<Ast> {
+        match args {
             [Ast::String(path)] => {
                 let source = fs::read_to_string(path).unwrap();
-                let (_, parsed) = program(&source).unwrap();
-                for ast in parsed {
-                    self.transform_top_level(ast);
-                }
+                program(&source).unwrap().1
             }
             _ => todo!("invalid arguments for `include`:\n{args:#?}"),
         }
+    }
+
+    fn use_user_defined_macros(&self, ast: Ast) -> Rewrite<Ast> {
+        (|| match &ast {
+            Ast::Sym(sym) => self.symbols.get(sym).cloned(),
+            Ast::Node(box Ast::Sym(sym), args) => {
+                let func_macro = self.functions.get(sym)?;
+                let params = &func_macro.params;
+                let num_args = args.len();
+                let num_params = params.len();
+                assert_eq!(
+                    num_args, num_params,
+                    "function macro `{sym}` expected {num_params}\
+                    arguments but got {num_args}"
+                );
+                let bindings =
+                    params.iter().map(String::as_str).zip(args).collect();
+                Some(interpolate(func_macro.body.clone(), &bindings))
+            }
+            _ => None,
+        })()
+        .map_or(Clean(ast), Dirty)
+    }
+
+    fn use_builtin_macros(&self, ast: Ast) -> Rewrite<Ast> {
+        (|| {
+            let (sym, args) = match &ast {
+                Ast::Node(box Ast::Sym(sym), args) => (sym, args),
+                _ => return None,
+            };
+            match &**sym {
+                "str-concat!" => args
+                    .iter()
+                    .map(|arg| match arg {
+                        Ast::String(s) => Some(&**s),
+                        _ => None,
+                    })
+                    .collect::<Option<_>>()
+                    .map(Ast::String),
+                "sym-concat!" => {
+                    assert!(
+                        !args.is_empty(),
+                        "`sym-concat!` cannot create an empty symbol"
+                    );
+                    args.iter()
+                        .map(|arg| match arg {
+                            Ast::Sym(sym) => Some(&**sym),
+                            _ => None,
+                        })
+                        .collect::<Option<_>>()
+                        .map(Ast::Sym)
+                }
+                _ => None,
+            }
+        })()
+        .map_or(Clean(ast), Dirty)
+    }
+
+    fn use_inline_include(&mut self, ast: Ast) -> Rewrite<Ast> {
+        let (head, tail) = match ast {
+            Ast::Node(head, tail) => (head, tail),
+            _ => return Clean(ast),
+        };
+
+        if !tail.iter().any(|item| item.is_the_function_call("include")) {
+            return Clean(Ast::Node(head, tail));
+        }
+
+        let tail = tail
+            .into_iter()
+            .map(|item| {
+                #[fancy_match]
+                match &item {
+                    Ast::Node(box Ast::Sym("include"), args) => {
+                        Dirty(self.include(args))
+                    }
+                    _ => Clean(vec![item]),
+                }
+            })
+            .collect::<Rewrite<Vec<Vec<Ast>>>>();
+
+        tail.map(|tail| Ast::Node(head, tail.into_iter().flatten().collect()))
     }
 }
 
