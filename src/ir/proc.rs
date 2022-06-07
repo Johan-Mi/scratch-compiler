@@ -101,87 +101,92 @@ impl Statement {
     fn from_ast(ast: Ast) -> Self {
         // TODO: Error handling
         match ast {
-            Ast::Node(box Ast::Sym(sym), tail) => match &*sym {
-                "do" => {
-                    Self::Do(tail.into_iter().map(Self::from_ast).collect())
-                }
-                "if" => todo!(),
-                "repeat" => {
-                    let mut tail = tail.into_iter();
-                    let times = tail.next().unwrap();
-                    Self::Repeat {
-                        times: Expr::from_ast(times),
-                        body: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
+            Ast::Node(box Ast::Sym(sym), tail) => {
+                let mut tail = tail.into_iter();
+                match &*sym {
+                    "do" => Self::Do(tail.map(Self::from_ast).collect()),
+                    "if" => {
+                        let condition = tail.next().unwrap();
+                        let if_true = tail.next().unwrap();
+                        let if_false = tail.next().unwrap();
+                        assert!(tail.next().is_none());
+                        Self::IfElse {
+                            condition: Expr::from_ast(condition),
+                            if_true: Box::new(Self::from_ast(if_true)),
+                            if_false: Box::new(Self::from_ast(if_false)),
+                        }
                     }
-                }
-                "forever" => Self::Forever(Box::new(Self::Do(
-                    tail.into_iter().map(Self::from_ast).collect(),
-                ))),
-                "until" => {
-                    let mut tail = tail.into_iter();
-                    let condition = tail.next().unwrap();
-                    Self::Until {
-                        condition: Expr::from_ast(condition),
-                        body: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
+                    "repeat" => {
+                        let times = tail.next().unwrap();
+                        Self::Repeat {
+                            times: Expr::from_ast(times),
+                            body: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                        }
                     }
-                }
-                "while" => {
-                    let mut tail = tail.into_iter();
-                    let condition = tail.next().unwrap();
-                    Self::While {
-                        condition: Expr::from_ast(condition),
-                        body: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
+                    "forever" => Self::Forever(Box::new(Self::Do(
+                        tail.map(Self::from_ast).collect(),
+                    ))),
+                    "until" => {
+                        let condition = tail.next().unwrap();
+                        Self::Until {
+                            condition: Expr::from_ast(condition),
+                            body: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                        }
                     }
-                }
-                "for" => {
-                    let mut tail = tail.into_iter();
-                    let counter = tail.next().unwrap();
-                    let counter = match counter {
-                        Ast::Sym(sym) => sym,
-                        _ => todo!(),
-                    };
-                    let times = tail.next().unwrap();
-                    Self::For {
-                        counter,
-                        times: Expr::from_ast(times),
-                        body: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
+                    "while" => {
+                        let condition = tail.next().unwrap();
+                        Self::While {
+                            condition: Expr::from_ast(condition),
+                            body: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                        }
                     }
-                }
-                "when" => {
-                    let mut tail = tail.into_iter();
-                    let condition = tail.next().unwrap();
-                    Self::IfElse {
-                        condition: Expr::from_ast(condition),
-                        if_true: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
-                        if_false: Box::new(Self::Do(Vec::new())),
+                    "for" => {
+                        let counter = tail.next().unwrap();
+                        let counter = match counter {
+                            Ast::Sym(sym) => sym,
+                            _ => todo!(),
+                        };
+                        let times = tail.next().unwrap();
+                        Self::For {
+                            counter,
+                            times: Expr::from_ast(times),
+                            body: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                        }
                     }
-                }
-                "unless" => {
-                    let mut tail = tail.into_iter();
-                    let condition = tail.next().unwrap();
-                    Self::IfElse {
-                        condition: Expr::from_ast(condition),
-                        if_true: Box::new(Self::Do(Vec::new())),
-                        if_false: Box::new(Self::Do(
-                            tail.map(Self::from_ast).collect(),
-                        )),
+                    "when" => {
+                        let condition = tail.next().unwrap();
+                        Self::IfElse {
+                            condition: Expr::from_ast(condition),
+                            if_true: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                            if_false: Box::new(Self::Do(Vec::new())),
+                        }
                     }
+                    "unless" => {
+                        let condition = tail.next().unwrap();
+                        Self::IfElse {
+                            condition: Expr::from_ast(condition),
+                            if_true: Box::new(Self::Do(Vec::new())),
+                            if_false: Box::new(Self::Do(
+                                tail.map(Self::from_ast).collect(),
+                            )),
+                        }
+                    }
+                    _ => Self::ProcCall {
+                        proc_name: sym,
+                        args: tail.map(Expr::from_ast).collect(),
+                    },
                 }
-                _ => Self::ProcCall {
-                    proc_name: sym,
-                    args: tail.into_iter().map(Expr::from_ast).collect(),
-                },
-            },
+            }
             _ => todo!(),
         }
     }
