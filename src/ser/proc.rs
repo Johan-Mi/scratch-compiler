@@ -1,11 +1,12 @@
 use crate::{
     ir::{
-        expr::{Expr, Value},
+        expr::Expr,
         proc::{Procedure, Statement},
     },
     ser::{reporter::Reporter, ProgramCtx},
     uid::Uid,
 };
+use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
 use std::{cell::RefCell, collections::HashMap};
 
@@ -182,7 +183,7 @@ impl<'a> ProcCtx<'a> {
                 "operator_join",
                 "STRING1",
                 "STRING2",
-                &Value::String(String::new()),
+                &Value::String(Default::default()),
                 args,
                 parent,
             ),

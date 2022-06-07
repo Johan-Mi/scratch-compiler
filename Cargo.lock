@@ -106,12 +106,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3f6f92acf49d1b98f7a81226834412ada05458b7364277387724a237f062695"
 
 [[package]]
+name = "sb3-stuff"
+version = "0.1.0"
+source = "git+https://github.com/Johan-Mi/sb3-stuff#a08090b41c3129b20a20309a7887db844ed5021d"
+dependencies = [
+ "smol_str",
+]
+
+[[package]]
 name = "scratch-compiler-rs"
 version = "0.1.0"
 dependencies = [
  "fancy-match",
  "md5",
  "nom",
+ "sb3-stuff",
  "serde",
  "serde_json",
  "trexp",
@@ -146,6 +155,15 @@ checksum = "9b7ce2b32a1aed03c558dc61a5cd328f15aff2dbc17daad8fb8af04d2100e15c"
 dependencies = [
  "itoa",
  "ryu",
+ "serde",
+]
+
+[[package]]
+name = "smol_str"
+version = "0.1.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7475118a28b7e3a2e157ce0131ba8c5526ea96e90ee601d9f6bb2e286a35ab44"
+dependencies = [
  "serde",
 ]
 
