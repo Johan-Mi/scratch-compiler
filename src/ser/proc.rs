@@ -31,10 +31,10 @@ struct ProcCtx<'a> {
 
 impl<'a> ProcCtx<'a> {
     fn serialize_proc(&self, name: &str, proc: &Procedure) {
+        let this = self.new_uid();
         match name {
             "when-flag-clicked" => {
                 assert!(proc.params.is_empty());
-                let this = self.new_uid();
                 let (body, _) = self.serialize_stmt(&proc.body, this, None);
                 self.emit_block(
                     this,
@@ -48,9 +48,105 @@ impl<'a> ProcCtx<'a> {
                     }),
                 );
             }
-            "when-cloned" => todo!(),
-            "when-received" => todo!(),
-            _ => todo!(),
+            "when-cloned" => {
+                assert!(proc.params.is_empty());
+                let (body, _) = self.serialize_stmt(&proc.body, this, None);
+                self.emit_block(
+                    this,
+                    json!({
+                        "opcode": "control_start_as_clone",
+                        "next": body,
+                        "parent": null,
+                        "topLevel": true,
+                        "x": 0,
+                        "y": 0,
+                    }),
+                );
+            }
+            "when-received" => {
+                let broadcast_name = match &proc.params[..] {
+                    [Expr::Lit(Value::String(broadcast_name))] => {
+                        broadcast_name
+                    }
+                    _ => todo!(),
+                };
+                let (body, _) = self.serialize_stmt(&proc.body, this, None);
+                self.emit_block(
+                    this,
+                    json!({
+                        "opcode": "event_whenbroadcastreceived",
+                        "next": body,
+                        "parent": null,
+                        "fields": {
+                            "BROADCAST_OPTION": [broadcast_name, null],
+                        },
+                        "topLevel": true,
+                        "x": 0,
+                        "y": 0,
+                    }),
+                );
+            }
+            _ => {
+                let params = proc
+                    .params
+                    .iter()
+                    .map(|param| match param {
+                        Expr::Sym(sym) => &**sym,
+                        _ => todo!(
+                            "invalid parameter to custom procedure definition:\
+                            \n{param:#?}"
+                        ),
+                    })
+                    .collect::<Vec<_>>();
+
+                let prototype_id = self.new_uid();
+                let param_ids: Vec<Uid> = todo!();
+
+                let proccode =
+                    format!("{name}{}", " %s".repeat(proc.params.len()));
+                let argumentids = serde_json::to_string(&param_ids).unwrap();
+                let argumentnames = serde_json::to_string(&params).unwrap();
+                let argumentdefaults =
+                    serde_json::to_string(&[""].repeat(proc.params.len()))
+                        .unwrap();
+                let inputs: Json = todo!();
+
+                let (body, _) = self.serialize_stmt(&proc.body, this, None);
+
+                self.emit_block(
+                    this,
+                    json!({
+                        "opcode": "procedures_definition",
+                        "next": body,
+                        "parent": null,
+                        "inputs": {
+                            "custom_block": [1, prototype_id],
+                        },
+                        "topLevel": true,
+                        "x": 0,
+                        "y": 0,
+                    }),
+                );
+                self.emit_block(
+                    this,
+                    json!({
+                        "opcode": "procedures_prototype",
+                        "next": null,
+                        "parent": this,
+                        "inputs": inputs,
+                        "shadow": true,
+                        "mutation": {
+                            "tagName": "mutation",
+                            "children": [],
+                            "proccode": proccode,
+                            "argumentids": argumentids,
+                            "argumentnames": argumentnames,
+                            "argumentdefaults": argumentdefaults,
+                            "warp": true,
+                        },
+                    }),
+                )
+            }
         }
     }
 
