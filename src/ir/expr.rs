@@ -1,11 +1,12 @@
 use crate::ast::Ast;
 use sb3_stuff::Value;
+use smol_str::SmolStr;
 use trexp::{Clean, Rewrite, TreeWalk};
 
 #[derive(Debug)]
 pub enum Expr {
     Lit(Value),
-    Sym(String),
+    Sym(SmolStr),
     FuncCall(String, Vec<Expr>),
 }
 
@@ -15,7 +16,7 @@ impl Expr {
         match ast {
             Ast::Num(num) => Self::Lit(Value::Num(num)),
             Ast::String(s) => Self::Lit(Value::String(s.into())),
-            Ast::Sym(sym) => Self::Sym(sym),
+            Ast::Sym(sym) => Self::Sym(sym.into()),
             Ast::Node(box Ast::Sym(func_name), args) => Self::FuncCall(
                 func_name,
                 args.into_iter().map(Self::from_ast).collect(),

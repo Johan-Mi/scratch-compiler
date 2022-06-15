@@ -21,6 +21,13 @@ impl Reporter {
         }
     }
 
+    pub fn non_shadow(json: Json) -> Self {
+        Self {
+            json,
+            shape: Shape::NonShadow,
+        }
+    }
+
     pub fn with_empty_shadow(&self) -> Json {
         match self.shape {
             Shape::Shadow => json!([1, self.json]),

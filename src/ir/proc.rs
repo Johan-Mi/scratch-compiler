@@ -2,8 +2,10 @@ use crate::{
     ast::{all_symbols, Ast},
     ir::expr::Expr,
     optimize::statement::optimize_stmt,
+    uid::Uid,
 };
 use fancy_match::fancy_match;
+use smol_str::SmolStr;
 use std::{collections::HashSet, mem};
 use trexp::{Clean, Rewrite, TreeWalk};
 
@@ -63,6 +65,10 @@ fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
         }
         _ => todo!(),
     }
+}
+
+pub struct CustomProcedure {
+    pub params: Vec<(SmolStr, Uid)>,
 }
 
 #[derive(Debug)]

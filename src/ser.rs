@@ -1,14 +1,15 @@
 mod proc;
 mod reporter;
+mod sprite;
 
-use self::proc::serialize_procs;
 use crate::{
     asset::asset_json,
-    ir::{sprite::Sprite, Program},
+    ir::{proc::CustomProcedure, Program},
     uid::{Uid, UidGenerator},
 };
 use serde_json::{json, Value as Json};
-use std::{fs::File, iter, path::Path};
+use smol_str::SmolStr;
+use std::{cell::RefCell, collections::HashMap, fs::File, iter, path::Path};
 use zip::{write::FileOptions, ZipWriter};
 
 pub fn write_sb3_file(program: &Program, path: &Path) {
@@ -18,8 +19,17 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
     zip.start_file("project.json", FileOptions::default())
         .unwrap();
 
-    let ctx = ProgramCtx {
+    let mut ctx = SerCtx {
         uid_gen: UidGenerator::new(),
+        blocks: RefCell::default(),
+        custom_procs: HashMap::new(),
+        proc_args: Vec::new(),
+        local_vars: HashMap::new(),
+        local_lists: HashMap::new(),
+        sprite_vars: HashMap::new(),
+        sprite_lists: HashMap::new(),
+        global_vars: HashMap::new(),
+        global_lists: HashMap::new(),
     };
     let targets = iter::once(("Stage", &program.stage))
         .chain(program.sprites.iter().map(|(name, spr)| (&**name, spr)))
@@ -39,58 +49,26 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
     zip.finish().unwrap();
 }
 
-struct ProgramCtx {
+struct SerCtx {
     uid_gen: UidGenerator,
+    blocks: RefCell<HashMap<Uid, Json>>,
+    custom_procs: HashMap<SmolStr, CustomProcedure>,
+    proc_args: Vec<SmolStr>,
+    local_vars: HashMap<SmolStr, Mangled>,
+    local_lists: HashMap<SmolStr, Mangled>,
+    sprite_vars: HashMap<SmolStr, Mangled>,
+    sprite_lists: HashMap<SmolStr, Mangled>,
+    global_vars: HashMap<SmolStr, Mangled>,
+    global_lists: HashMap<SmolStr, Mangled>,
 }
 
-impl ProgramCtx {
+impl SerCtx {
     fn new_uid(&self) -> Uid {
         self.uid_gen.new_uid()
     }
 }
 
-impl ProgramCtx {
-    fn serialize_sprite(&self, name: &str, sprite: &Sprite) -> Json {
-        let variables = sprite
-            .variables
-            .iter()
-            .map(|var| Mangled {
-                source_name: var.clone(),
-                mangled_name: var.clone(),
-                id: self.new_uid(),
-            })
-            .collect::<Vec<_>>();
-        let lists = sprite
-            .lists
-            .iter()
-            .map(|lst| Mangled {
-                source_name: lst.clone(),
-                mangled_name: lst.clone(),
-                id: self.new_uid(),
-            })
-            .collect::<Vec<_>>();
-        let costumes = sprite
-            .costumes
-            .iter()
-            .map(|(name, path)| asset_json(name, path))
-            .collect::<Vec<_>>();
-        let blocks = serialize_procs(self, &sprite.procedures);
-
-        json!({
-            "name": name,
-            "isStage": name == "Stage",
-            "variables": variables.iter().map(|var| (&var.mangled_name, 0)).collect::<Vec<_>>(),
-            "lists": lists.iter().map(|var| (&var.mangled_name, [] as [(); 0])).collect::<Vec<_>>(),
-            "costumes": costumes,
-            "currentCostume": 1,
-            "sounds": [],
-            "blocks": blocks,
-        })
-    }
-}
-
 struct Mangled {
-    source_name: String,
-    mangled_name: String,
+    name: String,
     id: Uid,
 }

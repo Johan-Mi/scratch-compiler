@@ -1,36 +1,28 @@
+use super::{reporter::Reporter, Mangled, SerCtx};
 use crate::{
     ir::{
         expr::Expr,
         proc::{Procedure, Statement},
     },
-    ser::{reporter::Reporter, ProgramCtx},
     uid::Uid,
 };
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
-use std::{cell::RefCell, collections::HashMap};
+use smol_str::SmolStr;
+use std::collections::HashMap;
 
-pub(super) fn serialize_procs(
-    ctx: &ProgramCtx,
-    procs: &HashMap<String, Procedure>,
-) -> HashMap<Uid, Json> {
-    let ctx = ProcCtx {
-        inner: ctx,
-        blocks: Default::default(),
-    };
-    for (name, proc) in procs {
-        ctx.serialize_proc(name, proc);
+impl SerCtx {
+    pub(super) fn serialize_procs(
+        &mut self,
+        procs: &HashMap<String, Procedure>,
+    ) -> HashMap<Uid, Json> {
+        for (name, proc) in procs {
+            self.serialize_proc(name, proc);
+        }
+        self.blocks.take()
     }
-    ctx.blocks.into_inner()
-}
 
-struct ProcCtx<'a> {
-    inner: &'a ProgramCtx,
-    blocks: RefCell<HashMap<Uid, Json>>,
-}
-
-impl<'a> ProcCtx<'a> {
-    fn serialize_proc(&self, name: &str, proc: &Procedure) {
+    fn serialize_proc(&mut self, name: &str, proc: &Procedure) {
         let this = self.new_uid();
         match name {
             "when-flag-clicked" => {
@@ -87,11 +79,11 @@ impl<'a> ProcCtx<'a> {
                 );
             }
             _ => {
-                let params = proc
+                self.proc_args = proc
                     .params
                     .iter()
                     .map(|param| match param {
-                        Expr::Sym(sym) => &**sym,
+                        Expr::Sym(sym) => sym.clone(),
                         _ => todo!(
                             "invalid parameter to custom procedure definition:\
                             \n{param:#?}"
@@ -100,16 +92,30 @@ impl<'a> ProcCtx<'a> {
                     .collect::<Vec<_>>();
 
                 let prototype_id = self.new_uid();
-                let param_ids: Vec<Uid> = todo!();
+                let param_ids: Vec<Uid> = self
+                    .custom_procs
+                    .get(name)
+                    .unwrap()
+                    .params
+                    .iter()
+                    .map(|(_, uid)| *uid)
+                    .collect();
 
                 let proccode =
                     format!("{name}{}", " %s".repeat(proc.params.len()));
                 let argumentids = serde_json::to_string(&param_ids).unwrap();
-                let argumentnames = serde_json::to_string(&params).unwrap();
+                let argumentnames =
+                    serde_json::to_string(&self.proc_args).unwrap();
                 let argumentdefaults =
                     serde_json::to_string(&[""].repeat(proc.params.len()))
                         .unwrap();
-                let inputs: Json = todo!();
+                let reporters: Json = proc
+                    .params
+                    .iter()
+                    .map(|param| {
+                        self.serialize_expr(param, this).without_shadow()
+                    })
+                    .collect();
 
                 let (body, _) = self.serialize_stmt(&proc.body, this, None);
 
@@ -133,7 +139,7 @@ impl<'a> ProcCtx<'a> {
                         "opcode": "procedures_prototype",
                         "next": null,
                         "parent": this,
-                        "inputs": inputs,
+                        "inputs": reporters,
                         "shadow": true,
                         "mutation": {
                             "tagName": "mutation",
@@ -190,7 +196,34 @@ impl<'a> ProcCtx<'a> {
                 condition,
                 if_true,
                 if_false,
-            } => todo!(),
+            } => {
+                let this = self.new_uid();
+                let (if_true, _) = self.serialize_stmt(if_true, this, None);
+                let (if_false, _) = self.serialize_stmt(if_false, this, None);
+
+                let block_json = if if_false.is_some() {
+                    json!({
+                        "opcode": "control_if_else",
+                        "parent": parent,
+                        "inputs": {
+                            "SUBSTACK": [2, if_true],
+                            "SUBSTACK2": [2, if_false],
+                        },
+                    })
+                } else {
+                    json!({
+                        "opcode": "control_if",
+                        "parent": parent,
+                        "inputs": {
+                            "SUBSTACK": [2, if_true],
+                        },
+                    })
+                };
+
+                self.emit_block(this, block_json);
+
+                (Some(this), Some(this))
+            }
             Statement::Repeat { times, body } => self.emit_stacking(
                 "control_repeat",
                 parent,
@@ -242,7 +275,22 @@ impl<'a> ProcCtx<'a> {
     fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Reporter {
         match expr {
             Expr::Lit(lit) => serialize_lit(lit),
-            Expr::Sym(_) => todo!(),
+            Expr::Sym(sym) => {
+                if self.proc_args.contains(sym) {
+                    self.emit_non_shadow(
+                        "argument_reporter_string_number",
+                        parent,
+                        &[],
+                        &[("VALUE", &|_| json!([sym, null]))],
+                    )
+                } else if let Some(var) = self.lookup_var(sym) {
+                    Reporter::non_shadow(json!([12, var.name, var.id]))
+                } else if let Some(list) = self.lookup_list(sym) {
+                    Reporter::non_shadow(json!([13, list.name, list.id]))
+                } else {
+                    todo!("unknown symbol in expression: `{sym}`")
+                }
+            }
             Expr::FuncCall(func_name, args) => {
                 self.serialize_func_call(func_name, args, parent)
             }
@@ -376,8 +424,55 @@ impl<'a> ProcCtx<'a> {
                 ),
                 _ => todo!(),
             },
-            _ => todo!("unknown procedure `{proc_name}`"),
+            _ => self.serialize_custom_proc_call(proc_name, args, parent, next),
         }
+    }
+
+    fn serialize_custom_proc_call(
+        &self,
+        proc_name: &str,
+        args: &[Expr],
+        parent: Uid,
+        next: Option<Uid>,
+    ) -> (Option<Uid>, Option<Uid>) {
+        let proc = self
+            .custom_procs
+            .get(proc_name)
+            .unwrap_or_else(|| todo!("unknown procedure `{proc_name}`"));
+
+        let this = self.new_uid();
+
+        let args: Vec<Json> = args
+            .iter()
+            .map(|arg| self.serialize_expr(arg, this).with_empty_shadow())
+            .collect();
+
+        let proccode =
+            format!("{proc_name}{}", " %s".repeat(proc.params.len()));
+        let param_ids: Vec<Uid> =
+            proc.params.iter().map(|(_, uid)| *uid).collect();
+        let argumentids = serde_json::to_string(&param_ids).unwrap();
+        let inputs: Json =
+            param_ids.iter().map(Uid::to_string).zip(args).collect();
+
+        self.emit_block(
+            this,
+            json!({
+                "opcode": "procedures_call",
+                "next": next,
+                "parent": parent,
+                "inputs": inputs,
+                "fields": [],
+                "mutation": {
+                      "tagName": "mutation",
+                      "children": [],
+                      "proccode": proccode,
+                      "argumentids": argumentids,
+                      "warp": "true",
+                }
+            }),
+        );
+        (Some(this), Some(this))
     }
 
     fn stmt_input<'s>(
@@ -399,6 +494,43 @@ impl<'a> ProcCtx<'a> {
         expr: &'s Expr,
     ) -> impl Fn(Uid) -> Json + 's {
         |this| self.serialize_expr(expr, this).without_shadow()
+    }
+
+    fn emit_non_shadow(
+        &self,
+        opcode: &str,
+        parent: Uid,
+        inputs: &[(&str, &dyn Fn(Uid) -> Json)],
+        fields: &[(&str, &dyn Fn(Uid) -> Json)],
+    ) -> Reporter {
+        let this = self.new_uid();
+
+        let inputs = Json::Object(
+            inputs
+                .iter()
+                .copied()
+                .map(|(name, fun)| (name.to_owned(), fun(this)))
+                .collect(),
+        );
+        let fields = Json::Object(
+            fields
+                .iter()
+                .copied()
+                .map(|(name, fun)| (name.to_owned(), fun(this)))
+                .collect(),
+        );
+
+        self.emit_block(
+            this,
+            json!({
+                "opcode": opcode,
+                "parent": parent,
+                "inputs": inputs,
+                "fields": fields,
+            }),
+        );
+
+        Reporter::from_uid(this)
     }
 
     fn emit_stacking(
@@ -444,8 +576,20 @@ impl<'a> ProcCtx<'a> {
         self.blocks.borrow_mut().insert(uid, block);
     }
 
-    fn new_uid(&self) -> Uid {
-        self.inner.new_uid()
+    fn lookup_var(&self, var_name: &SmolStr) -> Option<&Mangled> {
+        self.local_vars
+            .iter()
+            .chain(&self.sprite_vars)
+            .chain(&self.global_vars)
+            .find_map(|(name, var)| (name == var_name).then(|| var))
+    }
+
+    fn lookup_list(&self, list_name: &SmolStr) -> Option<&Mangled> {
+        self.local_lists
+            .iter()
+            .chain(&self.sprite_lists)
+            .chain(&self.global_lists)
+            .find_map(|(name, list)| (name == list_name).then(|| list))
     }
 }
 
