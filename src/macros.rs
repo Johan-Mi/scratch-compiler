@@ -85,24 +85,25 @@ impl MacroContext {
     }
 
     fn use_user_defined_macros(&self, ast: Ast) -> Rewrite<Ast> {
-        (|| match &ast {
+        match &ast {
             Ast::Sym(sym) => self.symbols.get(sym).cloned(),
             Ast::Node(box Ast::Sym(sym), args) => {
-                let func_macro = self.functions.get(sym)?;
-                let params = &func_macro.params;
-                let num_args = args.len();
-                let num_params = params.len();
-                assert_eq!(
-                    num_args, num_params,
-                    "function macro `{sym}` expected {num_params}\
+                self.functions.get(sym).map(|func_macro| {
+                    let params = &func_macro.params;
+                    let num_args = args.len();
+                    let num_params = params.len();
+                    assert_eq!(
+                        num_args, num_params,
+                        "function macro `{sym}` expected {num_params}\
                     arguments but got {num_args}"
-                );
-                let bindings =
-                    params.iter().map(String::as_str).zip(args).collect();
-                Some(interpolate(func_macro.body.clone(), &bindings))
+                    );
+                    let bindings =
+                        params.iter().map(String::as_str).zip(args).collect();
+                    interpolate(func_macro.body.clone(), &bindings)
+                })
             }
             _ => None,
-        })()
+        }
         .map_or(Clean(ast), Dirty)
     }
 

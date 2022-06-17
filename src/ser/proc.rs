@@ -632,20 +632,16 @@ impl SerCtx {
     ) -> Reporter {
         let this = self.new_uid();
 
-        let inputs = Json::Object(
-            inputs
-                .iter()
-                .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(this)))
-                .collect(),
-        );
-        let fields = Json::Object(
-            fields
-                .iter()
-                .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(this)))
-                .collect(),
-        );
+        let inputs: Json = inputs
+            .iter()
+            .copied()
+            .map(|(name, fun)| (name, fun(this)))
+            .collect();
+        let fields: Json = fields
+            .iter()
+            .copied()
+            .map(|(name, fun)| (name, fun(this)))
+            .collect();
 
         self.emit_block(
             this,
@@ -670,20 +666,16 @@ impl SerCtx {
     ) -> (Option<Uid>, Option<Uid>) {
         let this = self.new_uid();
 
-        let inputs = Json::Object(
-            inputs
-                .iter()
-                .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(this)))
-                .collect(),
-        );
-        let fields = Json::Object(
-            fields
-                .iter()
-                .copied()
-                .map(|(name, fun)| (name.to_owned(), fun(this)))
-                .collect(),
-        );
+        let inputs: Json = inputs
+            .iter()
+            .copied()
+            .map(|(name, fun)| (name, fun(this)))
+            .collect();
+        let fields: Json = fields
+            .iter()
+            .copied()
+            .map(|(name, fun)| (name, fun(this)))
+            .collect();
 
         self.emit_block(
             this,
@@ -708,7 +700,7 @@ impl SerCtx {
             .iter()
             .chain(&self.sprite_vars)
             .chain(&self.global_vars)
-            .find_map(|(name, var)| (name == var_name).then(|| var))
+            .find_map(|(name, var)| (name == var_name).then_some(var))
     }
 
     fn lookup_list(&self, list_name: &SmolStr) -> Option<&Mangled> {
@@ -716,7 +708,7 @@ impl SerCtx {
             .iter()
             .chain(&self.sprite_lists)
             .chain(&self.global_lists)
-            .find_map(|(name, list)| (name == list_name).then(|| list))
+            .find_map(|(name, list)| (name == list_name).then_some(list))
     }
 }
 
