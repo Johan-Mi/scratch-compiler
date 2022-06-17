@@ -303,6 +303,18 @@ impl SerCtx {
         args: &[Expr],
         parent: Uid,
     ) -> Reporter {
+        macro_rules! func {
+            ($opcode:ident(
+                $($param_name:ident: $param_type:ident),*
+            )) => {
+                self.simple_function(
+                    stringify!($opcode),
+                    &[$(Param::$param_type(stringify!($param_name))),*],
+                    parent,
+                    args,
+                )
+            }
+        }
         match func_name {
             "+" => self.associative0(
                 "operator_add",
@@ -322,7 +334,7 @@ impl SerCtx {
                 parent,
             ),
             "/" => todo!(),
-            "!!" => todo!(),
+            "!!" => func!(data_itemoflist(LIST: List, INDEX: Number)),
             "++" => self.associative0(
                 "operator_join",
                 "STRING1",
@@ -347,14 +359,16 @@ impl SerCtx {
                 args,
                 parent,
             ),
-            "not" => todo!(),
-            "=" => todo!(),
-            "<" => todo!(),
-            ">" => todo!(),
-            "length" => todo!(),
-            "str-length" => todo!(),
-            "char-at" => todo!(),
-            "mod" => todo!(),
+            "not" => func!(operator_not(OPERAND: Bool)),
+            "=" => func!(operator_equals(OPERAND1: String, OPERAND2: String)),
+            "<" => func!(operator_lt(OPERAND1: String, OPERAND2: String)),
+            ">" => func!(operator_gt(OPERAND1: String, OPERAND2: String)),
+            "length" => func!(data_lengthoflist(LIST: List)),
+            "str-length" => func!(operator_length(STRING: String)),
+            "char-at" => {
+                func!(operator_letter_of(STRING: String, LETTER: Number))
+            }
+            "mod" => func!(operator_mod(NUM1: Number, NUM2: Number)),
             "abs" => todo!(),
             "floor" => todo!(),
             "ceil" => todo!(),
@@ -413,17 +427,52 @@ impl SerCtx {
         parent: Uid,
         next: Option<Uid>,
     ) -> (Option<Uid>, Option<Uid>) {
-        match proc_name {
-            "say" => match args {
-                [message] => self.emit_stacking(
-                    "looks_say",
+        macro_rules! proc {
+            ($opcode:ident(
+                $($param_name:ident: $param_type:ident),*
+            )) => {
+                self.simple_proc(
+                    stringify!($opcode),
+                    &[$(Param::$param_type(stringify!($param_name))),*],
                     parent,
                     next,
-                    &[("MESSAGE", &self.empty_shadow_input(message))],
-                    &[],
-                ),
-                _ => todo!(),
-            },
+                    args,
+                )
+            }
+        }
+
+        match proc_name {
+            "erase-all" => proc!(pen_clear()),
+            "stamp" => proc!(pen_stamp()),
+            "pen-down" => proc!(pen_penDown()),
+            "pen-up" => proc!(pen_penUp()),
+            "set-xy" => proc!(motion_gotoxy(X: Number, Y: Number)),
+            "set-size" => proc!(looks_setsizeto(SIZE: Number)),
+            "set-costume" => proc!(looks_switchcostumeto(COSTUME: String)),
+            "show" => proc!(looks_show()),
+            "hide" => proc!(looks_hide()),
+            "say" => proc!(looks_say(MESSAGE: String)),
+            "change-x" => proc!(motion_changexby(DX: Number)),
+            "change-y" => proc!(motion_changeyby(DY: Number)),
+            "set-x" => proc!(motion_setx(X: Number)),
+            "set-y" => proc!(motion_sety(Y: Number)),
+            "wait" => proc!(control_wait(DURATION: Number)),
+            "ask" => proc!(sensing_askandwait(QUESTION: String)),
+            "send-broadcast-sync" => todo!(),
+            ":=" => proc!(data_setvariableto(VARIABLE: Var, VALUE: String)),
+            "+=" => proc!(data_changevariableby(VARIABLE: Var, VALUE: String)),
+            "replace" => proc!(data_replaceitemoflist(
+                LIST: List,
+                INDEX: Number,
+                ITEM: String
+            )),
+            "append" => proc!(data_addtolist(LIST: List, ITEM: String)),
+            "delete" => proc!(data_deleteoflist(LIST: List, INDEX: Number)),
+            "delete-all" => proc!(data_deletealloflist(LIST: List)),
+            "stop-all" => todo!(),
+            "stop-this-script" => todo!(),
+            "stop-other-scripts" => todo!(),
+            "clone-myself" => todo!(),
             _ => self.serialize_custom_proc_call(proc_name, args, parent, next),
         }
     }
@@ -470,6 +519,84 @@ impl SerCtx {
                       "argumentids": argumentids,
                       "warp": "true",
                 }
+            }),
+        );
+        (Some(this), Some(this))
+    }
+
+    fn simple_function(
+        &self,
+        opcode: &str,
+        params: &[Param],
+        parent: Uid,
+        args: &[Expr],
+    ) -> Reporter {
+        let this = self.new_uid();
+
+        assert_eq!(params.len(), args.len());
+        let inputs: Json = params
+            .iter()
+            .zip(args)
+            .map(|(param, arg)| match param {
+                Param::String(param_name) | Param::Number(param_name) => (
+                    *param_name,
+                    self.serialize_expr(arg, this).with_empty_shadow(),
+                ),
+                Param::Bool(param_name) => (
+                    *param_name,
+                    self.serialize_expr(arg, this).without_shadow(),
+                ),
+                Param::Var(_) => todo!(),
+                Param::List(_) => todo!(),
+            })
+            .collect();
+
+        self.emit_block(
+            this,
+            json!({
+                "opcode": opcode,
+                "parent": parent,
+                "inputs": inputs,
+            }),
+        );
+        Reporter::from_uid(this)
+    }
+
+    fn simple_proc(
+        &self,
+        opcode: &str,
+        params: &[Param],
+        parent: Uid,
+        next: Option<Uid>,
+        args: &[Expr],
+    ) -> (Option<Uid>, Option<Uid>) {
+        let this = self.new_uid();
+
+        assert_eq!(params.len(), args.len());
+        let inputs: Json = params
+            .iter()
+            .zip(args)
+            .map(|(param, arg)| match param {
+                Param::String(param_name) | Param::Number(param_name) => (
+                    *param_name,
+                    self.serialize_expr(arg, this).with_empty_shadow(),
+                ),
+                Param::Bool(param_name) => (
+                    *param_name,
+                    self.serialize_expr(arg, this).without_shadow(),
+                ),
+                Param::Var(_) => todo!(),
+                Param::List(_) => todo!(),
+            })
+            .collect();
+
+        self.emit_block(
+            this,
+            json!({
+                "opcode": opcode,
+                "parent": parent,
+                "next": next,
+                "inputs": inputs,
             }),
         );
         (Some(this), Some(this))
@@ -595,4 +722,12 @@ impl SerCtx {
 
 fn serialize_lit(lit: &Value) -> Reporter {
     Reporter::shadow(json!([10, lit.to_cow_str()]))
+}
+
+enum Param<'a> {
+    String(&'a str),
+    Number(&'a str),
+    Bool(&'a str),
+    Var(&'a str),
+    List(&'a str),
 }
