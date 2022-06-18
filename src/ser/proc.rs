@@ -696,19 +696,23 @@ impl SerCtx {
     }
 
     fn lookup_var(&self, var_name: &SmolStr) -> Option<&Mangled> {
-        self.local_vars
-            .iter()
-            .chain(&self.sprite_vars)
-            .chain(&self.global_vars)
-            .find_map(|(name, var)| (name == var_name).then_some(var))
+        if let Some(var) = self.local_vars.get(var_name) {
+            Some(var)
+        } else if let Some(var) = self.sprite_vars.get(var_name) {
+            Some(var)
+        } else {
+            self.global_vars.get(var_name)
+        }
     }
 
     fn lookup_list(&self, list_name: &SmolStr) -> Option<&Mangled> {
-        self.local_lists
-            .iter()
-            .chain(&self.sprite_lists)
-            .chain(&self.global_lists)
-            .find_map(|(name, list)| (name == list_name).then_some(list))
+        if let Some(list) = self.local_lists.get(list_name) {
+            Some(list)
+        } else if let Some(list) = self.sprite_lists.get(list_name) {
+            Some(list)
+        } else {
+            self.global_lists.get(list_name)
+        }
     }
 }
 
