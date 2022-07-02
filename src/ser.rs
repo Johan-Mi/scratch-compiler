@@ -19,8 +19,39 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
     zip.start_file("project.json", FileOptions::default())
         .unwrap();
 
+    let uid_gen = UidGenerator::new();
+
+    let global_vars = program
+        .stage
+        .variables
+        .iter()
+        .map(|var| {
+            (
+                var.into(),
+                Mangled {
+                    name: var.clone(),
+                    id: uid_gen.new_uid(),
+                },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+    let global_lists = program
+        .stage
+        .lists
+        .iter()
+        .map(|list| {
+            (
+                list.into(),
+                Mangled {
+                    name: list.clone(),
+                    id: uid_gen.new_uid(),
+                },
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
     let mut ctx = SerCtx {
-        uid_gen: UidGenerator::new(),
+        uid_gen,
         blocks: RefCell::default(),
         custom_procs: HashMap::new(),
         proc_args: Vec::new(),
@@ -28,8 +59,8 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
         local_lists: HashMap::new(),
         sprite_vars: HashMap::new(),
         sprite_lists: HashMap::new(),
-        global_vars: HashMap::new(),
-        global_lists: HashMap::new(),
+        global_vars,
+        global_lists,
     };
     let targets = iter::once(("Stage", &program.stage))
         .chain(program.sprites.iter().map(|(name, spr)| (&**name, spr)))

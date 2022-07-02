@@ -8,7 +8,6 @@ use crate::{
 };
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
-use smol_str::SmolStr;
 use std::collections::HashMap;
 
 impl SerCtx {
@@ -198,6 +197,8 @@ impl SerCtx {
                 if_false,
             } => {
                 let this = self.new_uid();
+                let condition =
+                    self.serialize_expr(condition, this).without_shadow();
                 let (if_true, _) = self.serialize_stmt(if_true, this, None);
                 let (if_false, _) = self.serialize_stmt(if_false, this, None);
 
@@ -206,6 +207,7 @@ impl SerCtx {
                         "opcode": "control_if_else",
                         "parent": parent,
                         "inputs": {
+                            "CONDITION": condition,
                             "SUBSTACK": [2, if_true],
                             "SUBSTACK2": [2, if_false],
                         },
@@ -215,6 +217,7 @@ impl SerCtx {
                         "opcode": "control_if",
                         "parent": parent,
                         "inputs": {
+                            "CONDITION": condition,
                             "SUBSTACK": [2, if_true],
                         },
                     })
@@ -268,7 +271,17 @@ impl SerCtx {
                 counter,
                 times,
                 body,
-            } => todo!(),
+            } => self.emit_stacking(
+                "control_for_each",
+                parent,
+                next,
+                &[
+                    ("VARIABLE", &self.var_input(counter)),
+                    ("VALUE", &self.shadowless_input(times)),
+                    ("SUBSTACK", &self.stmt_input(body)),
+                ],
+                &[],
+            ),
         }
     }
 
@@ -546,8 +559,27 @@ impl SerCtx {
                     *param_name,
                     self.serialize_expr(arg, this).without_shadow(),
                 ),
-                Param::Var(_) => todo!(),
-                Param::List(_) => todo!(),
+                Param::Var(param_name) => {
+                    let var_name = match arg {
+                        Expr::Sym(sym) => sym,
+                        _ => todo!(),
+                    };
+                    let var = self.lookup_var(var_name).unwrap_or_else(|| {
+                        todo!("variable `{var_name}` does not exist")
+                    });
+                    (*param_name, json!([var.name, var.id]))
+                }
+                Param::List(param_name) => {
+                    let list_name = match arg {
+                        Expr::Sym(sym) => sym,
+                        _ => todo!(),
+                    };
+                    let list =
+                        self.lookup_list(list_name).unwrap_or_else(|| {
+                            todo!("list `{list_name}` does not exist")
+                        });
+                    (*param_name, json!([list.name, list.id]))
+                }
             })
             .collect();
 
@@ -585,8 +617,27 @@ impl SerCtx {
                     *param_name,
                     self.serialize_expr(arg, this).without_shadow(),
                 ),
-                Param::Var(_) => todo!(),
-                Param::List(_) => todo!(),
+                Param::Var(param_name) => {
+                    let var_name = match arg {
+                        Expr::Sym(sym) => sym,
+                        _ => todo!(),
+                    };
+                    let var = self.lookup_var(var_name).unwrap_or_else(|| {
+                        todo!("variable `{var_name}` does not exist")
+                    });
+                    (*param_name, json!([var.name, var.id]))
+                }
+                Param::List(param_name) => {
+                    let list_name = match arg {
+                        Expr::Sym(sym) => sym,
+                        _ => todo!(),
+                    };
+                    let list =
+                        self.lookup_list(list_name).unwrap_or_else(|| {
+                            todo!("list `{list_name}` does not exist")
+                        });
+                    (*param_name, json!([list.name, list.id]))
+                }
             })
             .collect();
 
@@ -621,6 +672,15 @@ impl SerCtx {
         expr: &'s Expr,
     ) -> impl Fn(Uid) -> Json + 's {
         |this| self.serialize_expr(expr, this).without_shadow()
+    }
+
+    fn var_input<'s>(&'s self, var_name: &'s str) -> impl Fn(Uid) -> Json + 's {
+        move |_| {
+            let var = self.lookup_var(var_name).unwrap_or_else(|| {
+                todo!("variable `{var_name}` does not exist")
+            });
+            json!([var.name, var.id])
+        }
     }
 
     fn emit_non_shadow(
@@ -695,7 +755,7 @@ impl SerCtx {
         self.blocks.borrow_mut().insert(uid, block);
     }
 
-    fn lookup_var(&self, var_name: &SmolStr) -> Option<&Mangled> {
+    fn lookup_var(&self, var_name: &str) -> Option<&Mangled> {
         if let Some(var) = self.local_vars.get(var_name) {
             Some(var)
         } else if let Some(var) = self.sprite_vars.get(var_name) {
@@ -705,7 +765,7 @@ impl SerCtx {
         }
     }
 
-    fn lookup_list(&self, list_name: &SmolStr) -> Option<&Mangled> {
+    fn lookup_list(&self, list_name: &str) -> Option<&Mangled> {
         if let Some(list) = self.local_lists.get(list_name) {
             Some(list)
         } else if let Some(list) = self.sprite_lists.get(list_name) {

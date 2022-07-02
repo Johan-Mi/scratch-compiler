@@ -17,7 +17,7 @@ impl SerCtx {
             .iter()
             .map(|var| {
                 (
-                    var.clone(),
+                    var.into(),
                     Mangled {
                         name: var.clone(),
                         id: self.new_uid(),
@@ -30,7 +30,7 @@ impl SerCtx {
             .iter()
             .map(|lst| {
                 (
-                    lst.clone(),
+                    lst.into(),
                     Mangled {
                         name: lst.clone(),
                         id: self.new_uid(),
@@ -38,6 +38,23 @@ impl SerCtx {
                 )
             })
             .collect::<HashMap<_, _>>();
+
+        let var_initializers = variables
+            .values()
+            .map(|var| (var.name.clone(), 0))
+            .collect::<Vec<_>>();
+        let list_initializers = lists
+            .values()
+            .map(|var| (var.name.clone(), [(); 0]))
+            .collect::<Vec<_>>();
+
+        if name != "Stage" {
+            // Variables and lists belonging to the stage are considered global,
+            // so excluding them here prevents them from being defined twice.
+            self.sprite_vars = variables;
+            self.sprite_lists = lists;
+        }
+
         let costumes = sprite
             .costumes
             .iter()
@@ -73,8 +90,8 @@ impl SerCtx {
         json!({
             "name": name,
             "isStage": name == "Stage",
-            "variables": variables.values().map(|var| (&var.name, 0)).collect::<Vec<_>>(),
-            "lists": lists.values().map(|var| (&var.name, [(); 0])).collect::<Vec<_>>(),
+            "variables": var_initializers,
+            "lists": list_initializers,
             "costumes": costumes,
             "currentCostume": 1,
             "sounds": [],
