@@ -3,15 +3,15 @@ use nom::{
     branch::alt,
     bytes::complete::{is_a, is_not, take_while_m_n},
     character::complete::{
-        char, digit0, digit1, hex_digit1, multispace1, oct_digit1, one_of,
-        satisfy,
+        char, digit1, hex_digit1, multispace1, oct_digit1, one_of, satisfy,
     },
     combinator::{
         all_consuming, map_opt, map_res, not, opt, peek, recognize, value,
     },
     error::ParseError,
     multi::{count, many0, separated_list0},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
+    number::complete::double,
+    sequence::{delimited, pair, preceded, separated_pair, terminated},
     IResult, Parser,
 };
 use std::borrow::Cow;
@@ -25,25 +25,11 @@ fn expr(input: &str) -> IResult<&str, Ast> {
 }
 
 fn number(input: &str) -> IResult<&str, Ast> {
-    let exponent = opt(tuple((one_of("eE"), sign, digit1)));
-
-    let decimal = map_res(
-        recognize(tuple((
-            sign,
-            alt((
-                unit(preceded(char('.'), digit1)),
-                unit(pair(digit1, opt(preceded(char('.'), digit0)))),
-            )),
-            exponent,
-        ))),
-        str::parse::<f64>,
-    );
-
     let hex = based(16, "xX", hex_digit1);
     let binary = based(2, "bB", is_a("01"));
     let octal = based(8, "oO", oct_digit1);
 
-    terminated(alt((hex, binary, octal, decimal)), not(sym_non_first_char))
+    terminated(alt((hex, binary, octal, double)), not(sym_non_first_char))
         .map(Ast::Num)
         .parse(input)
 }
