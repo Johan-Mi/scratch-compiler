@@ -150,7 +150,7 @@ impl SerCtx {
                             "warp": true,
                         },
                     }),
-                )
+                );
             }
         }
     }

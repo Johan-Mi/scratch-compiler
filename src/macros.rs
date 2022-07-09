@@ -67,7 +67,7 @@ impl MacroContext {
             Ast::Node(box Ast::Sym("macro"), args) => self.define(args),
             Ast::Node(box Ast::Sym("include"), args) => {
                 for item in self.include(&args) {
-                    self.transform_top_level(item)
+                    self.transform_top_level(item);
                 }
             }
             _ => self.asts.push(ast),

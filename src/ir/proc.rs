@@ -200,7 +200,7 @@ impl Statement {
     fn optimize(&mut self) {
         let placeholder = Self::Do(Vec::new());
         let this = mem::replace(self, placeholder);
-        *self = optimize_stmt(this).into_inner()
+        *self = optimize_stmt(this).into_inner();
     }
 }
 
