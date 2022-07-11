@@ -33,7 +33,7 @@ impl UidGenerator {
     pub fn new_uid(&self) -> Uid {
         let counter = self.counter.get();
         self.counter
-            .set(NonZeroU32::new(counter.get() + 1).expect("ran out of UIDs"));
+            .set(counter.checked_add(1).expect("ran out of UIDs"));
         Uid(counter)
     }
 }
