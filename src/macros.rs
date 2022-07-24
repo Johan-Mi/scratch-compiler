@@ -135,6 +135,12 @@ impl MacroContext {
                         .collect::<Option<_>>()
                         .map(Ast::Sym)
                 }
+                "include-str" => match &args[..] {
+                    [Ast::String(path)] => {
+                        Some(Ast::String(fs::read_to_string(path).unwrap()))
+                    }
+                    _ => None,
+                },
                 _ => None,
             }
         })()
