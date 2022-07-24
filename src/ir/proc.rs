@@ -187,6 +187,27 @@ impl Statement {
                             )),
                         }
                     }
+                    "cond" => {
+                        let mut cases = Vec::with_capacity(tail.len() / 2);
+                        let mut else_branch = Self::Do(Vec::new());
+                        while let Some(ast) = tail.next() {
+                            match tail.next() {
+                                Some(body) => cases.push((
+                                    Expr::from_ast(ast),
+                                    Self::from_ast(body),
+                                )),
+                                None => else_branch = Self::from_ast(ast),
+                            }
+                        }
+                        cases.into_iter().rfold(
+                            else_branch,
+                            |acc, (condition, then)| Self::IfElse {
+                                condition,
+                                if_true: Box::new(then),
+                                if_false: Box::new(acc),
+                            },
+                        )
+                    }
                     _ => Self::ProcCall {
                         proc_name: sym,
                         args: tail.map(Expr::from_ast).collect(),
