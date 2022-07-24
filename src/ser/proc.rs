@@ -451,24 +451,20 @@ impl SerCtx {
         match args {
             [] => serialize_lit(neutral),
             [single] => self.serialize_expr(single, parent),
-            [lhs, rhs] => {
-                let this = self.new_uid();
-                let lhs = self.serialize_expr(lhs, this).with_empty_shadow();
-                let rhs = self.serialize_expr(rhs, this).with_empty_shadow();
-                self.emit_block(
-                    this,
-                    json!({
-                        "opcode": opcode,
-                        "parent": parent,
-                        "inputs": {
-                            lhs_name: lhs,
-                            rhs_name: rhs,
-                        },
+            [lhs, rhs @ ..] => self.emit_non_shadow(
+                opcode,
+                parent,
+                &[
+                    (lhs_name, &self.empty_shadow_input(lhs)),
+                    (rhs_name, &|parent| {
+                        self.associative0(
+                            opcode, lhs_name, rhs_name, neutral, rhs, parent,
+                        )
+                        .with_empty_shadow()
                     }),
-                );
-                Reporter::from_uid(this)
-            }
-            _ => todo!("variadic argument counts"),
+                ],
+                &[],
+            ),
         }
     }
 
