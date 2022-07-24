@@ -22,6 +22,35 @@ impl SerCtx {
     }
 
     fn serialize_proc(&mut self, name: &str, proc: &Procedure) {
+        self.local_vars = proc
+            .variables
+            .iter()
+            .map(|name| {
+                let id = self.new_uid();
+                (
+                    name.into(),
+                    Mangled {
+                        name: format!("local {id} {name}"),
+                        id,
+                    },
+                )
+            })
+            .collect();
+        self.local_lists = proc
+            .lists
+            .iter()
+            .map(|name| {
+                let id = self.new_uid();
+                (
+                    name.into(),
+                    Mangled {
+                        name: format!("local {id} {name}"),
+                        id,
+                    },
+                )
+            })
+            .collect();
+
         let this = self.new_uid();
         match name {
             "when-flag-clicked" => {
