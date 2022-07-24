@@ -137,13 +137,9 @@ impl SerCtx {
                 let argumentdefaults =
                     serde_json::to_string(&[""].repeat(proc.params.len()))
                         .unwrap();
-                let reporters: Json = proc
-                    .params
-                    .iter()
-                    .map(|param| {
-                        self.serialize_expr(param, this).without_shadow()
-                    })
-                    .collect();
+                let reporters = proc.params.iter().map(|param| {
+                    self.serialize_expr(param, this).without_shadow()
+                });
 
                 let (body, _) = self.serialize_stmt(&proc.body, this, None);
 
@@ -167,7 +163,7 @@ impl SerCtx {
                         "opcode": "procedures_prototype",
                         "next": null,
                         "parent": this,
-                        "inputs": reporters,
+                        "inputs": param_ids.iter().zip(reporters).map(|(id, rep)| (id.to_string(), rep)).collect::<Json>(),
                         "shadow": true,
                         "mutation": {
                             "tagName": "mutation",
@@ -305,11 +301,10 @@ impl SerCtx {
                 parent,
                 next,
                 &[
-                    ("VARIABLE", &self.var_input(counter)),
                     ("VALUE", &self.shadowless_input(times)),
                     ("SUBSTACK", &self.stmt_input(body)),
                 ],
-                &[],
+                &[("VARIABLE", &self.var_input(counter))],
             ),
         }
     }
@@ -317,26 +312,36 @@ impl SerCtx {
     fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Reporter {
         match expr {
             Expr::Lit(lit) => serialize_lit(lit),
-            Expr::Sym(sym) => {
-                if self.proc_args.contains(sym) {
-                    self.emit_non_shadow(
-                        "argument_reporter_string_number",
-                        parent,
-                        &[],
-                        &[("VALUE", &|_| json!([sym, null]))],
-                    )
-                } else if let Some(var) = self.lookup_var(sym) {
-                    Reporter::non_shadow(json!([12, var.name, var.id]))
-                } else if let Some(list) = self.lookup_list(sym) {
-                    Reporter::non_shadow(json!([13, list.name, list.id]))
-                } else {
-                    todo!("unknown symbol in expression: `{sym}`")
+            Expr::Sym(sym) => match &**sym {
+                "x-pos" => self.simple_symbol("motion_xposition", parent),
+                "y-pos" => self.simple_symbol("motion_yposition", parent),
+                "timer" => self.simple_symbol("sensing_timer", parent),
+                "answer" => self.simple_symbol("sensing_answer", parent),
+                _ => {
+                    if self.proc_args.contains(sym) {
+                        self.emit_non_shadow(
+                            "argument_reporter_string_number",
+                            parent,
+                            &[],
+                            &[("VALUE", &|_| json!([sym, null]))],
+                        )
+                    } else if let Some(var) = self.lookup_var(sym) {
+                        Reporter::non_shadow(json!([12, var.name, var.id]))
+                    } else if let Some(list) = self.lookup_list(sym) {
+                        Reporter::non_shadow(json!([13, list.name, list.id]))
+                    } else {
+                        todo!("unknown symbol in expression: `{sym}`")
+                    }
                 }
-            }
+            },
             Expr::FuncCall(func_name, args) => {
                 self.serialize_func_call(func_name, args, parent)
             }
         }
+    }
+
+    fn simple_symbol(&self, opcode: &str, parent: Uid) -> Reporter {
+        self.emit_non_shadow(opcode, parent, &[], &[])
     }
 
     fn serialize_func_call(
@@ -535,7 +540,22 @@ impl SerCtx {
             "set-y" => proc!(motion_sety(Y: Number)),
             "wait" => proc!(control_wait(DURATION: Number)),
             "ask" => proc!(sensing_askandwait(QUESTION: String)),
-            "send-broadcast-sync" => todo!(),
+            "send-broadcast-sync" => match args {
+                [name] => {
+                    let broadcast_input = |parent| match name {
+                        Expr::Lit(lit) => json!([1, [11, lit.to_string(), ""]]),
+                        _ => self.serialize_expr(name, parent).without_shadow(),
+                    };
+                    self.emit_stacking(
+                        "event_broadcastandwait",
+                        parent,
+                        next,
+                        &[("BROADCAST_INPUT", &broadcast_input)],
+                        &[],
+                    )
+                }
+                _ => todo!(),
+            },
             ":=" => proc!(data_setvariableto(VARIABLE: Var, VALUE: String)),
             "+=" => proc!(data_changevariableby(VARIABLE: Var, VALUE: String)),
             "replace" => proc!(data_replaceitemoflist(
@@ -546,9 +566,38 @@ impl SerCtx {
             "append" => proc!(data_addtolist(LIST: List, ITEM: String)),
             "delete" => proc!(data_deleteoflist(LIST: List, INDEX: Number)),
             "delete-all" => proc!(data_deletealloflist(LIST: List)),
-            "stop-all" => todo!(),
-            "stop-this-script" => todo!(),
-            "stop-other-scripts" => todo!(),
+            "stop-all" => match args {
+                [] => self.emit_stacking(
+                    "control_stop",
+                    parent,
+                    next,
+                    &[],
+                    &[("STOP_OPTION", &|_| json!(["all", null]))],
+                ),
+                _ => todo!(),
+            },
+            "stop-this-script" => match args {
+                [] => self.emit_stacking(
+                    "control_stop",
+                    parent,
+                    next,
+                    &[],
+                    &[("STOP_OPTION", &|_| json!(["this script", null]))],
+                ),
+                _ => todo!(),
+            },
+            "stop-other-scripts" => match args {
+                [] => self.emit_stacking(
+                    "control_stop",
+                    parent,
+                    next,
+                    &[],
+                    &[("STOP_OPTION", &|_| {
+                        json!(["other scripts in this sprite", null])
+                    })],
+                ),
+                _ => todo!(),
+            },
             "clone-myself" => todo!(),
             _ => self.serialize_custom_proc_call(proc_name, args, parent, next),
         }
@@ -588,7 +637,6 @@ impl SerCtx {
                 "next": next,
                 "parent": parent,
                 "inputs": inputs,
-                "fields": [],
                 "mutation": {
                       "tagName": "mutation",
                       "children": [],
@@ -614,15 +662,24 @@ impl SerCtx {
         let inputs: Json = params
             .iter()
             .zip(args)
-            .map(|(param, arg)| match param {
-                Param::String(param_name) | Param::Number(param_name) => (
-                    *param_name,
-                    self.serialize_expr(arg, this).with_empty_shadow(),
-                ),
-                Param::Bool(param_name) => (
+            .flat_map(|(param, arg)| match param {
+                Param::String(param_name) | Param::Number(param_name) => {
+                    Some((
+                        *param_name,
+                        self.serialize_expr(arg, this).with_empty_shadow(),
+                    ))
+                }
+                Param::Bool(param_name) => Some((
                     *param_name,
                     self.serialize_expr(arg, this).without_shadow(),
-                ),
+                )),
+                _ => None,
+            })
+            .collect();
+        let fields: Json = params
+            .iter()
+            .zip(args)
+            .flat_map(|(param, arg)| match param {
                 Param::Var(param_name) => {
                     let var_name = match arg {
                         Expr::Sym(sym) => sym,
@@ -631,7 +688,7 @@ impl SerCtx {
                     let var = self.lookup_var(var_name).unwrap_or_else(|| {
                         todo!("variable `{var_name}` does not exist")
                     });
-                    (*param_name, json!([var.name, var.id]))
+                    Some((*param_name, json!([var.name, var.id])))
                 }
                 Param::List(param_name) => {
                     let list_name = match arg {
@@ -642,8 +699,9 @@ impl SerCtx {
                         self.lookup_list(list_name).unwrap_or_else(|| {
                             todo!("list `{list_name}` does not exist")
                         });
-                    (*param_name, json!([list.name, list.id]))
+                    Some((*param_name, json!([list.name, list.id])))
                 }
+                _ => None,
             })
             .collect();
 
@@ -653,6 +711,7 @@ impl SerCtx {
                 "opcode": opcode,
                 "parent": parent,
                 "inputs": inputs,
+                "fields": fields,
             }),
         );
         Reporter::from_uid(this)
@@ -672,15 +731,24 @@ impl SerCtx {
         let inputs: Json = params
             .iter()
             .zip(args)
-            .map(|(param, arg)| match param {
-                Param::String(param_name) | Param::Number(param_name) => (
-                    *param_name,
-                    self.serialize_expr(arg, this).with_empty_shadow(),
-                ),
-                Param::Bool(param_name) => (
+            .flat_map(|(param, arg)| match param {
+                Param::String(param_name) | Param::Number(param_name) => {
+                    Some((
+                        *param_name,
+                        self.serialize_expr(arg, this).with_empty_shadow(),
+                    ))
+                }
+                Param::Bool(param_name) => Some((
                     *param_name,
                     self.serialize_expr(arg, this).without_shadow(),
-                ),
+                )),
+                _ => None,
+            })
+            .collect();
+        let fields: Json = params
+            .iter()
+            .zip(args)
+            .flat_map(|(param, arg)| match param {
                 Param::Var(param_name) => {
                     let var_name = match arg {
                         Expr::Sym(sym) => sym,
@@ -689,7 +757,7 @@ impl SerCtx {
                     let var = self.lookup_var(var_name).unwrap_or_else(|| {
                         todo!("variable `{var_name}` does not exist")
                     });
-                    (*param_name, json!([var.name, var.id]))
+                    Some((*param_name, json!([var.name, var.id])))
                 }
                 Param::List(param_name) => {
                     let list_name = match arg {
@@ -700,8 +768,9 @@ impl SerCtx {
                         self.lookup_list(list_name).unwrap_or_else(|| {
                             todo!("list `{list_name}` does not exist")
                         });
-                    (*param_name, json!([list.name, list.id]))
+                    Some((*param_name, json!([list.name, list.id])))
                 }
+                _ => None,
             })
             .collect();
 
@@ -712,6 +781,7 @@ impl SerCtx {
                 "parent": parent,
                 "next": next,
                 "inputs": inputs,
+                "fields": fields,
             }),
         );
         (Some(this), Some(this))

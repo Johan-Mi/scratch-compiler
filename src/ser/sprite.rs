@@ -40,13 +40,13 @@ impl SerCtx {
             .collect::<HashMap<_, _>>();
 
         let var_initializers = variables
-            .values()
-            .map(|var| (var.name.clone(), 0))
-            .collect::<Vec<_>>();
+            .iter()
+            .map(|(name, mangled)| (mangled.id.to_string(), json!([name, 0])))
+            .collect::<Json>();
         let list_initializers = lists
-            .values()
-            .map(|var| (var.name.clone(), [(); 0]))
-            .collect::<Vec<_>>();
+            .iter()
+            .map(|(name, mangled)| (mangled.id.to_string(), json!([name, []])))
+            .collect::<Json>();
 
         if name != "Stage" {
             // Variables and lists belonging to the stage are considered global,
