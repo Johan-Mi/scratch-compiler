@@ -337,7 +337,32 @@ impl SerCtx {
                 args,
                 parent,
             ),
-            "-" => todo!(),
+            "-" => match args {
+                [negation] => self.emit_non_shadow(
+                    "operator_subtract",
+                    parent,
+                    &[
+                        ("NUM1", &|_| {
+                            serialize_lit(&Value::Num(0.0)).with_empty_shadow()
+                        }),
+                        ("NUM2", &self.empty_shadow_input(negation)),
+                    ],
+                    &[],
+                ),
+                [lhs, rest @ ..] => self.emit_non_shadow(
+                    "operator_subtract",
+                    parent,
+                    &[
+                        ("NUM1", &self.empty_shadow_input(lhs)),
+                        ("NUM2", &|parent| {
+                            self.serialize_func_call("+", rest, parent)
+                                .with_empty_shadow()
+                        }),
+                    ],
+                    &[],
+                ),
+                [] => todo!(),
+            },
             "*" => self.associative0(
                 "operator_multiply",
                 "NUM1",
@@ -346,7 +371,21 @@ impl SerCtx {
                 args,
                 parent,
             ),
-            "/" => todo!(),
+            "/" => match args {
+                [] | [_] => todo!(),
+                [numerator, denominators @ ..] => self.emit_non_shadow(
+                    "operator_divide",
+                    parent,
+                    &[
+                        ("NUM1", &self.empty_shadow_input(numerator)),
+                        ("NUM2", &|parent| {
+                            self.serialize_func_call("+", denominators, parent)
+                                .with_empty_shadow()
+                        }),
+                    ],
+                    &[],
+                ),
+            },
             "!!" => func!(data_itemoflist(LIST: List, INDEX: Number)),
             "++" => self.associative0(
                 "operator_join",
