@@ -795,23 +795,17 @@ impl SerCtx {
     }
 
     fn lookup_var(&self, var_name: &str) -> Option<&Mangled> {
-        if let Some(var) = self.local_vars.get(var_name) {
-            Some(var)
-        } else if let Some(var) = self.sprite_vars.get(var_name) {
-            Some(var)
-        } else {
-            self.global_vars.get(var_name)
-        }
+        self.local_vars
+            .get(var_name)
+            .or_else(|| self.sprite_vars.get(var_name))
+            .or_else(|| self.global_vars.get(var_name))
     }
 
     fn lookup_list(&self, list_name: &str) -> Option<&Mangled> {
-        if let Some(list) = self.local_lists.get(list_name) {
-            Some(list)
-        } else if let Some(list) = self.sprite_lists.get(list_name) {
-            Some(list)
-        } else {
-            self.global_lists.get(list_name)
-        }
+        self.local_lists
+            .get(list_name)
+            .or_else(|| self.sprite_lists.get(list_name))
+            .or_else(|| self.global_lists.get(list_name))
     }
 }
 
