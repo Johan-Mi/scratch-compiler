@@ -1,7 +1,7 @@
 use super::{Mangled, SerCtx};
 use crate::{
+    asset::Asset,
     ir::{expr::Expr, proc::CustomProcedure, sprite::Sprite},
-    ser::asset_json,
 };
 use serde_json::{json, Value as Json};
 use std::collections::HashMap;
@@ -58,7 +58,9 @@ impl SerCtx {
         let costumes = sprite
             .costumes
             .iter()
-            .map(|(name, path)| asset_json(name, path))
+            .map(|(name, path)| {
+                serde_json::to_value(Asset::new(name, path)).unwrap()
+            })
             .collect::<Vec<_>>();
 
         self.custom_procs = sprite

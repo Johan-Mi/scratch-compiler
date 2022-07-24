@@ -3,13 +3,15 @@ mod reporter;
 mod sprite;
 
 use crate::{
-    asset::asset_json,
+    asset::Asset,
     ir::{proc::CustomProcedure, Program},
     uid::{Uid, UidGenerator},
 };
 use serde_json::{json, Value as Json};
 use smol_str::SmolStr;
-use std::{cell::RefCell, collections::HashMap, fs::File, iter, path::Path};
+use std::{
+    cell::RefCell, collections::HashMap, fs::File, io, iter, path::Path,
+};
 use zip::{write::FileOptions, ZipWriter};
 
 pub fn write_sb3_file(program: &Program, path: &Path) {
@@ -77,6 +79,20 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
         }),
     )
     .unwrap();
+
+    for (name, path) in program
+        .sprites
+        .values()
+        .chain(iter::once(&program.stage))
+        .flat_map(|sprite| &sprite.costumes)
+    {
+        let asset = Asset::new(name, path);
+        let mut file = File::open(path).unwrap();
+        zip.start_file(asset.md5ext, FileOptions::default())
+            .unwrap();
+        io::copy(&mut file, &mut zip).unwrap();
+    }
+
     zip.finish().unwrap();
 }
 
