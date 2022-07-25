@@ -5,8 +5,8 @@ use crate::{
 use trexp::{Bind, Clean, Rewrite, TreeWalk};
 
 pub fn optimize_stmt(stmt: Statement) -> Rewrite<Statement> {
-    stmt.bottom_up(|s| {
-        Rewrite::repeat(s, |s| {
+    Rewrite::repeat(stmt, |s| {
+        s.bottom_up(|s| {
             STMT_OPTIMIZATIONS.iter().fold(Clean(s), Bind::bind_mut)
         })
     })

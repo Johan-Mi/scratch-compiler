@@ -24,6 +24,14 @@ impl Expr {
             _ => todo!(),
         }
     }
+
+    #[must_use]
+    pub const fn as_lit(&self) -> Option<&Value> {
+        match self {
+            Self::Lit(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl TreeWalk<Rewrite<Self>> for Expr {
