@@ -10,14 +10,20 @@ use crate::{
 use serde_json::{json, Value as Json};
 use smol_str::SmolStr;
 use std::{
-    cell::RefCell, collections::HashMap, fs::File, io, iter, path::Path,
+    cell::RefCell,
+    collections::HashMap,
+    fs::File,
+    io::{self, BufWriter},
+    iter,
+    path::Path,
 };
 use zip::{write::FileOptions, ZipWriter};
 
 pub fn write_sb3_file(program: &Program, path: &Path) {
     // TODO: Error handling
     let file = File::create(path).unwrap();
-    let mut zip = ZipWriter::new(file);
+    let buf = BufWriter::new(file);
+    let mut zip = ZipWriter::new(buf);
     zip.start_file("project.json", FileOptions::default())
         .unwrap();
 
