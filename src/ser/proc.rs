@@ -158,7 +158,7 @@ impl SerCtx {
                     }),
                 );
                 self.emit_block(
-                    this,
+                    prototype_id,
                     json!({
                         "opcode": "procedures_prototype",
                         "next": null,
