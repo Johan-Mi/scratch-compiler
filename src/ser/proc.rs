@@ -459,22 +459,37 @@ impl SerCtx {
                 func!(operator_letter_of(STRING: String, LETTER: Number))
             }
             "mod" => func!(operator_mod(NUM1: Number, NUM2: Number)),
-            "abs" => todo!(),
-            "floor" => todo!(),
-            "ceil" => todo!(),
-            "sqrt" => todo!(),
-            "ln" => todo!(),
-            "log" => todo!(),
-            "e^" => todo!(),
-            "ten^" => todo!(),
-            "sin" => todo!(),
-            "cos" => todo!(),
-            "tan" => todo!(),
-            "asin" => todo!(),
-            "acos" => todo!(),
-            "atan" => todo!(),
+            "abs" => self.mathop("abs", parent, args),
+            "floor" => self.mathop("floor", parent, args),
+            "ceil" => self.mathop("ceil", parent, args),
+            "sqrt" => self.mathop("sqrt", parent, args),
+            "ln" => self.mathop("ln", parent, args),
+            "log" => self.mathop("log", parent, args),
+            "e^" => self.mathop("e ^", parent, args),
+            "ten^" => self.mathop("10 ^", parent, args),
+            "sin" => self.mathop("sin", parent, args),
+            "cos" => self.mathop("cos", parent, args),
+            "tan" => self.mathop("tan", parent, args),
+            "asin" => self.mathop("asin", parent, args),
+            "acos" => self.mathop("acos", parent, args),
+            "atan" => self.mathop("atan", parent, args),
             _ => todo!("unknown function `{func_name}`"),
         }
+    }
+
+    fn mathop(&self, op_name: &str, parent: Uid, args: &[Expr]) -> Reporter {
+        let num = match args {
+            [num] => {
+                |parent| self.serialize_expr(num, parent).with_empty_shadow()
+            }
+            _ => todo!(),
+        };
+        self.emit_non_shadow(
+            "operator_mathop",
+            parent,
+            &[("NUM", &num)],
+            &[("OPERATOR", &|_| json!([op_name, null]))],
+        )
     }
 
     fn associative0(
