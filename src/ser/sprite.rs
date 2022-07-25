@@ -68,22 +68,31 @@ impl SerCtx {
             .iter()
             .filter_map(|(name, proc)| match &**name {
                 "when-flag-clicked" | "when-cloned" | "when-received" => None,
-                _ => Some((
-                    name.into(),
-                    CustomProcedure {
-                        params: proc
-                            .params
-                            .iter()
-                            .map(|param| match param {
-                                Expr::Sym(sym) => (sym.clone(), self.new_uid()),
-                                _ => todo!(
-                                    "invalid parameter to custom\
+                _ => {
+                    assert_eq!(
+                        1,
+                        proc.len(),
+                        "duplicate definition of custom procdeure `{name}`"
+                    );
+                    Some((
+                        name.into(),
+                        CustomProcedure {
+                            params: proc[0]
+                                .params
+                                .iter()
+                                .map(|param| match param {
+                                    Expr::Sym(sym) => {
+                                        (sym.clone(), self.new_uid())
+                                    }
+                                    _ => todo!(
+                                        "invalid parameter to custom\
                                     procedure definition:\n{param:#?}"
-                                ),
-                            })
-                            .collect(),
-                    },
-                )),
+                                    ),
+                                })
+                                .collect(),
+                        },
+                    ))
+                }
             })
             .collect();
 

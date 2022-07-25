@@ -13,10 +13,12 @@ use std::collections::HashMap;
 impl SerCtx {
     pub(super) fn serialize_procs(
         &mut self,
-        procs: &HashMap<String, Procedure>,
+        procs: &HashMap<String, Vec<Procedure>>,
     ) -> HashMap<Uid, Json> {
-        for (name, proc) in procs {
-            self.serialize_proc(name, proc);
+        for (name, procs) in procs {
+            for proc in procs {
+                self.serialize_proc(name, proc);
+            }
         }
         self.blocks.take()
     }

@@ -4,7 +4,7 @@ use crate::{
 };
 use fancy_match::fancy_match;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     path::PathBuf,
 };
 
@@ -13,7 +13,7 @@ pub struct Sprite {
     pub costumes: HashMap<String, PathBuf>,
     pub variables: HashSet<String>,
     pub lists: HashSet<String>,
-    pub procedures: HashMap<String, Procedure>,
+    pub procedures: HashMap<String, Vec<Procedure>>,
 }
 
 impl Sprite {
@@ -43,7 +43,10 @@ impl Sprite {
                     "costumes" => parse_costume_decl(&mut costumes, tail),
                     "proc" => {
                         let (name, proc) = Procedure::from_asts(tail);
-                        procedures.insert(name, proc);
+                        procedures
+                            .entry(name)
+                            .or_insert_with(|| Vec::with_capacity(1))
+                            .push(proc);
                     }
                     _ => todo!("invalid item in sprite `{name}`: `{sym}`"),
                 },
@@ -72,11 +75,20 @@ impl Sprite {
         self.costumes.extend(costumes);
         self.variables.extend(variables);
         self.lists.extend(lists);
-        self.procedures.extend(procedures);
+        for (name, procs) in procedures {
+            match self.procedures.entry(name) {
+                Entry::Occupied(mut occupied) => {
+                    occupied.get_mut().extend(procs)
+                }
+                Entry::Vacant(vacant) => {
+                    vacant.insert(procs);
+                }
+            }
+        }
     }
 
     pub fn optimize(&mut self) {
-        for proc in self.procedures.values_mut() {
+        for proc in self.procedures.values_mut().flatten() {
             proc.optimize();
         }
     }
