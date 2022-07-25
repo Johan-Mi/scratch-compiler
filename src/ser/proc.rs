@@ -231,6 +231,7 @@ impl SerCtx {
                     json!({
                         "opcode": "control_if_else",
                         "parent": parent,
+                        "next": next,
                         "inputs": {
                             "CONDITION": condition,
                             "SUBSTACK": [2, if_true],
@@ -241,6 +242,7 @@ impl SerCtx {
                     json!({
                         "opcode": "control_if",
                         "parent": parent,
+                        "next": next,
                         "inputs": {
                             "CONDITION": condition,
                             "SUBSTACK": [2, if_true],
