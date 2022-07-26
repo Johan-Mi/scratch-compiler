@@ -1,7 +1,7 @@
 use crate::{
     ir::{
         expr::Expr::Lit,
-        proc::Statement::{self, *},
+        statement::Statement::{self, *},
     },
     optimize::expr::optimize_expr,
 };

@@ -2,7 +2,7 @@ use super::{reporter::Reporter, Mangled, SerCtx};
 use crate::{
     ir::{
         expr::Expr,
-        proc::{Procedure, Statement},
+        {proc::Procedure, statement::Statement},
     },
     uid::Uid,
 };
