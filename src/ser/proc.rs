@@ -461,7 +461,7 @@ impl SerCtx {
             "mod" => func!(operator_mod(NUM1: Number, NUM2: Number)),
             "abs" => self.mathop("abs", parent, args),
             "floor" => self.mathop("floor", parent, args),
-            "ceil" => self.mathop("ceil", parent, args),
+            "ceil" => self.mathop("ceiling", parent, args),
             "sqrt" => self.mathop("sqrt", parent, args),
             "ln" => self.mathop("ln", parent, args),
             "log" => self.mathop("log", parent, args),
