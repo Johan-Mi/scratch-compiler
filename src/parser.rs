@@ -1,3 +1,6 @@
+pub mod input;
+
+use self::input::{spanned, Input};
 use crate::ast::Ast;
 use nom::{
     branch::alt,
@@ -16,45 +19,54 @@ use nom::{
 };
 use std::borrow::Cow;
 
-pub fn program(input: &str) -> IResult<&str, Vec<Ast>> {
+pub fn program(input: Input) -> IResult<Input, Vec<Ast>> {
     all_consuming(delimited(ws, separated_list0(ws, expr), ws))(input)
 }
 
-fn expr(input: &str) -> IResult<&str, Ast> {
+fn expr(input: Input) -> IResult<Input, Ast> {
     alt((number, string, sym, node, unquote))(input)
 }
 
-fn number(input: &str) -> IResult<&str, Ast> {
+fn number(input: Input) -> IResult<Input, Ast> {
     let hex = based(16, "xX", hex_digit1);
     let binary = based(2, "bB", is_a("01"));
     let octal = based(8, "oO", oct_digit1);
 
-    terminated(alt((hex, binary, octal, double)), not(sym_non_first_char))
-        .map(Ast::Num)
-        .parse(input)
+    spanned(terminated(
+        alt((hex, binary, octal, double)),
+        not(sym_non_first_char),
+    ))
+    .map(|(span, num)| Ast::Num(num, span))
+    .parse(input)
 }
 
 fn based<'a>(
     base: u32,
     prefix: &'static str,
-    digitp: impl FnMut(&'a str) -> IResult<&'a str, &'a str>,
-) -> impl FnMut(&'a str) -> IResult<&'a str, f64> {
+    digitp: impl FnMut(Input<'a>) -> IResult<Input<'a>, Input<'a>>,
+) -> impl FnMut(Input<'a>) -> IResult<Input<'a>, f64> {
     map_res(
         separated_pair(sign, pair(char('0'), one_of(prefix)), digitp),
-        move |(sgn, digits): (_, &str)| {
+        move |(sgn, digits)| {
             let sgn = Cow::Borrowed(sgn.unwrap_or_default());
-            let with_sign = sgn + digits;
+            let with_sign = sgn + digits.as_str();
             i64::from_str_radix(&with_sign, base).map(|n| n as f64)
         },
     )
 }
 
-fn sign(input: &str) -> IResult<&str, Option<&str>> {
-    opt(recognize(one_of("+-")))(input)
+fn sign(input: Input) -> IResult<Input, Option<&str>> {
+    opt(recognize(one_of("+-")))
+        .map(|o| o.map(Input::into_str))
+        .parse(input)
 }
 
-fn string(input: &str) -> IResult<&str, Ast> {
-    let normal = is_not("\"\\\n").map(Cow::Borrowed);
+fn hex_digit(input: Input) -> IResult<Input, char> {
+    satisfy(|c| c.is_ascii_hexdigit())(input)
+}
+
+fn string(input: Input) -> IResult<Input, Ast> {
+    let normal = is_not("\"\\\n").map(Input::into_str).map(Cow::Borrowed);
     let null = value(
         Cow::Borrowed("\0"),
         terminated(char('0'), not(peek(digit1))),
@@ -72,7 +84,6 @@ fn string(input: &str) -> IResult<&str, Ast> {
     ))
     .map(Cow::Borrowed);
 
-    let hex_digit = |inp| satisfy(|c| c.is_ascii_hexdigit())(inp);
     let hex_escape_sequence =
         preceded(char('x'), recognize(count(hex_digit, 2)));
     let hex4digits = recognize(count(hex_digit, 4));
@@ -91,7 +102,7 @@ fn string(input: &str) -> IResult<&str, Ast> {
             map_opt(
                 map_res(
                     alt((hex_escape_sequence, unicode_escape_sequence)),
-                    |digits| u32::from_str_radix(digits, 16),
+                    |digits| u32::from_str_radix(digits.as_str(), 16),
                 ),
                 |c| char::from_u32(c).map(String::from).map(Cow::Owned),
             ),
@@ -99,43 +110,43 @@ fn string(input: &str) -> IResult<&str, Ast> {
     );
     let string_char = alt((normal, escape_sequence));
 
-    delimited(char('"'), many0(string_char), char('"'))
-        .map(|strs| Ast::String(strs.concat()))
+    spanned(delimited(char('"'), many0(string_char), char('"')))
+        .map(|(span, strs)| Ast::String(strs.concat(), span))
         .parse(input)
 }
 
-fn sym_first_char(input: &str) -> IResult<&str, char> {
+fn sym_first_char(input: Input) -> IResult<Input, char> {
     alt((satisfy(char::is_alphabetic), one_of("!$%&*+-./:<=>?@^_~[]")))(input)
 }
 
-fn sym_non_first_char(input: &str) -> IResult<&str, ()> {
+fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
     alt((unit(sym_first_char), unit(digit1)))(input)
 }
 
-fn sym(input: &str) -> IResult<&str, Ast> {
-    recognize(pair(sym_first_char, many0(sym_non_first_char)))
-        .map(|sym: &str| Ast::Sym(sym.to_owned()))
+fn sym(input: Input) -> IResult<Input, Ast> {
+    spanned(recognize(pair(sym_first_char, many0(sym_non_first_char))))
+        .map(|(span, sym)| Ast::Sym(sym.as_str().to_owned(), span))
         .parse(input)
 }
 
-fn node(input: &str) -> IResult<&str, Ast> {
-    let content = pair(expr, many0(preceded(ws, expr)))
-        .map(|(first, rest)| Ast::Node(Box::new(first), rest));
+fn node(input: Input) -> IResult<Input, Ast> {
+    let content = spanned(pair(expr, many0(preceded(ws, expr))))
+        .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span));
 
     delimited(pair(char('('), ws), content, pair(ws, char(')')))(input)
 }
 
-fn unquote(input: &str) -> IResult<&str, Ast> {
-    preceded(pair(char(','), ws), expr)
-        .map(|ast| Ast::Unquote(Box::new(ast)))
+fn unquote(input: Input) -> IResult<Input, Ast> {
+    spanned(preceded(pair(char(','), ws), expr))
+        .map(|(span, ast)| Ast::Unquote(Box::new(ast), span))
         .parse(input)
 }
 
-fn eol_comment(input: &str) -> IResult<&str, ()> {
+fn eol_comment(input: Input) -> IResult<Input, ()> {
     unit(pair(char(';'), opt(is_not("\n\r"))))(input)
 }
 
-fn ws(input: &str) -> IResult<&str, ()> {
+fn ws(input: Input) -> IResult<Input, ()> {
     unit(many0(alt((unit(multispace1), eol_comment))))(input)
 }
 

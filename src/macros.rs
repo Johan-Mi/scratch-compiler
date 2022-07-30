@@ -1,6 +1,6 @@
 use crate::{
     ast::{all_symbols, Ast},
-    parser::program,
+    parser::{input::Input, program},
 };
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs};
@@ -27,12 +27,12 @@ impl MacroContext {
         let mut args = args.into_iter();
         let signature = args.next().unwrap();
         match signature {
-            Ast::Sym(macro_name) => {
+            Ast::Sym(macro_name, ..) => {
                 let body = args.next().unwrap();
                 assert!(args.next().is_none());
                 self.symbols.insert(macro_name, body);
             }
-            Ast::Node(box Ast::Sym(macro_name), params) => {
+            Ast::Node(box Ast::Sym(macro_name, ..), params, ..) => {
                 let params = all_symbols(params);
                 let body = args.next().unwrap();
                 assert!(args.next().is_none());
@@ -64,8 +64,8 @@ impl MacroContext {
 
         #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym("macro"), args) => self.define(args),
-            Ast::Node(box Ast::Sym("include"), args) => {
+            Ast::Node(box Ast::Sym("macro", ..), args, ..) => self.define(args),
+            Ast::Node(box Ast::Sym("include", ..), args, ..) => {
                 for item in self.include(&args) {
                     self.transform_top_level(item);
                 }
@@ -76,9 +76,11 @@ impl MacroContext {
 
     fn include(&mut self, args: &[Ast]) -> Vec<Ast> {
         match args {
-            [Ast::String(path)] => {
+            [Ast::String(path, ..)] => {
                 let source = fs::read_to_string(path).unwrap();
-                program(&source).unwrap().1
+                let file_id =
+                    crate::FILES.lock().unwrap().add(path, source.clone());
+                program(Input::new(&source, file_id)).unwrap().1
             }
             _ => todo!("invalid arguments for `include`:\n{args:#?}"),
         }
@@ -86,8 +88,8 @@ impl MacroContext {
 
     fn use_user_defined_macros(&self, ast: Ast) -> Rewrite<Ast> {
         match &ast {
-            Ast::Sym(sym) => self.symbols.get(sym).cloned(),
-            Ast::Node(box Ast::Sym(sym), args) => {
+            Ast::Sym(sym, ..) => self.symbols.get(sym).cloned(),
+            Ast::Node(box Ast::Sym(sym, ..), args, ..) => {
                 self.functions.get(sym).map(|func_macro| {
                     let params = &func_macro.params;
                     let num_args = args.len();
@@ -109,19 +111,21 @@ impl MacroContext {
 
     fn use_builtin_macros(&self, ast: Ast) -> Rewrite<Ast> {
         (|| {
-            let (sym, args) = match &ast {
-                Ast::Node(box Ast::Sym(sym), args) => (sym, args),
+            let (sym, args, span) = match &ast {
+                Ast::Node(box Ast::Sym(sym, ..), args, span) => {
+                    (sym, args, *span)
+                }
                 _ => return None,
             };
             match &**sym {
                 "str-concat!" => args
                     .iter()
                     .map(|arg| match arg {
-                        Ast::String(s) => Some(&**s),
+                        Ast::String(s, ..) => Some(&**s),
                         _ => None,
                     })
                     .collect::<Option<_>>()
-                    .map(Ast::String),
+                    .map(|s| Ast::String(s, span)),
                 "sym-concat!" => {
                     assert!(
                         !args.is_empty(),
@@ -129,16 +133,17 @@ impl MacroContext {
                     );
                     args.iter()
                         .map(|arg| match arg {
-                            Ast::Sym(sym) => Some(&**sym),
+                            Ast::Sym(sym, ..) => Some(&**sym),
                             _ => None,
                         })
                         .collect::<Option<_>>()
-                        .map(Ast::Sym)
+                        .map(|sym| Ast::Sym(sym, span))
                 }
                 "include-str" => match &args[..] {
-                    [Ast::String(path)] => {
-                        Some(Ast::String(fs::read_to_string(path).unwrap()))
-                    }
+                    [Ast::String(path, ..)] => Some(Ast::String(
+                        fs::read_to_string(path).unwrap(),
+                        span,
+                    )),
                     _ => None,
                 },
                 _ => None,
@@ -148,13 +153,13 @@ impl MacroContext {
     }
 
     fn use_inline_include(&mut self, ast: Ast) -> Rewrite<Ast> {
-        let (head, tail) = match ast {
-            Ast::Node(head, tail) => (head, tail),
+        let (head, tail, span) = match ast {
+            Ast::Node(head, tail, span) => (head, tail, span),
             _ => return Clean(ast),
         };
 
         if !tail.iter().any(|item| item.is_the_function_call("include")) {
-            return Clean(Ast::Node(head, tail));
+            return Clean(Ast::Node(head, tail, span));
         }
 
         let tail = tail
@@ -162,7 +167,7 @@ impl MacroContext {
             .map(|item| {
                 #[fancy_match]
                 match &item {
-                    Ast::Node(box Ast::Sym("include"), args) => {
+                    Ast::Node(box Ast::Sym("include", ..), args, ..) => {
                         Dirty(self.include(args))
                     }
                     _ => Clean(vec![item]),
@@ -170,17 +175,19 @@ impl MacroContext {
             })
             .collect::<Rewrite<Vec<Vec<Ast>>>>();
 
-        tail.map(|tail| Ast::Node(head, tail.into_iter().flatten().collect()))
+        tail.map(|tail| {
+            Ast::Node(head, tail.into_iter().flatten().collect(), span)
+        })
     }
 }
 
 fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Ast {
     match body {
-        Ast::Unquote(box Ast::Sym(sym)) => {
+        Ast::Unquote(box Ast::Sym(sym, ..), ..) => {
             // TODO: Error handling
             bindings.get(&*sym).copied().unwrap().clone()
         }
-        Ast::Unquote(unquoted) => *unquoted,
+        Ast::Unquote(unquoted, ..) => *unquoted,
         _ => body.each_branch(|tree| interpolate(tree, bindings)),
     }
 }

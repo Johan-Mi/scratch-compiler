@@ -21,12 +21,12 @@ impl Sprite {
         // TODO: Error handling
         let mut tail = #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym("sprite"), tail) => tail.into_iter(),
+            Ast::Node(box Ast::Sym("sprite", ..), tail, ..) => tail.into_iter(),
             _ => todo!("invalid sprite definition:\n{ast:#?}"),
         };
 
         let name = match tail.next() {
-            Some(Ast::String(name)) => name,
+            Some(Ast::String(name, ..)) => name,
             _ => todo!(),
         };
 
@@ -37,7 +37,7 @@ impl Sprite {
 
         for decl in tail {
             match decl {
-                Ast::Node(box Ast::Sym(sym), tail) => match &*sym {
+                Ast::Node(box Ast::Sym(sym, ..), tail, ..) => match &*sym {
                     "variables" => variables.extend(all_symbols(tail)),
                     "lists" => lists.extend(all_symbols(tail)),
                     "costumes" => parse_costume_decl(&mut costumes, tail),
@@ -99,12 +99,12 @@ fn parse_costume_decl(costumes: &mut HashMap<String, PathBuf>, args: Vec<Ast>) {
     let mut args = args.into_iter();
     while let Some(name) = args.next() {
         let name = match name {
-            Ast::String(name) => name,
+            Ast::String(name, ..) => name,
             _ => todo!(),
         };
         let path = args.next().unwrap();
         let path = match path {
-            Ast::String(path) => path,
+            Ast::String(path, ..) => path,
             _ => todo!(),
         };
         costumes.insert(name, path.into());

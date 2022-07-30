@@ -28,10 +28,10 @@ impl Procedure {
         for stmt_or_decl in args {
             #[fancy_match]
             match stmt_or_decl {
-                Ast::Node(box Ast::Sym("variables"), var_decls) => {
+                Ast::Node(box Ast::Sym("variables", ..), var_decls, ..) => {
                     variables.extend(all_symbols(var_decls));
                 }
-                Ast::Node(box Ast::Sym("lists"), list_decls) => {
+                Ast::Node(box Ast::Sym("lists", ..), list_decls, ..) => {
                     lists.extend(all_symbols(list_decls));
                 }
                 _ => body.push(Statement::from_ast(stmt_or_decl)),
@@ -57,7 +57,7 @@ impl Procedure {
 fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
     // TODO: Error handling
     match ast {
-        Ast::Node(box Ast::Sym(name), params) => {
+        Ast::Node(box Ast::Sym(name, ..), params, ..) => {
             let params = params.into_iter().map(Expr::from_ast).collect();
             (name, params)
         }

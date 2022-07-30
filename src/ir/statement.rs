@@ -38,7 +38,7 @@ impl Statement {
     pub fn from_ast(ast: Ast) -> Self {
         // TODO: Error handling
         match ast {
-            Ast::Node(box Ast::Sym(sym), tail) => {
+            Ast::Node(box Ast::Sym(sym, ..), tail, ..) => {
                 let mut tail = tail.into_iter();
                 match &*sym {
                     "do" => Self::Do(tail.map(Self::from_ast).collect()),
@@ -86,7 +86,7 @@ impl Statement {
                     "for" => {
                         let counter = tail.next().unwrap();
                         let counter = match counter {
-                            Ast::Sym(sym) => sym,
+                            Ast::Sym(sym, ..) => sym,
                             _ => todo!(),
                         };
                         let times = tail.next().unwrap();
