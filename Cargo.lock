@@ -170,6 +170,7 @@ dependencies = [
  "serde",
  "serde_json",
  "smol_str",
+ "thiserror",
  "trexp",
  "zip",
 ]
@@ -235,9 +236,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "thiserror"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd829fe32373d27f76265620b5309d0340cb8550f523c1dda251d6298069069a"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0396bc89e626244658bef819e22d0cc459e795a5ebe878e6ec336d1674a8d79a"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "trexp"
 version = "0.1.0"
-source = "git+https://github.com/Johan-Mi/trexp#3d3ffbed5634c2ca9adba90d09578c45cf3bc1b6"
+source = "git+https://github.com/Johan-Mi/trexp#a965ae34f684d13a1104b5349618072e424ad9e3"
 
 [[package]]
 name = "unicode-ident"

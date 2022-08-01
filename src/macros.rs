@@ -1,17 +1,19 @@
 use crate::{
     ast::{all_symbols, Ast},
+    error::{Error, Result},
     parser::{input::Input, program},
+    span::Span,
 };
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs};
 use trexp::{Clean, Dirty, Rewrite, TreeWalk};
 
-pub fn expand(program: Vec<Ast>) -> Vec<Ast> {
+pub fn expand(program: Vec<Ast>) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext::default();
     for ast in program {
-        ctx.transform_top_level(ast);
+        ctx.transform_top_level(ast)?;
     }
-    ctx.asts
+    Ok(ctx.asts)
 }
 
 #[derive(Default)]
@@ -22,95 +24,115 @@ struct MacroContext {
 }
 
 impl MacroContext {
-    fn define(&mut self, args: Vec<Ast>) {
-        // TODO: Error handling
+    fn define(&mut self, args: Vec<Ast>, span: Span) -> Result<()> {
         let mut args = args.into_iter();
-        let signature = args.next().unwrap();
+        let signature = args.next().ok_or_else(|| {
+            Box::new(Error::MacroDefinitionMissingBody { span })
+        })?;
         match signature {
             Ast::Sym(macro_name, ..) => {
-                let body = args.next().unwrap();
+                let body = args.next().ok_or_else(|| {
+                    Box::new(Error::MacroDefinitionMissingBody { span })
+                })?;
                 assert!(args.next().is_none());
                 self.symbols.insert(macro_name, body);
+                Ok(())
             }
             Ast::Node(box Ast::Sym(macro_name, ..), params, ..) => {
                 let params = all_symbols(params);
-                let body = args.next().unwrap();
+                let body = args.next().ok_or_else(|| {
+                    Box::new(Error::MacroDefinitionMissingSignature { span })
+                })?;
                 assert!(args.next().is_none());
                 self.functions
                     .insert(macro_name, FunctionMacro { params, body });
+                Ok(())
             }
-            _ => todo!("invalid macro signature:\n{signature:#?}"),
+            _ => Err(Box::new(Error::InvalidMacroSignature { span })),
         }
     }
 
-    fn transform_shallow(&mut self, ast: Ast) -> Rewrite<Ast> {
+    fn transform_shallow(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
         [
             |this: &mut Self, ast| Self::use_builtin_macros(this, ast),
             |this: &mut Self, ast| Self::use_user_defined_macros(this, ast),
             Self::use_inline_include,
         ]
         .iter()
-        .fold(Clean(ast), |ast, f| ast.bind(|ast| f(self, ast)))
+        .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
     }
 
-    fn transform_deep(&mut self, ast: Ast) -> Rewrite<Ast> {
-        Rewrite::repeat(ast, |ast| {
+    fn transform_deep(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
+        Rewrite::try_repeat(ast, |ast| {
             ast.bottom_up(|branch| self.transform_shallow(branch))
         })
     }
 
-    fn transform_top_level(&mut self, ast: Ast) {
-        let ast = self.transform_deep(ast).into_inner();
+    fn transform_top_level(&mut self, ast: Ast) -> Result<()> {
+        let ast = self.transform_deep(ast)?.into_inner();
 
         #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym("macro", ..), args, ..) => self.define(args),
-            Ast::Node(box Ast::Sym("include", ..), args, ..) => {
-                for item in self.include(&args) {
-                    self.transform_top_level(item);
-                }
+            Ast::Node(box Ast::Sym("macro", ..), args, span) => {
+                self.define(args, span)
             }
-            _ => self.asts.push(ast),
+            Ast::Node(box Ast::Sym("include", ..), args, span) => {
+                for item in self.include(&args, span)? {
+                    self.transform_top_level(item)?;
+                }
+                Ok(())
+            }
+            _ => {
+                self.asts.push(ast);
+                Ok(())
+            }
         }
     }
 
-    fn include(&mut self, args: &[Ast]) -> Vec<Ast> {
+    fn include(&mut self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
         match args {
             [Ast::String(path, ..)] => {
                 let source = fs::read_to_string(path).unwrap();
                 let file_id =
                     crate::FILES.lock().unwrap().add(path, source.clone());
-                program(Input::new(&source, file_id)).unwrap().1
+                Ok(program(Input::new(&source, file_id)).unwrap().1)
             }
-            _ => todo!("invalid arguments for `include`:\n{args:#?}"),
+            _ => Err(Box::new(Error::InvalidArgsForInclude { span })),
         }
     }
 
-    fn use_user_defined_macros(&self, ast: Ast) -> Rewrite<Ast> {
-        match &ast {
+    fn use_user_defined_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
+        Ok(match &ast {
             Ast::Sym(sym, ..) => self.symbols.get(sym).cloned(),
-            Ast::Node(box Ast::Sym(sym, ..), args, ..) => {
-                self.functions.get(sym).map(|func_macro| {
+            Ast::Node(box Ast::Sym(sym, ..), args, span) => self
+                .functions
+                .get(sym)
+                .map(|func_macro| {
                     let params = &func_macro.params;
                     let num_args = args.len();
                     let num_params = params.len();
-                    assert_eq!(
-                        num_args, num_params,
-                        "function macro `{sym}` expected {num_params}\
-                    arguments but got {num_args}"
-                    );
+                    if num_args != num_params {
+                        return Err(Box::new(
+                            Error::FunctionMacroWrongArgCount {
+                                span: *span,
+                                macro_name: sym.clone(),
+                                expected: num_params,
+                                got: num_args,
+                            },
+                        ));
+                    }
                     let bindings =
                         params.iter().map(String::as_str).zip(args).collect();
                     interpolate(func_macro.body.clone(), &bindings)
                 })
-            }
+                .transpose()?,
             _ => None,
         }
-        .map_or(Clean(ast), Dirty)
+        .map_or(Clean(ast), Dirty))
     }
 
-    fn use_builtin_macros(&self, ast: Ast) -> Rewrite<Ast> {
-        (|| {
+    fn use_builtin_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
+        Ok((|| {
             let (sym, args, span) = match &ast {
                 Ast::Node(box Ast::Sym(sym, ..), args, span) => {
                     (sym, args, *span)
@@ -149,17 +171,17 @@ impl MacroContext {
                 _ => None,
             }
         })()
-        .map_or(Clean(ast), Dirty)
+        .map_or(Clean(ast), Dirty))
     }
 
-    fn use_inline_include(&mut self, ast: Ast) -> Rewrite<Ast> {
+    fn use_inline_include(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
         let (head, tail, span) = match ast {
             Ast::Node(head, tail, span) => (head, tail, span),
-            _ => return Clean(ast),
+            _ => return Ok(Clean(ast)),
         };
 
         if !tail.iter().any(|item| item.is_the_function_call("include")) {
-            return Clean(Ast::Node(head, tail, span));
+            return Ok(Clean(Ast::Node(head, tail, span)));
         }
 
         let tail = tail
@@ -167,27 +189,33 @@ impl MacroContext {
             .map(|item| {
                 #[fancy_match]
                 match &item {
-                    Ast::Node(box Ast::Sym("include", ..), args, ..) => {
-                        Dirty(self.include(args))
+                    Ast::Node(box Ast::Sym("include", ..), args, span) => {
+                        self.include(args, *span).map(Dirty)
                     }
-                    _ => Clean(vec![item]),
+                    _ => Ok(Clean(vec![item])),
                 }
             })
-            .collect::<Rewrite<Vec<Vec<Ast>>>>();
+            .collect::<Result<Rewrite<Vec<Vec<Ast>>>>>()?;
 
-        tail.map(|tail| {
+        Ok(tail.map(|tail| {
             Ast::Node(head, tail.into_iter().flatten().collect(), span)
-        })
+        }))
     }
 }
 
-fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Ast {
+fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Result<Ast> {
     match body {
-        Ast::Unquote(box Ast::Sym(sym, ..), ..) => {
-            // TODO: Error handling
-            bindings.get(&*sym).copied().unwrap().clone()
-        }
-        Ast::Unquote(unquoted, ..) => *unquoted,
+        Ast::Unquote(box Ast::Sym(sym, span), ..) => bindings
+            .get(&*sym)
+            .ok_or_else(|| {
+                Box::new(Error::UnknownMetavariable {
+                    span,
+                    var_name: sym,
+                })
+            })
+            .copied()
+            .cloned(),
+        Ast::Unquote(unquoted, ..) => Ok(*unquoted),
         _ => body.each_branch(|tree| interpolate(tree, bindings)),
     }
 }

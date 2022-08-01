@@ -32,6 +32,46 @@ impl TreeWalk<Self> for Ast {
     }
 }
 
+impl<E> TreeWalk<Result<Self, E>> for Ast {
+    fn each_branch(
+        self,
+        mut f: impl FnMut(Self) -> Result<Self, E>,
+    ) -> Result<Self, E> {
+        match self {
+            Ast::Num(..) | Ast::String(..) | Ast::Sym(..) => Ok(self),
+            Ast::Node(mut head, tail, span) => {
+                *head = f(*head)?;
+                let tail = tail.into_iter().map(f).collect::<Result<_, _>>()?;
+                Ok(Self::Node(head, tail, span))
+            }
+            Ast::Unquote(mut unquoted, span) => {
+                *unquoted = f(*unquoted)?;
+                Ok(Self::Unquote(unquoted, span))
+            }
+        }
+    }
+}
+
+impl<E> TreeWalk<Result<Rewrite<Self>, E>> for Ast {
+    fn each_branch(
+        self,
+        mut f: impl FnMut(Self) -> Result<Rewrite<Self>, E>,
+    ) -> Result<Rewrite<Self>, E> {
+        match self {
+            Ast::Num(..) | Ast::String(..) | Ast::Sym(..) => Ok(Clean(self)),
+            Ast::Node(head, tail, span) => f(*head)?.try_bind(|head| {
+                Ok(tail
+                    .into_iter()
+                    .map(f)
+                    .collect::<Result<Rewrite<_>, _>>()?
+                    .map(|tail| Self::Node(Box::new(head), tail, span)))
+            }),
+            Ast::Unquote(unquoted, span) => Ok(f(*unquoted)?
+                .map(|unquoted| Self::Unquote(Box::new(unquoted), span))),
+        }
+    }
+}
+
 impl TreeWalk<Rewrite<Self>> for Ast {
     fn each_branch(
         self,

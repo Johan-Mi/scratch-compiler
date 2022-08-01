@@ -5,6 +5,7 @@
 
 mod asset;
 mod ast;
+mod error;
 mod ir;
 mod macros;
 mod optimize;
@@ -44,7 +45,13 @@ fn main() {
         }
     };
 
-    let expanded = expand(asts);
+    let expanded = match expand(asts) {
+        Ok(input) => input,
+        Err(err) => {
+            eprintln!("{err}");
+            return;
+        }
+    };
     let mut program = Program::from_asts(expanded);
     program.optimize();
     write_sb3_file(&program, Path::new("project.sb3"));
