@@ -1,3 +1,4 @@
+use crate::span::Span;
 use codespan::{ByteIndex, FileId};
 use nom::{
     error::ParseError, AsBytes, Compare, IResult, InputIter, InputLength,
@@ -7,8 +8,6 @@ use std::{
     ops::{Range, RangeFrom, RangeTo},
     str::{CharIndices, Chars},
 };
-
-use crate::span::Span;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Input<'a> {
