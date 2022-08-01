@@ -14,14 +14,14 @@ impl Reporter {
         }
     }
 
-    pub fn shadow(json: Json) -> Self {
+    pub const fn shadow(json: Json) -> Self {
         Self {
             json,
             shape: Shape::Shadow,
         }
     }
 
-    pub fn non_shadow(json: Json) -> Self {
+    pub const fn non_shadow(json: Json) -> Self {
         Self {
             json,
             shape: Shape::NonShadow,

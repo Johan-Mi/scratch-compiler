@@ -25,7 +25,11 @@ impl<'a> Input<'a> {
         }
     }
 
-    pub fn as_str(&self) -> &str {
+    pub const fn as_str(&self) -> &str {
+        self.text
+    }
+
+    pub const fn into_str(self) -> &'a str {
         self.text
     }
 
@@ -33,12 +37,6 @@ impl<'a> Input<'a> {
         u32::try_from(self.text.as_ptr() as usize - self.start)
             .unwrap()
             .into()
-    }
-}
-
-impl<'a> Input<'a> {
-    pub fn into_str(self) -> &'a str {
-        self.text
     }
 }
 
