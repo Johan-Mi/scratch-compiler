@@ -1,4 +1,6 @@
-use crate::{ast::Ast, ir::expr::Expr, optimize::statement::optimize_stmt};
+use crate::{
+    ast::Ast, ir::expr::Expr, optimize::statement::optimize_stmt, span::Span,
+};
 use std::mem;
 use trexp::{Clean, Rewrite, TreeWalk};
 
@@ -28,7 +30,7 @@ pub enum Statement {
         body: Box<Statement>,
     },
     For {
-        counter: String,
+        counter: (String, Span),
         times: Expr,
         body: Box<Statement>,
     },
@@ -86,7 +88,7 @@ impl Statement {
                     "for" => {
                         let counter = tail.next().unwrap();
                         let counter = match counter {
-                            Ast::Sym(sym, ..) => sym,
+                            Ast::Sym(sym, span) => (sym, span),
                             _ => todo!(),
                         };
                         let times = tail.next().unwrap();

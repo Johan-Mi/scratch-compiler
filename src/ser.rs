@@ -4,6 +4,7 @@ mod sprite;
 
 use crate::{
     asset::Asset,
+    error::Result,
     ir::{proc::CustomProcedure, Program},
     uid::{Uid, UidGenerator},
 };
@@ -19,7 +20,7 @@ use std::{
 };
 use zip::{write::FileOptions, ZipWriter};
 
-pub fn write_sb3_file(program: &Program, path: &Path) {
+pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     // TODO: Error handling
     let file = File::create(path).unwrap();
     let buf = BufWriter::new(file);
@@ -73,7 +74,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
     let targets = iter::once(("Stage", &program.stage))
         .chain(program.sprites.iter().map(|(name, spr)| (&**name, spr)))
         .map(|(name, spr)| ctx.serialize_sprite(name, spr))
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
 
     serde_json::to_writer(
         &mut zip,
@@ -100,6 +101,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) {
     }
 
     zip.finish().unwrap();
+    Ok(())
 }
 
 struct SerCtx {

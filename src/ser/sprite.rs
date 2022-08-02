@@ -1,6 +1,7 @@
 use super::{Mangled, SerCtx};
 use crate::{
     asset::Asset,
+    error::Result,
     ir::{expr::Expr, proc::CustomProcedure, sprite::Sprite},
 };
 use serde_json::{json, Value as Json};
@@ -11,7 +12,7 @@ impl SerCtx {
         &mut self,
         name: &str,
         sprite: &Sprite,
-    ) -> Json {
+    ) -> Result<Json> {
         let variables = sprite
             .variables
             .iter()
@@ -81,7 +82,7 @@ impl SerCtx {
                                 .params
                                 .iter()
                                 .map(|param| match param {
-                                    Expr::Sym(sym) => {
+                                    Expr::Sym(sym, ..) => {
                                         (sym.clone(), self.new_uid())
                                     }
                                     _ => todo!(
@@ -96,9 +97,9 @@ impl SerCtx {
             })
             .collect();
 
-        let blocks = self.serialize_procs(&sprite.procedures);
+        let blocks = self.serialize_procs(&sprite.procedures)?;
 
-        json!({
+        Ok(json!({
             "name": name,
             "isStage": name == "Stage",
             "variables": var_initializers,
@@ -107,6 +108,6 @@ impl SerCtx {
             "currentCostume": 1,
             "sounds": [],
             "blocks": blocks,
-        })
+        }))
     }
 }

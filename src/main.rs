@@ -54,5 +54,7 @@ fn main() {
     };
     let mut program = Program::from_asts(expanded);
     program.optimize();
-    write_sb3_file(&program, Path::new("project.sb3"));
+    if let Err(err) = write_sb3_file(&program, Path::new("project.sb3")) {
+        eprintln!("{err}");
+    }
 }
