@@ -22,11 +22,19 @@ const STMT_OPTIMIZATIONS: &[fn(Statement) -> Rewrite<Statement>] =
 fn optimize_stmt_exprs(stmt: Statement) -> Rewrite<Statement> {
     match stmt {
         Do(_) | Forever(_) => Clean(stmt),
-        ProcCall { proc_name, args } => args
+        ProcCall {
+            proc_name,
+            proc_span,
+            args,
+        } => args
             .into_iter()
             .map(optimize_expr)
             .collect::<Rewrite<_>>()
-            .map(|args| ProcCall { proc_name, args }),
+            .map(|args| ProcCall {
+                proc_name,
+                proc_span,
+                args,
+            }),
         IfElse {
             condition,
             if_true,

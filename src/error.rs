@@ -30,6 +30,10 @@ pub enum Error {
     MacroDefinitionMissingSignature {
         span: Span,
     },
+    UnknownFunction {
+        span: Span,
+        func_name: String,
+    },
     UnknownList {
         span: Span,
         list_name: SmolStr,
@@ -37,6 +41,10 @@ pub enum Error {
     UnknownMetavariable {
         span: Span,
         var_name: String,
+    },
+    UnknownProc {
+        span: Span,
+        proc_name: String,
     },
     UnknownVar {
         span: Span,
@@ -78,11 +86,17 @@ impl Error {
                 span,
                 String::from("macro definition is missing a signature"),
             ),
+            UnknownFunction { span, func_name } => {
+                (span, format!("unknown function: `{func_name}`"))
+            }
             UnknownList { span, list_name } => {
                 (span, format!("unknown list: `{list_name}`"))
             }
             UnknownMetavariable { span, var_name } => {
                 (span, format!("unknown metavariable: `{var_name}`"))
+            }
+            UnknownProc { span, proc_name } => {
+                (span, format!("unknown procedure: `{proc_name}`"))
             }
             UnknownVar { span, var_name } => {
                 (span, format!("unknown variable: `{var_name}`"))

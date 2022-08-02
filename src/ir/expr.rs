@@ -7,7 +7,7 @@ use trexp::{Clean, Rewrite, TreeWalk};
 pub enum Expr {
     Lit(Value),
     Sym(SmolStr, Span),
-    FuncCall(String, Vec<Expr>),
+    FuncCall(String, Span, Vec<Expr>),
 }
 
 impl Expr {
@@ -17,10 +17,13 @@ impl Expr {
             Ast::Num(num, ..) => Self::Lit(Value::Num(num)),
             Ast::String(s, ..) => Self::Lit(Value::String(s.into())),
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
-            Ast::Node(box Ast::Sym(func_name, ..), args, ..) => Self::FuncCall(
-                func_name,
-                args.into_iter().map(Self::from_ast).collect(),
-            ),
+            Ast::Node(box Ast::Sym(func_name, span), args, ..) => {
+                Self::FuncCall(
+                    func_name,
+                    span,
+                    args.into_iter().map(Self::from_ast).collect(),
+                )
+            }
             _ => todo!(),
         }
     }
@@ -41,11 +44,11 @@ impl TreeWalk<Rewrite<Self>> for Expr {
     ) -> Rewrite<Self> {
         match self {
             Expr::Lit(_) | Expr::Sym(..) => Clean(self),
-            Expr::FuncCall(func_name, args) => args
-                .into_iter()
-                .map(f)
-                .collect::<Rewrite<_>>()
-                .map(|new_args| Self::FuncCall(func_name, new_args)),
+            Expr::FuncCall(func_name, func_span, args) => {
+                args.into_iter().map(f).collect::<Rewrite<_>>().map(
+                    |new_args| Self::FuncCall(func_name, func_span, new_args),
+                )
+            }
         }
     }
 }

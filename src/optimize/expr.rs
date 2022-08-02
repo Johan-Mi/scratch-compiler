@@ -18,7 +18,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[const_minus];
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
     #[fancy_match]
     match &expr {
-        FuncCall("-", args) => match &args[..] {
+        FuncCall("-", _, args) => match &args[..] {
             [Lit(negation)] => Dirty(Lit(Value::Num(-negation.to_num()))),
             [Lit(lhs), rest @ ..] => {
                 match rest

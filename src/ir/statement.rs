@@ -8,6 +8,7 @@ use trexp::{Clean, Rewrite, TreeWalk};
 pub enum Statement {
     ProcCall {
         proc_name: String,
+        proc_span: Span,
         args: Vec<Expr>,
     },
     Do(Vec<Statement>),
@@ -40,7 +41,7 @@ impl Statement {
     pub fn from_ast(ast: Ast) -> Self {
         // TODO: Error handling
         match ast {
-            Ast::Node(box Ast::Sym(sym, ..), tail, ..) => {
+            Ast::Node(box Ast::Sym(sym, sym_span), tail, ..) => {
                 let mut tail = tail.into_iter();
                 match &*sym {
                     "do" => Self::Do(tail.map(Self::from_ast).collect()),
@@ -143,6 +144,7 @@ impl Statement {
                     }
                     _ => Self::ProcCall {
                         proc_name: sym,
+                        proc_span: sym_span,
                         args: tail.map(Expr::from_ast).collect(),
                     },
                 }

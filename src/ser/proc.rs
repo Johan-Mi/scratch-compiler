@@ -198,9 +198,13 @@ impl SerCtx {
         next: Option<Uid>,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
         Ok(match stmt {
-            Statement::ProcCall { proc_name, args } => {
-                self.serialize_proc_call(proc_name, args, parent, next)?
-            }
+            Statement::ProcCall {
+                proc_name,
+                proc_span,
+                args,
+            } => self.serialize_proc_call(
+                proc_name, args, parent, next, *proc_span,
+            )?,
             Statement::Do(stmts) => match &stmts[..] {
                 [] => (None, Some(parent)),
                 [single] => self.serialize_stmt(single, parent, next)?,
@@ -354,8 +358,8 @@ impl SerCtx {
                     }
                 }
             },
-            Expr::FuncCall(func_name, args) => {
-                self.serialize_func_call(func_name, args, parent)?
+            Expr::FuncCall(func_name, span, args) => {
+                self.serialize_func_call(func_name, args, parent, *span)?
             }
         })
     }
@@ -369,6 +373,7 @@ impl SerCtx {
         func_name: &str,
         args: &[Expr],
         parent: Uid,
+        span: Span,
     ) -> Result<Reporter> {
         macro_rules! func {
             ($opcode:ident(
@@ -411,7 +416,7 @@ impl SerCtx {
                         ("NUM1", &self.empty_shadow_input(lhs)),
                         ("NUM2", &|parent| {
                             Ok(self
-                                .serialize_func_call("+", rest, parent)?
+                                .serialize_func_call("+", rest, parent, span)?
                                 .with_empty_shadow())
                         }),
                     ],
@@ -436,7 +441,12 @@ impl SerCtx {
                         ("NUM1", &self.empty_shadow_input(numerator)),
                         ("NUM2", &|parent| {
                             Ok(self
-                                .serialize_func_call("+", denominators, parent)?
+                                .serialize_func_call(
+                                    "+",
+                                    denominators,
+                                    parent,
+                                    span,
+                                )?
                                 .with_empty_shadow())
                         }),
                     ],
@@ -492,7 +502,10 @@ impl SerCtx {
             "asin" => self.mathop("asin", parent, args),
             "acos" => self.mathop("acos", parent, args),
             "atan" => self.mathop("atan", parent, args),
-            _ => todo!("unknown function `{func_name}`"),
+            _ => Err(Box::new(Error::UnknownFunction {
+                span,
+                func_name: func_name.to_owned(),
+            })),
         }
     }
 
@@ -553,6 +566,7 @@ impl SerCtx {
         args: &[Expr],
         parent: Uid,
         next: Option<Uid>,
+        span: Span,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
         macro_rules! proc {
             ($opcode:ident(
@@ -650,7 +664,9 @@ impl SerCtx {
                 _ => todo!(),
             },
             "clone-myself" => todo!(),
-            _ => self.serialize_custom_proc_call(proc_name, args, parent, next),
+            _ => self.serialize_custom_proc_call(
+                proc_name, args, parent, next, span,
+            ),
         }
     }
 
@@ -660,11 +676,14 @@ impl SerCtx {
         args: &[Expr],
         parent: Uid,
         next: Option<Uid>,
+        span: Span,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
-        let proc = self
-            .custom_procs
-            .get(proc_name)
-            .unwrap_or_else(|| todo!("unknown procedure `{proc_name}`"));
+        let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
+            Box::new(Error::UnknownProc {
+                span,
+                proc_name: proc_name.to_owned(),
+            })
+        })?;
 
         let this = self.new_uid();
 
