@@ -14,6 +14,16 @@ impl Ast {
     pub fn is_the_function_call(&self, func_name: &str) -> bool {
         matches!(self, Self::Node(box Ast::Sym(sym, ..), ..) if sym == func_name)
     }
+
+    pub fn span(&self) -> Span {
+        match *self {
+            Ast::Num(_, span) => span,
+            Ast::String(_, span) => span,
+            Ast::Sym(_, span) => span,
+            Ast::Node(_, _, span) => span,
+            Ast::Unquote(_, span) => span,
+        }
+    }
 }
 
 impl TreeWalk<Self> for Ast {

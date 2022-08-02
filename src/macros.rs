@@ -48,7 +48,9 @@ impl MacroContext {
                     .insert(macro_name, FunctionMacro { params, body });
                 Ok(())
             }
-            _ => Err(Box::new(Error::InvalidMacroSignature { span })),
+            invalid_signature => Err(Box::new(Error::InvalidMacroSignature {
+                span: invalid_signature.span(),
+            })),
         }
     }
 
