@@ -3,7 +3,11 @@ pub mod proc;
 pub mod sprite;
 pub mod statement;
 
-use crate::{ast::Ast, ir::sprite::Sprite};
+use crate::{
+    ast::Ast,
+    error::{Error, Result},
+    ir::sprite::Sprite,
+};
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug)]
@@ -13,8 +17,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn from_asts(asts: Vec<Ast>) -> Self {
-        // TODO: Error handling
+    pub fn from_asts(asts: Vec<Ast>) -> Result<Self> {
         let mut sprites = HashMap::<String, Sprite>::new();
 
         for ast in asts {
@@ -29,8 +32,11 @@ impl Program {
             }
         }
 
-        let stage = sprites.remove("Stage").unwrap();
-        Self { stage, sprites }
+        let stage = sprites
+            .remove("Stage")
+            .ok_or_else(|| Box::new(Error::ProgramMissingStage))?;
+
+        Ok(Self { stage, sprites })
     }
 
     pub fn optimize(&mut self) {

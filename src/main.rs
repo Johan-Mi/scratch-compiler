@@ -45,16 +45,11 @@ fn main() {
         }
     };
 
-    let expanded = match expand(asts) {
-        Ok(input) => input,
-        Err(err) => {
-            err.emit();
-            return;
-        }
-    };
-    let mut program = Program::from_asts(expanded);
-    program.optimize();
-    if let Err(err) = write_sb3_file(&program, Path::new("project.sb3")) {
+    if let Err(err) = expand(asts).and_then(|expanded| {
+        let mut program = Program::from_asts(expanded)?;
+        program.optimize();
+        write_sb3_file(&program, Path::new("project.sb3"))
+    }) {
         err.emit();
     }
 }

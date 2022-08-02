@@ -1,6 +1,6 @@
 use crate::{span::Span, FILES};
 use codespan_reporting::{
-    diagnostic::{Diagnostic, Label},
+    diagnostic::Label,
     term::{
         self,
         termcolor::{ColorChoice, StandardStream},
@@ -30,6 +30,7 @@ pub enum Error {
     MacroDefinitionMissingSignature {
         span: Span,
     },
+    ProgramMissingStage,
     UnknownFunction {
         span: Span,
         func_name: String,
@@ -59,57 +60,53 @@ pub enum Error {
 impl Error {
     pub fn emit(&self) {
         use Error::*;
-        let (primary_span, message) = match self {
+        let diagnostic = match self {
             FunctionMacroWrongArgCount {
                 span,
                 macro_name,
                 expected,
                 got,
-            } => (
-                span,
+            } => with_span(
                 format!(
-                    "function macro `{macro_name}` expected {expected} {} but\
+                    "function macro `{macro_name}` expected {expected} {} but \
                     got {got}",
                     plural(*expected, "argument", "arguments"),
                 ),
+                *span,
             ),
             InvalidArgsForInclude { span } => {
-                (span, String::from("invalid arguments for `include`"))
+                with_span("invalid arguments for `include`", *span)
             }
             InvalidMacroSignature { span } => {
-                (span, String::from("invalid macro signature"))
+                with_span("invalid macro signature", *span)
             }
             MacroDefinitionMissingBody { span } => {
-                (span, String::from("macro definition is missing a body"))
+                with_span("macro definition is missing a body", *span)
             }
-            MacroDefinitionMissingSignature { span } => (
-                span,
-                String::from("macro definition is missing a signature"),
-            ),
+            MacroDefinitionMissingSignature { span } => {
+                with_span("macro definition is missing a signature", *span)
+            }
+            ProgramMissingStage => just_message("program is missing a stage"),
             UnknownFunction { span, func_name } => {
-                (span, format!("unknown function: `{func_name}`"))
+                with_span(format!("unknown function: `{func_name}`"), *span)
             }
             UnknownList { span, list_name } => {
-                (span, format!("unknown list: `{list_name}`"))
+                with_span(format!("unknown list: `{list_name}`"), *span)
             }
             UnknownMetavariable { span, var_name } => {
-                (span, format!("unknown metavariable: `{var_name}`"))
+                with_span(format!("unknown metavariable: `{var_name}`"), *span)
             }
             UnknownProc { span, proc_name } => {
-                (span, format!("unknown procedure: `{proc_name}`"))
+                with_span(format!("unknown procedure: `{proc_name}`"), *span)
             }
             UnknownVar { span, var_name } => {
-                (span, format!("unknown variable: `{var_name}`"))
+                with_span(format!("unknown variable: `{var_name}`"), *span)
             }
-            UnknownVarOrList { span, sym_name } => {
-                (span, format!("unknown variable or list: `{sym_name}`"))
-            }
+            UnknownVarOrList { span, sym_name } => with_span(
+                format!("unknown variable or list: `{sym_name}`"),
+                *span,
+            ),
         };
-
-        let diagnostic =
-            Diagnostic::error().with_message(message).with_labels(vec![
-                Label::primary(primary_span.file, primary_span.position),
-            ]);
 
         let writer = StandardStream::stderr(ColorChoice::Always);
         let config = codespan_reporting::term::Config::default();
@@ -125,4 +122,15 @@ fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
     } else {
         many
     }
+}
+
+type Diagnostic = codespan_reporting::diagnostic::Diagnostic<codespan::FileId>;
+
+fn just_message(message: impl Into<String>) -> Diagnostic {
+    Diagnostic::error().with_message(message)
+}
+
+fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
+    just_message(message)
+        .with_labels(vec![Label::primary(span.file, span.position)])
 }
