@@ -60,8 +60,8 @@ impl Error {
             } => (
                 span,
                 format!(
-                    "{span}: function macro `{macro_name}` expected \
-                    {expected} {} but got {got}",
+                    "function macro `{macro_name}` expected {expected} {} but\
+                    got {got}",
                     plural(*expected, "argument", "arguments"),
                 ),
             ),
