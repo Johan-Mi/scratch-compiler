@@ -21,7 +21,7 @@ impl Program {
         let mut sprites = HashMap::<String, Sprite>::new();
 
         for ast in asts {
-            let (name, sprite) = Sprite::from_ast(ast);
+            let (name, sprite) = Sprite::from_ast(ast)?;
             match sprites.entry(name) {
                 Entry::Occupied(mut merging_existing_sprite) => {
                     merging_existing_sprite.get_mut().merge(sprite);

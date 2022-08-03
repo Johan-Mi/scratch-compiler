@@ -380,10 +380,12 @@ impl SerCtx {
                 $($param_name:ident: $param_type:ident),*
             )) => {
                 self.simple_function(
+                    func_name,
                     stringify!($opcode),
                     &[$(Param::$param_type(stringify!($param_name))),*],
                     parent,
                     args,
+                    span,
                 )
             }
         }
@@ -721,13 +723,23 @@ impl SerCtx {
 
     fn simple_function(
         &self,
+        func_name: &str,
         opcode: &str,
         params: &[Param],
         parent: Uid,
         args: &[Expr],
+        span: Span,
     ) -> Result<Reporter> {
         let this = self.new_uid();
 
+        if params.len() != args.len() {
+            return Err(Box::new(Error::FunctionWrongArgCount {
+                span,
+                func_name: func_name.to_owned(),
+                expected: params.len(),
+                got: args.len(),
+            }));
+        }
         assert_eq!(params.len(), args.len());
         let inputs: Json = params
             .iter()

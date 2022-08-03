@@ -4,7 +4,7 @@ mod sprite;
 
 use crate::{
     asset::Asset,
-    error::Result,
+    error::{Error, Result},
     ir::{proc::CustomProcedure, Program},
     uid::{Uid, UidGenerator},
 };
@@ -22,11 +22,14 @@ use zip::{write::FileOptions, ZipWriter};
 
 pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     // TODO: Error handling
-    let file = File::create(path).unwrap();
+    let file = File::create(path)
+        .map_err(|err| Box::new(Error::CouldNotCreateSb3File { inner: err }))?;
     let buf = BufWriter::new(file);
     let mut zip = ZipWriter::new(buf);
     zip.start_file("project.json", FileOptions::default())
-        .unwrap();
+        .map_err(|err| {
+            Box::new(Error::CouldNotCreateProjectJson { inner: err })
+        })?;
 
     let uid_gen = UidGenerator::new();
 
@@ -100,7 +103,8 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
         io::copy(&mut file, &mut zip).unwrap();
     }
 
-    zip.finish().unwrap();
+    zip.finish()
+        .map_err(|err| Box::new(Error::CouldNotFinishZip { inner: err }))?;
     Ok(())
 }
 

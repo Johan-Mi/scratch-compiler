@@ -1,5 +1,6 @@
 use crate::{
     ast::{all_symbols, Ast},
+    error::{Error, Result},
     ir::proc::Procedure,
 };
 use fancy_match::fancy_match;
@@ -17,18 +18,29 @@ pub struct Sprite {
 }
 
 impl Sprite {
-    pub fn from_ast(ast: Ast) -> (String, Self) {
+    pub fn from_ast(ast: Ast) -> Result<(String, Self)> {
         // TODO: Error handling
-        let mut tail = #[fancy_match]
+        let (mut tail, span) = #[fancy_match]
         match ast {
-            Ast::Node(box Ast::Sym("sprite", ..), tail, ..) => tail.into_iter(),
+            Ast::Node(box Ast::Sym("sprite", ..), tail, span) => {
+                (tail.into_iter(), span)
+            }
             _ => todo!("invalid sprite definition:\n{ast:#?}"),
         };
 
         let name = match tail.next() {
-            Some(Ast::String(name, ..)) => name,
-            _ => todo!(),
-        };
+            Some(Ast::String(name, ..)) => Ok(name),
+            Some(Ast::Sym(_, sym_span)) => {
+                Err(Box::new(Error::SpriteMissingName {
+                    span,
+                    candidate_symbol: Some(sym_span),
+                }))
+            }
+            _ => Err(Box::new(Error::SpriteMissingName {
+                span,
+                candidate_symbol: None,
+            })),
+        }?;
 
         let mut costumes = HashMap::new();
         let mut variables = HashSet::new();
@@ -36,6 +48,7 @@ impl Sprite {
         let mut procedures = HashMap::new();
 
         for decl in tail {
+            let span = decl.span();
             match decl {
                 Ast::Node(box Ast::Sym(sym, ..), tail, ..) => match &*sym {
                     "variables" => variables.extend(all_symbols(tail)),
@@ -48,13 +61,17 @@ impl Sprite {
                             .or_insert_with(|| Vec::with_capacity(1))
                             .push(proc);
                     }
-                    _ => todo!("invalid item in sprite `{name}`: `{sym}`"),
+                    _ => {
+                        return Err(Box::new(Error::InvalidItemInSprite {
+                            span,
+                        }))
+                    }
                 },
-                _ => todo!(),
+                _ => return Err(Box::new(Error::InvalidItemInSprite { span })),
             }
         }
 
-        (
+        Ok((
             name,
             Self {
                 costumes,
@@ -62,7 +79,7 @@ impl Sprite {
                 lists,
                 procedures,
             },
-        )
+        ))
     }
 
     pub fn merge(&mut self, other: Self) {
