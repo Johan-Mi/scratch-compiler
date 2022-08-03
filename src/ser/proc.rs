@@ -462,7 +462,7 @@ impl SerCtx {
                 "operator_join",
                 "STRING1",
                 "STRING2",
-                &Value::String(Default::default()),
+                &Value::String(smol_str::SmolStr::default()),
                 args,
                 parent,
             ),
@@ -1054,6 +1054,7 @@ enum Param<'a> {
     List(&'a str),
 }
 
+#[derive(Clone, Copy)]
 struct Call<'a> {
     name: &'a str,
     opcode: &'a str,

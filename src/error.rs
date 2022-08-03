@@ -217,7 +217,7 @@ impl Error {
     }
 }
 
-fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
+const fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
     if count == 1 {
         one
     } else {

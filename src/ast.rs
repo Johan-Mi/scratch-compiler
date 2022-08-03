@@ -15,13 +15,13 @@ impl Ast {
         matches!(self, Self::Node(box Ast::Sym(sym, ..), ..) if sym == func_name)
     }
 
-    pub fn span(&self) -> Span {
+    pub const fn span(&self) -> Span {
         match *self {
-            Ast::Num(_, span) => span,
-            Ast::String(_, span) => span,
-            Ast::Sym(_, span) => span,
-            Ast::Node(_, _, span) => span,
-            Ast::Unquote(_, span) => span,
+            Ast::Num(_, span)
+            | Ast::String(_, span)
+            | Ast::Sym(_, span)
+            | Ast::Node(_, _, span)
+            | Ast::Unquote(_, span) => span,
         }
     }
 }

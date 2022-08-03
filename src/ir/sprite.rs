@@ -95,7 +95,7 @@ impl Sprite {
         for (name, procs) in procedures {
             match self.procedures.entry(name) {
                 Entry::Occupied(mut occupied) => {
-                    occupied.get_mut().extend(procs)
+                    occupied.get_mut().extend(procs);
                 }
                 Entry::Vacant(vacant) => {
                     vacant.insert(procs);

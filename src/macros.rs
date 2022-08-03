@@ -56,9 +56,9 @@ impl MacroContext {
 
     fn transform_shallow(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
         [
-            |this: &mut Self, ast| Self::use_builtin_macros(this, ast),
-            |this: &mut Self, ast| Self::use_user_defined_macros(this, ast),
-            Self::use_inline_include,
+            |_this: &Self, ast| Self::use_builtin_macros(ast),
+            Self::use_user_defined_macros,
+            |_this: &Self, ast| Self::use_inline_include(ast),
         ]
         .iter()
         .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
@@ -79,7 +79,7 @@ impl MacroContext {
                 self.define(args, span)
             }
             Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                for item in self.include(&args, span)? {
+                for item in include(&args, span)? {
                     self.transform_top_level(item)?;
                 }
                 Ok(())
@@ -88,18 +88,6 @@ impl MacroContext {
                 self.asts.push(ast);
                 Ok(())
             }
-        }
-    }
-
-    fn include(&mut self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
-        match args {
-            [Ast::String(path, ..)] => {
-                let source = fs::read_to_string(path).unwrap();
-                let file_id =
-                    crate::FILES.lock().unwrap().add(path, source.clone());
-                Ok(program(Input::new(&source, file_id)).unwrap().1)
-            }
-            _ => Err(Box::new(Error::InvalidArgsForInclude { span })),
         }
     }
 
@@ -133,7 +121,7 @@ impl MacroContext {
         .map_or(Clean(ast), Dirty))
     }
 
-    fn use_builtin_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
+    fn use_builtin_macros(ast: Ast) -> Result<Rewrite<Ast>> {
         Ok((|| {
             let (sym, args, span) = match &ast {
                 Ast::Node(box Ast::Sym(sym, ..), args, span) => {
@@ -176,7 +164,7 @@ impl MacroContext {
         .map_or(Clean(ast), Dirty))
     }
 
-    fn use_inline_include(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
+    fn use_inline_include(ast: Ast) -> Result<Rewrite<Ast>> {
         let (head, tail, span) = match ast {
             Ast::Node(head, tail, span) => (head, tail, span),
             _ => return Ok(Clean(ast)),
@@ -192,7 +180,7 @@ impl MacroContext {
                 #[fancy_match]
                 match &item {
                     Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                        self.include(args, *span).map(Dirty)
+                        include(args, *span).map(Dirty)
                     }
                     _ => Ok(Clean(vec![item])),
                 }
@@ -202,6 +190,18 @@ impl MacroContext {
         Ok(tail.map(|tail| {
             Ast::Node(head, tail.into_iter().flatten().collect(), span)
         }))
+    }
+}
+
+fn include(args: &[Ast], span: Span) -> Result<Vec<Ast>> {
+    match args {
+        [Ast::String(path, ..)] => {
+            let source = fs::read_to_string(path).unwrap();
+            let file_id =
+                crate::FILES.lock().unwrap().add(path, source.clone());
+            Ok(program(Input::new(&source, file_id)).unwrap().1)
+        }
+        _ => Err(Box::new(Error::InvalidArgsForInclude { span })),
     }
 }
 
