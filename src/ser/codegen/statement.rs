@@ -336,64 +336,8 @@ impl SerCtx {
                 got: args.len(),
             }));
         }
-        let inputs: Json = params
-            .iter()
-            .zip(args)
-            .map(|(param, arg)| {
-                Ok(match param {
-                    Param::String(param_name) | Param::Number(param_name) => {
-                        Some((
-                            *param_name,
-                            self.serialize_expr(arg, this)?.with_empty_shadow(),
-                        ))
-                    }
-                    Param::Bool(param_name) => Some((
-                        *param_name,
-                        self.serialize_expr(arg, this)?.without_shadow(),
-                    )),
-                    _ => None,
-                })
-            })
-            .filter_map(Result::transpose)
-            .collect::<Result<_>>()?;
-        let fields: Json = params
-            .iter()
-            .zip(args)
-            .map(|(param, arg)| {
-                Ok(match param {
-                    Param::Var(param_name) => {
-                        let (var_name, span) = match arg {
-                            Expr::Sym(sym, span) => (sym, *span),
-                            _ => todo!(),
-                        };
-                        let var =
-                            self.lookup_var(var_name).ok_or_else(|| {
-                                Box::new(Error::UnknownVar {
-                                    span,
-                                    var_name: var_name.clone(),
-                                })
-                            })?;
-                        Some((*param_name, json!([var.name, var.id])))
-                    }
-                    Param::List(param_name) => {
-                        let (list_name, span) = match arg {
-                            Expr::Sym(sym, span) => (sym, *span),
-                            _ => todo!(),
-                        };
-                        let list =
-                            self.lookup_list(list_name).ok_or_else(|| {
-                                Box::new(Error::UnknownList {
-                                    span,
-                                    list_name: list_name.clone(),
-                                })
-                            })?;
-                        Some((*param_name, json!([list.name, list.id])))
-                    }
-                    _ => None,
-                })
-            })
-            .filter_map(Result::transpose)
-            .collect::<Result<_>>()?;
+        let (inputs, fields) =
+            self.create_inputs_and_fields(params, args, this)?;
 
         self.emit_block(
             this,

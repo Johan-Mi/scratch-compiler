@@ -241,17 +241,8 @@ impl SerCtx {
         fields: InputFieldFns,
     ) -> Result<Reporter> {
         let this = self.new_uid();
-
-        let inputs: Json = inputs
-            .iter()
-            .copied()
-            .map(|(name, fun)| Ok((name, fun(this)?)))
-            .collect::<Result<_>>()?;
-        let fields: Json = fields
-            .iter()
-            .copied()
-            .map(|(name, fun)| Ok((name, fun(this)?)))
-            .collect::<Result<_>>()?;
+        let inputs = resolve_input_field_fns(inputs, this)?;
+        let fields = resolve_input_field_fns(fields, this)?;
 
         self.emit_block(
             this,
@@ -275,17 +266,8 @@ impl SerCtx {
         fields: InputFieldFns,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
         let this = self.new_uid();
-
-        let inputs: Json = inputs
-            .iter()
-            .copied()
-            .map(|(name, fun)| Ok((name, fun(this)?)))
-            .collect::<Result<_>>()?;
-        let fields: Json = fields
-            .iter()
-            .copied()
-            .map(|(name, fun)| Ok((name, fun(this)?)))
-            .collect::<Result<_>>()?;
+        let inputs = resolve_input_field_fns(inputs, this)?;
+        let fields = resolve_input_field_fns(fields, this)?;
 
         self.emit_block(
             this,
@@ -318,9 +300,84 @@ impl SerCtx {
             .or_else(|| self.sprite_lists.get(list_name))
             .or_else(|| self.global_lists.get(list_name))
     }
+
+    fn create_inputs_and_fields(
+        &self,
+        params: &[Param],
+        args: &[Expr],
+        parent: Uid,
+    ) -> Result<(Json, Json)> {
+        let inputs = params
+            .iter()
+            .zip(args)
+            .map(|(param, arg)| {
+                Ok(match param {
+                    Param::String(param_name) | Param::Number(param_name) => {
+                        Some((
+                            *param_name,
+                            self.serialize_expr(arg, parent)?
+                                .with_empty_shadow(),
+                        ))
+                    }
+                    Param::Bool(param_name) => Some((
+                        *param_name,
+                        self.serialize_expr(arg, parent)?.without_shadow(),
+                    )),
+                    _ => None,
+                })
+            })
+            .filter_map(Result::transpose)
+            .collect::<Result<_>>()?;
+        let fields = params
+            .iter()
+            .zip(args)
+            .map(|(param, arg)| {
+                Ok(match param {
+                    Param::Var(param_name) => {
+                        let (var_name, span) = match arg {
+                            Expr::Sym(sym, span) => (sym, *span),
+                            _ => todo!(),
+                        };
+                        let var =
+                            self.lookup_var(var_name).ok_or_else(|| {
+                                Box::new(Error::UnknownVar {
+                                    span,
+                                    var_name: var_name.clone(),
+                                })
+                            })?;
+                        Some((*param_name, json!([var.name, var.id])))
+                    }
+                    Param::List(param_name) => {
+                        let (list_name, span) = match arg {
+                            Expr::Sym(sym, span) => (sym, *span),
+                            _ => todo!(),
+                        };
+                        let list =
+                            self.lookup_list(list_name).ok_or_else(|| {
+                                Box::new(Error::UnknownList {
+                                    span,
+                                    list_name: list_name.clone(),
+                                })
+                            })?;
+                        Some((*param_name, json!([list.name, list.id])))
+                    }
+                    _ => None,
+                })
+            })
+            .filter_map(Result::transpose)
+            .collect::<Result<_>>()?;
+        Ok((inputs, fields))
+    }
 }
 
 type InputFieldFns<'a> = &'a [(&'a str, &'a dyn Fn(Uid) -> Result<Json>)];
+
+fn resolve_input_field_fns(fns: InputFieldFns, parent: Uid) -> Result<Json> {
+    fns.iter()
+        .copied()
+        .map(|(name, fun)| Ok((name, fun(parent)?)))
+        .collect()
+}
 
 enum Param<'a> {
     String(&'a str),
