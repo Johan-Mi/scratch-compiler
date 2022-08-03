@@ -49,16 +49,14 @@ fn based<'a>(
         separated_pair(sign, pair(char('0'), one_of(prefix)), digitp),
         move |(sgn, digits)| {
             let sgn = Cow::Borrowed(sgn.unwrap_or_default());
-            let with_sign = sgn + digits.as_str();
+            let with_sign = sgn + digits.to_str();
             i64::from_str_radix(&with_sign, base).map(|n| n as f64)
         },
     )
 }
 
 fn sign(input: Input) -> IResult<Input, Option<&str>> {
-    opt(recognize(one_of("+-")))
-        .map(|o| o.map(Input::into_str))
-        .parse(input)
+    opt(recognize(one_of("+-")).map(Input::to_str)).parse(input)
 }
 
 fn hex_digit(input: Input) -> IResult<Input, char> {
@@ -66,7 +64,7 @@ fn hex_digit(input: Input) -> IResult<Input, char> {
 }
 
 fn string(input: Input) -> IResult<Input, Ast> {
-    let normal = is_not("\"\\\n").map(Input::into_str).map(Cow::Borrowed);
+    let normal = is_not("\"\\\n").map(Input::to_str).map(Cow::Borrowed);
     let null = value(
         Cow::Borrowed("\0"),
         terminated(char('0'), not(peek(digit1))),
@@ -102,7 +100,7 @@ fn string(input: Input) -> IResult<Input, Ast> {
             map_opt(
                 map_res(
                     alt((hex_escape_sequence, unicode_escape_sequence)),
-                    |digits| u32::from_str_radix(digits.as_str(), 16),
+                    |digits| u32::from_str_radix(digits.to_str(), 16),
                 ),
                 |c| char::from_u32(c).map(String::from).map(Cow::Owned),
             ),
@@ -125,7 +123,7 @@ fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
 
 fn sym(input: Input) -> IResult<Input, Ast> {
     spanned(recognize(pair(sym_first_char, many0(sym_non_first_char))))
-        .map(|(span, sym)| Ast::Sym(sym.as_str().to_owned(), span))
+        .map(|(span, sym)| Ast::Sym(sym.to_str().to_owned(), span))
         .parse(input)
 }
 

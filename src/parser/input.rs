@@ -25,11 +25,7 @@ impl<'a> Input<'a> {
         }
     }
 
-    pub const fn as_str(&self) -> &str {
-        self.text
-    }
-
-    pub const fn into_str(self) -> &'a str {
+    pub const fn to_str(self) -> &'a str {
         self.text
     }
 
