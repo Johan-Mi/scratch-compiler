@@ -1,4 +1,5 @@
 use crate::uid::Uid;
+use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
 
 pub struct Reporter {
@@ -12,6 +13,10 @@ impl Reporter {
             json: json!(uid),
             shape: Shape::NonShadow,
         }
+    }
+
+    pub fn from_lit(lit: &Value) -> Self {
+        Self::shadow(json!([10, lit.to_cow_str()]))
     }
 
     pub const fn shadow(json: Json) -> Self {

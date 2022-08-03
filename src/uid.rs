@@ -19,11 +19,11 @@ impl Serialize for Uid {
     }
 }
 
-pub struct UidGenerator {
+pub struct Generator {
     counter: Cell<NonZeroU32>,
 }
 
-impl UidGenerator {
+impl Generator {
     pub fn new() -> Self {
         Self {
             counter: Cell::new(NonZeroU32::new(1).unwrap()),

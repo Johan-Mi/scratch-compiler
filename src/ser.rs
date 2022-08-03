@@ -1,12 +1,11 @@
-mod proc;
-mod reporter;
+mod codegen;
 mod sprite;
 
 use crate::{
     asset::Asset,
     error::{Error, Result},
     ir::{proc::CustomProcedure, Program},
-    uid::{Uid, UidGenerator},
+    uid::Uid,
 };
 use serde_json::{json, Value as Json};
 use smol_str::SmolStr;
@@ -31,7 +30,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
             Box::new(Error::CouldNotCreateProjectJson { inner: err })
         })?;
 
-    let uid_gen = UidGenerator::new();
+    let uid_gen = crate::uid::Generator::new();
 
     let global_vars = program
         .stage
@@ -109,7 +108,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
 }
 
 struct SerCtx {
-    uid_gen: UidGenerator,
+    uid_gen: crate::uid::Generator,
     blocks: RefCell<HashMap<Uid, Json>>,
     custom_procs: HashMap<SmolStr, CustomProcedure>,
     proc_args: Vec<SmolStr>,
