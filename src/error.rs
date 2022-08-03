@@ -10,6 +10,12 @@ pub type Result<T> = std::result::Result<T, Box<Error>>;
 
 #[derive(Debug)]
 pub enum Error {
+    BuiltinProcWrongArgCount {
+        span: Span,
+        proc_name: String,
+        expected: usize,
+        got: usize,
+    },
     CouldNotCreateSb3File {
         inner: io::Error,
     },
@@ -81,6 +87,18 @@ impl Error {
     pub fn emit(&self) {
         use Error::*;
         let diagnostics = match self {
+            BuiltinProcWrongArgCount {
+                span,
+                proc_name,
+                expected,
+                got,
+            } => vec![wrong_arg_count(
+                "builtin procedure",
+                proc_name,
+                *expected,
+                *got,
+                *span,
+            )],
             CouldNotCreateSb3File { inner } => {
                 vec![just_message("could not create SB3 file")
                     .with_notes(vec![inner.to_string()])]
@@ -98,12 +116,11 @@ impl Error {
                 macro_name,
                 expected,
                 got,
-            } => vec![with_span(
-                format!(
-                    "function macro `{macro_name}` expected {expected} {} but \
-                    got {got}",
-                    plural(*expected, "argument", "arguments"),
-                ),
+            } => vec![wrong_arg_count(
+                "function macro",
+                macro_name,
+                *expected,
+                *got,
                 *span,
             )],
             FunctionWrongArgCount {
@@ -111,13 +128,8 @@ impl Error {
                 func_name,
                 expected,
                 got,
-            } => vec![with_span(
-                format!(
-                    "function `{func_name}` expected {expected} {} but \
-                    got {got}",
-                    plural(*expected, "argument", "arguments"),
-                ),
-                *span,
+            } => vec![wrong_arg_count(
+                "function", func_name, *expected, *got, *span,
             )],
             InvalidArgsForInclude { span } => {
                 vec![with_span("invalid arguments for `include`", *span)]
@@ -227,4 +239,20 @@ fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
 
 fn secondary(span: Span) -> Label {
     Label::secondary(span.file, span.position)
+}
+
+fn wrong_arg_count(
+    kind: &str,
+    name: &str,
+    expected: usize,
+    got: usize,
+    span: Span,
+) -> Diagnostic {
+    with_span(
+        format!(
+            "{kind} `{name}` expected {expected} {} but got {got}",
+            plural(expected, "argument", "arguments"),
+        ),
+        span,
+    )
 }

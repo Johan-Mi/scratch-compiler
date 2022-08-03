@@ -380,12 +380,14 @@ impl SerCtx {
                 $($param_name:ident: $param_type:ident),*
             )) => {
                 self.simple_function(
-                    func_name,
-                    stringify!($opcode),
+                    Call {
+                        name: func_name,
+                        opcode: stringify!($opcode),
+                        parent,
+                        args,
+                        span,
+                    },
                     &[$(Param::$param_type(stringify!($param_name))),*],
-                    parent,
-                    args,
-                    span,
                 )
             }
         }
@@ -575,11 +577,15 @@ impl SerCtx {
                 $($param_name:ident: $param_type:ident),*
             )) => {
                 self.simple_proc(
-                    stringify!($opcode),
+                    Call {
+                        args,
+                        name: proc_name,
+                        opcode: stringify!($opcode),
+                        parent,
+                        span,
+                    },
                     &[$(Param::$param_type(stringify!($param_name))),*],
-                    parent,
                     next,
-                    args,
                 )
             }
         }
@@ -723,14 +729,17 @@ impl SerCtx {
 
     fn simple_function(
         &self,
-        func_name: &str,
-        opcode: &str,
+        call: Call,
         params: &[Param],
-        parent: Uid,
-        args: &[Expr],
-        span: Span,
     ) -> Result<Reporter> {
         let this = self.new_uid();
+        let Call {
+            name: func_name,
+            opcode,
+            parent,
+            args,
+            span,
+        } = call;
 
         if params.len() != args.len() {
             return Err(Box::new(Error::FunctionWrongArgCount {
@@ -814,15 +823,27 @@ impl SerCtx {
 
     fn simple_proc(
         &self,
-        opcode: &str,
+        call: Call,
         params: &[Param],
-        parent: Uid,
         next: Option<Uid>,
-        args: &[Expr],
     ) -> Result<(Option<Uid>, Option<Uid>)> {
         let this = self.new_uid();
+        let Call {
+            args,
+            name: proc_name,
+            opcode,
+            parent,
+            span,
+        } = call;
 
-        assert_eq!(params.len(), args.len());
+        if params.len() != args.len() {
+            return Err(Box::new(Error::BuiltinProcWrongArgCount {
+                span,
+                proc_name: proc_name.to_owned(),
+                expected: params.len(),
+                got: args.len(),
+            }));
+        }
         let inputs: Json = params
             .iter()
             .zip(args)
@@ -1031,4 +1052,12 @@ enum Param<'a> {
     Bool(&'a str),
     Var(&'a str),
     List(&'a str),
+}
+
+struct Call<'a> {
+    name: &'a str,
+    opcode: &'a str,
+    parent: Uid,
+    args: &'a [Expr],
+    span: Span,
 }
