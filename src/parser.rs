@@ -128,10 +128,10 @@ fn sym(input: Input) -> IResult<Input, Ast> {
 }
 
 fn node(input: Input) -> IResult<Input, Ast> {
-    let content = spanned(pair(expr, many0(preceded(ws, expr))))
-        .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span));
-
-    delimited(pair(char('('), ws), content, pair(ws, char(')')))(input)
+    let content = pair(expr, many0(preceded(ws, expr)));
+    spanned(delimited(pair(char('('), ws), content, pair(ws, char(')'))))
+        .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span))
+        .parse(input)
 }
 
 fn unquote(input: Input) -> IResult<Input, Ast> {
