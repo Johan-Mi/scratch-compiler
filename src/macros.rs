@@ -139,10 +139,11 @@ impl MacroContext {
                     .collect::<Option<_>>()
                     .map(|s| Ast::String(s, span)),
                 "sym-concat!" => {
-                    assert!(
-                        !args.is_empty(),
-                        "`sym-concat!` cannot create an empty symbol"
-                    );
+                    if args.is_empty() {
+                        return Some(Err(Box::new(
+                            Error::SymConcatEmptySymbol { span },
+                        )));
+                    }
                     args.iter()
                         .map(|arg| match arg {
                             Ast::Sym(sym, ..) => Some(&**sym),
@@ -160,7 +161,9 @@ impl MacroContext {
                 },
                 _ => None,
             }
+            .map(Ok)
         })()
+        .transpose()?
         .map_or(Clean(ast), Dirty))
     }
 

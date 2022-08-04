@@ -57,6 +57,9 @@ pub enum Error {
         span: Span,
         candidate_symbol: Option<Span>,
     },
+    SymConcatEmptySymbol {
+        span: Span,
+    },
     UnknownFunction {
         span: Span,
         func_name: String,
@@ -174,6 +177,12 @@ impl Error {
                     vec![diagnostic]
                 }
             }
+            SymConcatEmptySymbol { span } => vec![
+                with_span("`sym-concat!` cannot create an empty symbol", *span),
+                Diagnostic::help().with_message(
+                    "At least one symbol must be provided as an argument",
+                ),
+            ],
             UnknownFunction { span, func_name } => {
                 vec![with_span(
                     format!("unknown function: `{func_name}`"),
