@@ -261,6 +261,7 @@ impl SerCtx {
                 _ => todo!(),
             },
             "clone-myself" => todo!(),
+            "reset-timer" => proc!(sensing_resettimer()),
             _ => self.serialize_custom_proc_call(
                 proc_name, args, parent, next, span,
             ),

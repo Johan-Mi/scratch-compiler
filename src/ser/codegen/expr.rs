@@ -191,6 +191,7 @@ impl SerCtx {
             "asin" => self.mathop("asin", parent, args),
             "acos" => self.mathop("acos", parent, args),
             "atan" => self.mathop("atan", parent, args),
+            "pressing-key" => func!(sensing_keypressed(KEY_OPTION: String)),
             _ => Err(Box::new(Error::UnknownFunction {
                 span,
                 func_name: func_name.to_owned(),
