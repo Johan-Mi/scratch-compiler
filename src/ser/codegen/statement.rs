@@ -181,6 +181,9 @@ impl SerCtx {
             "stamp" => proc!(pen_stamp()),
             "pen-down" => proc!(pen_penDown()),
             "pen-up" => proc!(pen_penUp()),
+            "set-pen-size" => proc!(pen_setPenSizeTo(SIZE: Number)),
+            // TODO: Color parameters
+            "set-pen-color" => proc!(pen_setPenColorToColor(COLOR: Number)),
             "set-xy" => proc!(motion_gotoxy(X: Number, Y: Number)),
             "set-size" => proc!(looks_setsizeto(SIZE: Number)),
             "set-costume" => proc!(looks_switchcostumeto(COSTUME: String)),
