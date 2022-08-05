@@ -25,6 +25,11 @@ pub enum Error {
     CouldNotFinishZip {
         inner: zip::result::ZipError,
     },
+    FunctionMacroMatchFailed {
+        pattern: Span,
+        provided: Span,
+        macro_name: String,
+    },
     FunctionMacroWrongArgCount {
         span: Span,
         macro_name: String,
@@ -114,6 +119,18 @@ impl Error {
                 vec![just_message("could not finish zip archive")
                     .with_notes(vec![inner.to_string()])]
             }
+            FunctionMacroMatchFailed {
+                pattern,
+                provided,
+                macro_name,
+            } => vec![just_message(format!(
+                "argument to function macro `{macro_name}` does not match the \
+                pattern in its definition"
+            ))
+            .with_labels(vec![
+                primary(*provided).with_message("argument provided here"),
+                secondary(*pattern).with_message("pattern was defined here"),
+            ])],
             FunctionMacroWrongArgCount {
                 span,
                 macro_name,
@@ -242,8 +259,11 @@ fn just_message(message: impl Into<String>) -> Diagnostic {
 }
 
 fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
-    just_message(message)
-        .with_labels(vec![Label::primary(span.file, span.position)])
+    just_message(message).with_labels(vec![primary(span)])
+}
+
+fn primary(span: Span) -> Label {
+    Label::primary(span.file, span.position)
 }
 
 fn secondary(span: Span) -> Label {

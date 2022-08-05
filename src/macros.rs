@@ -1,5 +1,5 @@
 use crate::{
-    ast::{all_symbols, Ast},
+    ast::Ast,
     error::{Error, Result},
     parser::{input::Input, program},
     span::Span,
@@ -39,7 +39,10 @@ impl MacroContext {
                 Ok(())
             }
             Ast::Node(box Ast::Sym(macro_name, ..), params, ..) => {
-                let params = all_symbols(params);
+                let params = params
+                    .into_iter()
+                    .map(Parameter::from_ast)
+                    .collect::<Result<_>>()?;
                 let body = args.next().ok_or_else(|| {
                     Box::new(Error::MacroDefinitionMissingBody { span })
                 })?;
@@ -54,7 +57,7 @@ impl MacroContext {
         }
     }
 
-    fn transform_shallow(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
+    fn transform_shallow(&self, ast: Ast) -> Result<Rewrite<Ast>> {
         [
             |_this: &Self, ast| Self::use_builtin_macros(ast),
             Self::use_user_defined_macros,
@@ -64,14 +67,20 @@ impl MacroContext {
         .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
     }
 
-    fn transform_deep(&mut self, ast: Ast) -> Result<Rewrite<Ast>> {
+    fn transform_deep(&self, ast: Ast) -> Result<Rewrite<Ast>> {
         Rewrite::try_repeat(ast, |ast| {
             ast.bottom_up(|branch| self.transform_shallow(branch))
         })
     }
 
     fn transform_top_level(&mut self, ast: Ast) -> Result<()> {
-        let ast = self.transform_deep(ast)?.into_inner();
+        // HACK: Prevents early expansion of macro body, while still allowing
+        // macros to define other macros.
+        let ast = if ast.is_the_function_call("macro") {
+            ast
+        } else {
+            self.transform_deep(ast)?.into_inner()
+        };
 
         #[fancy_match]
         match ast {
@@ -111,8 +120,14 @@ impl MacroContext {
                             },
                         ));
                     }
-                    let bindings =
-                        params.iter().map(String::as_str).zip(args).collect();
+                    let mut bindings = HashMap::new();
+                    for (param, arg) in params.iter().zip(args) {
+                        param.pattern_match(
+                            sym,
+                            &self.transform_deep(arg.clone())?.into_inner(),
+                            &mut bindings,
+                        )?;
+                    }
                     interpolate(func_macro.body.clone(), &bindings)
                 })
                 .transpose()?,
@@ -208,7 +223,7 @@ fn include(args: &[Ast], span: Span) -> Result<Vec<Ast>> {
     }
 }
 
-fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Result<Ast> {
+fn interpolate(body: Ast, bindings: &HashMap<String, Ast>) -> Result<Ast> {
     match body {
         Ast::Unquote(box Ast::Sym(sym, span), ..) => bindings
             .get(&*sym)
@@ -218,7 +233,6 @@ fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Result<Ast> {
                     var_name: sym,
                 })
             })
-            .copied()
             .cloned(),
         Ast::Unquote(unquoted, ..) => Ok(*unquoted),
         _ => body.each_branch(|tree| interpolate(tree, bindings)),
@@ -226,6 +240,59 @@ fn interpolate(body: Ast, bindings: &HashMap<&str, &Ast>) -> Result<Ast> {
 }
 
 struct FunctionMacro {
-    params: Vec<String>,
+    params: Vec<Parameter>,
     body: Ast,
+}
+
+enum Parameter {
+    Var(String),
+    Constructor(String, Vec<Parameter>, Span),
+}
+
+impl Parameter {
+    fn from_ast(ast: Ast) -> Result<Self> {
+        match ast {
+            Ast::Sym(var, _) => Ok(Self::Var(var)),
+            Ast::Node(box Ast::Sym(name, _), subparams, span) => {
+                Ok(Self::Constructor(
+                    name,
+                    subparams
+                        .into_iter()
+                        .map(Parameter::from_ast)
+                        .collect::<Result<_>>()?,
+                    span,
+                ))
+            }
+            _ => todo!(),
+        }
+    }
+
+    fn pattern_match(
+        &self,
+        macro_name: &str,
+        ast: &Ast,
+        bindings: &mut HashMap<String, Ast>,
+    ) -> Result<()> {
+        match self {
+            Parameter::Var(var) => {
+                assert!(bindings.insert(var.clone(), ast.clone()).is_none());
+                Ok(())
+            }
+            Parameter::Constructor(name, subparams, span) => match ast {
+                Ast::Node(box Ast::Sym(sym, _), subtrees, _)
+                    if sym == name && subparams.len() == subtrees.len() =>
+                {
+                    for (p, t) in subparams.iter().zip(subtrees) {
+                        p.pattern_match(macro_name, t, bindings)?;
+                    }
+                    Ok(())
+                }
+                _ => Err(Box::new(Error::FunctionMacroMatchFailed {
+                    pattern: *span,
+                    provided: ast.span(),
+                    macro_name: macro_name.to_owned(),
+                })),
+            },
+        }
+    }
 }
