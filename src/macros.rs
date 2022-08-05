@@ -27,7 +27,7 @@ impl MacroContext {
     fn define(&mut self, args: Vec<Ast>, span: Span) -> Result<()> {
         let mut args = args.into_iter();
         let signature = args.next().ok_or_else(|| {
-            Box::new(Error::MacroDefinitionMissingBody { span })
+            Box::new(Error::MacroDefinitionMissingSignature { span })
         })?;
         match signature {
             Ast::Sym(macro_name, ..) => {
@@ -41,7 +41,7 @@ impl MacroContext {
             Ast::Node(box Ast::Sym(macro_name, ..), params, ..) => {
                 let params = all_symbols(params);
                 let body = args.next().ok_or_else(|| {
-                    Box::new(Error::MacroDefinitionMissingSignature { span })
+                    Box::new(Error::MacroDefinitionMissingBody { span })
                 })?;
                 assert!(args.next().is_none());
                 self.functions
