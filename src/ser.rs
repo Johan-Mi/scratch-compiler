@@ -12,8 +12,8 @@ use smol_str::SmolStr;
 use std::{
     cell::RefCell,
     collections::HashMap,
-    fs::File,
-    io::{self, BufWriter},
+    fs::{self, File},
+    io::{self, Cursor},
     iter,
     path::Path,
 };
@@ -21,10 +21,7 @@ use zip::{write::FileOptions, ZipWriter};
 
 pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     // TODO: Error handling
-    let file = File::create(path)
-        .map_err(|err| Box::new(Error::CouldNotCreateSb3File { inner: err }))?;
-    let buf = BufWriter::new(file);
-    let mut zip = ZipWriter::new(buf);
+    let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file("project.json", FileOptions::default())
         .map_err(|err| {
             Box::new(Error::CouldNotCreateProjectJson { inner: err })
@@ -102,8 +99,12 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
         io::copy(&mut file, &mut zip).unwrap();
     }
 
-    zip.finish()
+    let buf = zip
+        .finish()
         .map_err(|err| Box::new(Error::CouldNotFinishZip { inner: err }))?;
+    fs::write(path, buf.into_inner())
+        .map_err(|err| Box::new(Error::CouldNotCreateSb3File { inner: err }))?;
+
     Ok(())
 }
 
