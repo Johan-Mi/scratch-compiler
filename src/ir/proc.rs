@@ -1,5 +1,6 @@
 use crate::{
     ast::{all_symbols, Ast},
+    error::Result,
     ir::{expr::Expr, statement::Statement},
     uid::Uid,
 };
@@ -16,11 +17,11 @@ pub struct Procedure {
 }
 
 impl Procedure {
-    pub fn from_asts(args: Vec<Ast>) -> (String, Self) {
+    pub fn from_asts(args: Vec<Ast>) -> Result<(String, Self)> {
         // TODO: Error handling
         let mut args = args.into_iter();
         let signature = args.next().unwrap();
-        let (name, params) = parse_signature(signature);
+        let (name, params) = parse_signature(signature)?;
         let mut body = Vec::new();
         let mut variables = HashSet::new();
         let mut lists = HashSet::new();
@@ -34,11 +35,11 @@ impl Procedure {
                 Ast::Node(box Ast::Sym("lists", ..), list_decls, ..) => {
                     lists.extend(all_symbols(list_decls));
                 }
-                _ => body.push(Statement::from_ast(stmt_or_decl)),
+                _ => body.push(Statement::from_ast(stmt_or_decl)?),
             }
         }
 
-        (
+        Ok((
             name,
             Self {
                 params,
@@ -46,7 +47,7 @@ impl Procedure {
                 variables,
                 lists,
             },
-        )
+        ))
     }
 
     pub fn optimize(&mut self) {
@@ -54,12 +55,15 @@ impl Procedure {
     }
 }
 
-fn parse_signature(ast: Ast) -> (String, Vec<Expr>) {
+fn parse_signature(ast: Ast) -> Result<(String, Vec<Expr>)> {
     // TODO: Error handling
     match ast {
         Ast::Node(box Ast::Sym(name, ..), params, ..) => {
-            let params = params.into_iter().map(Expr::from_ast).collect();
-            (name, params)
+            let params = params
+                .into_iter()
+                .map(Expr::from_ast)
+                .collect::<Result<_>>()?;
+            Ok((name, params))
         }
         _ => todo!(),
     }

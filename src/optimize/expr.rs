@@ -1,5 +1,4 @@
 use crate::ir::expr::Expr::{self, *};
-use fancy_match::fancy_match;
 use sb3_stuff::Value;
 use std::mem;
 use trexp::{Bind, Clean, Rewrite, TreeWalk};
@@ -18,9 +17,8 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] =
 
 /// Constant folding for `-`.
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
-    #[fancy_match]
-    match &expr {
-        FuncCall("-", _, args) => match &args[..] {
+    match expr {
+        FuncCall("-", _, ref args) => match &args[..] {
             [Lit(negation)] => Dirty(Lit(Value::Num(-negation.to_num()))),
             [Lit(lhs), rest @ ..] => {
                 match rest
@@ -40,14 +38,13 @@ fn const_minus(expr: Expr) -> Rewrite<Expr> {
 
 /// Multiplication by 0 or 1.
 fn mul_identities(expr: Expr) -> Rewrite<Expr> {
-    #[fancy_match]
-    match &expr {
-        FuncCall("*", span, args) => match &args[..] {
+    match expr {
+        FuncCall("*", span, ref args) => match &args[..] {
             [Lit(Value::Num(num)), ..] if *num == 0.0 => {
                 Dirty(Lit(Value::Num(0.0)))
             }
             [Lit(Value::Num(num)), rest @ ..] if *num == 1.0 => {
-                Dirty(FuncCall("*".to_owned(), *span, rest.to_vec()))
+                Dirty(FuncCall("*", span, rest.to_vec()))
             }
             _ => Clean(expr),
         },
@@ -57,11 +54,10 @@ fn mul_identities(expr: Expr) -> Rewrite<Expr> {
 
 /// Addition with 0.
 fn add_identity(expr: Expr) -> Rewrite<Expr> {
-    #[fancy_match]
-    match &expr {
-        FuncCall("+", span, args) => match &args[..] {
+    match expr {
+        FuncCall("+", span, ref args) => match &args[..] {
             [Lit(Value::Num(num)), rest @ ..] if *num == 0.0 => {
-                Dirty(FuncCall("+".to_owned(), *span, rest.to_vec()))
+                Dirty(FuncCall("+", span, rest.to_vec()))
             }
             _ => Clean(expr),
         },
@@ -74,18 +70,14 @@ fn add_identity(expr: Expr) -> Rewrite<Expr> {
 /// - `(sin (- n))` => `(- (sin n))`
 /// - `(cos (- n))` => `(cos n)`
 fn trigonometry(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall(sym_sin, _, args) = &mut expr
-      && sym_sin == "sin"
-      && let [FuncCall(sym_minus, _, args)] = &mut args[..]
-      && sym_minus == "-"
+    if let FuncCall(sym_sin @ "sin", _, args) = &mut expr
+      && let [FuncCall(sym_minus @ "-", _, args)] = &mut args[..]
       && args.len() == 1
     {
         mem::swap(sym_sin, sym_minus);
         Dirty(expr)
-    } else if let FuncCall(sym_cos, _, cos_args) = &mut expr
-      && sym_cos == "cos"
-      && let [FuncCall(sym_minus, _, args)] = &mut cos_args[..]
-      && sym_minus == "-"
+    } else if let FuncCall("cos", _, cos_args) = &mut expr
+      && let [FuncCall("-", _, args)] = &mut cos_args[..]
       && args.len() == 1
     {
         *cos_args = mem::take(args);

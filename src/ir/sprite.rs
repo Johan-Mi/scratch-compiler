@@ -55,7 +55,7 @@ impl Sprite {
                     "lists" => lists.extend(all_symbols(tail)),
                     "costumes" => parse_costume_decl(&mut costumes, tail),
                     "proc" => {
-                        let (name, proc) = Procedure::from_asts(tail);
+                        let (name, proc) = Procedure::from_asts(tail)?;
                         procedures
                             .entry(name)
                             .or_insert_with(|| Vec::with_capacity(1))
