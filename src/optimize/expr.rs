@@ -1,6 +1,7 @@
 use crate::ir::expr::Expr::{self, *};
 use fancy_match::fancy_match;
 use sb3_stuff::Value;
+use std::mem;
 use trexp::{Bind, Clean, Rewrite, TreeWalk};
 use Rewrite::Dirty;
 
@@ -13,7 +14,7 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
 }
 
 const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] =
-    &[const_minus, mul_identities, add_identity];
+    &[const_minus, mul_identities, add_identity, trigonometry];
 
 /// Constant folding for `-`.
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
@@ -65,5 +66,31 @@ fn add_identity(expr: Expr) -> Rewrite<Expr> {
             _ => Clean(expr),
         },
         _ => Clean(expr),
+    }
+}
+
+/// Trigonometric identities
+///
+/// - `(sin (- n))` => `(- (sin n))`
+/// - `(cos (- n))` => `(cos n)`
+fn trigonometry(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall(sym_sin, _, args) = &mut expr
+      && sym_sin == "sin"
+      && let [FuncCall(sym_minus, _, args)] = &mut args[..]
+      && sym_minus == "-"
+      && args.len() == 1
+    {
+        mem::swap(sym_sin, sym_minus);
+        Dirty(expr)
+    } else if let FuncCall(sym_cos, _, cos_args) = &mut expr
+      && sym_cos == "cos"
+      && let [FuncCall(sym_minus, _, args)] = &mut cos_args[..]
+      && sym_minus == "-"
+      && args.len() == 1
+    {
+        *cos_args = mem::take(args);
+        Dirty(expr)
+    } else {
+        Clean(expr)
     }
 }
