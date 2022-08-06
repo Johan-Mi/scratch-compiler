@@ -3,7 +3,7 @@ use sb3_stuff::Value;
 use smol_str::SmolStr;
 use trexp::{Clean, Rewrite, TreeWalk};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     Lit(Value),
     Sym(SmolStr, Span),

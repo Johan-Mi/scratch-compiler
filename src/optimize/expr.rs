@@ -12,7 +12,8 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
     })
 }
 
-const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[const_minus];
+const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] =
+    &[const_minus, mul_identities, add_identity];
 
 /// Constant folding for `-`.
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
@@ -29,6 +30,37 @@ fn const_minus(expr: Expr) -> Rewrite<Expr> {
                     Some(sum) => Dirty(Lit(Value::Num(lhs.to_num() - sum))),
                     _ => Clean(expr),
                 }
+            }
+            _ => Clean(expr),
+        },
+        _ => Clean(expr),
+    }
+}
+
+/// Multiplication by 0 or 1.
+fn mul_identities(expr: Expr) -> Rewrite<Expr> {
+    #[fancy_match]
+    match &expr {
+        FuncCall("*", span, args) => match &args[..] {
+            [Lit(Value::Num(num)), ..] if *num == 0.0 => {
+                Dirty(Lit(Value::Num(0.0)))
+            }
+            [Lit(Value::Num(num)), rest @ ..] if *num == 1.0 => {
+                Dirty(FuncCall("*".to_owned(), *span, rest.to_vec()))
+            }
+            _ => Clean(expr),
+        },
+        _ => Clean(expr),
+    }
+}
+
+/// Addition with 0.
+fn add_identity(expr: Expr) -> Rewrite<Expr> {
+    #[fancy_match]
+    match &expr {
+        FuncCall("+", span, args) => match &args[..] {
+            [Lit(Value::Num(num)), rest @ ..] if *num == 0.0 => {
+                Dirty(FuncCall("+".to_owned(), *span, rest.to_vec()))
             }
             _ => Clean(expr),
         },
