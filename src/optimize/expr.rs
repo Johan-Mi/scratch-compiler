@@ -12,8 +12,13 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
     })
 }
 
-const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] =
-    &[const_minus, mul_identities, add_identity, trigonometry];
+const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
+    const_minus,
+    mul_identities,
+    add_identity,
+    trigonometry,
+    double_minus,
+];
 
 /// Constant folding for `-`.
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
@@ -81,6 +86,20 @@ fn trigonometry(mut expr: Expr) -> Rewrite<Expr> {
       && args.len() == 1
     {
         *cos_args = mem::take(args);
+        Dirty(expr)
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Double negation just converts the argument to a number.
+fn double_minus(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall(outer_sym @ "-", _, outer_args) = &mut expr
+      && let [FuncCall("-", _, args)] = &mut outer_args[..]
+      && args.len() == 1
+    {
+        *outer_sym = "to-num";
+        *outer_args = mem::take(args);
         Dirty(expr)
     } else {
         Clean(expr)
