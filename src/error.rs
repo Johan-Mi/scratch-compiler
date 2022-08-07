@@ -38,7 +38,7 @@ pub enum Error {
     },
     FunctionWrongArgCount {
         span: Span,
-        func_name: String,
+        func_name: &'static str,
         expected: usize,
         got: usize,
     },

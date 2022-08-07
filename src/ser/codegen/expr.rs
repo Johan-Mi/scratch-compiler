@@ -55,7 +55,7 @@ impl SerCtx {
 
     fn serialize_func_call(
         &self,
-        func_name: &str,
+        func_name: &'static str,
         args: &[Expr],
         parent: Uid,
         span: Span,
@@ -196,7 +196,7 @@ impl SerCtx {
                 [_] => self.serialize_func_call("+", args, parent, span),
                 _ => Err(Box::new(Error::FunctionWrongArgCount {
                     span,
-                    func_name: func_name.to_owned(),
+                    func_name,
                     expected: 1,
                     got: args.len(),
                 })),
@@ -261,7 +261,7 @@ impl SerCtx {
 
     fn simple_function(
         &self,
-        call: Call,
+        call: Call<'static, '_>,
         params: &[Param],
     ) -> Result<Reporter> {
         let this = self.new_uid();
@@ -276,7 +276,7 @@ impl SerCtx {
         if params.len() != args.len() {
             return Err(Box::new(Error::FunctionWrongArgCount {
                 span,
-                func_name: func_name.to_owned(),
+                func_name,
                 expected: params.len(),
                 got: args.len(),
             }));

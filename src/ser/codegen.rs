@@ -388,8 +388,8 @@ enum Param<'a> {
 }
 
 #[derive(Clone, Copy)]
-struct Call<'a> {
-    name: &'a str,
+struct Call<'name, 'a> {
+    name: &'name str,
     opcode: &'a str,
     parent: Uid,
     args: &'a [Expr],
