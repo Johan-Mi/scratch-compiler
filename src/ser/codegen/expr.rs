@@ -193,7 +193,15 @@ impl SerCtx {
             "atan" => self.mathop("atan", parent, args),
             "pressing-key" => func!(sensing_keypressed(KEY_OPTION: String)),
             "to-num" => match args {
-                [_] => self.serialize_func_call("+", args, parent, span),
+                [arg] => self.emit_non_shadow(
+                    "operator_add",
+                    parent,
+                    &[
+                        ("NUM1", &|_| Ok(json!([1, [10, ""]]))),
+                        ("NUM2", &self.shadowless_input(arg)),
+                    ],
+                    &[],
+                ),
                 _ => Err(Box::new(Error::FunctionWrongArgCount {
                     span,
                     func_name,
