@@ -58,15 +58,14 @@ fn mul_identities(expr: Expr) -> Rewrite<Expr> {
 }
 
 /// Addition with 0.
-fn add_identity(expr: Expr) -> Rewrite<Expr> {
-    match expr {
-        FuncCall("+", span, ref args) => match &args[..] {
-            [Lit(Value::Num(num)), rest @ ..] if *num == 0.0 => {
-                Dirty(FuncCall("+", span, rest.to_vec()))
-            }
-            _ => Clean(expr),
-        },
-        _ => Clean(expr),
+fn add_identity(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("+", _, args) = &mut expr
+      && matches!(&args[..], [Lit(Value::Num(num)), ..] if *num == 0.0)
+    {
+        args.swap_remove(0);
+        Dirty(expr)
+    } else {
+        Clean(expr)
     }
 }
 
