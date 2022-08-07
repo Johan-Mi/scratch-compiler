@@ -127,6 +127,7 @@ impl SerCtx {
     }
 }
 
+#[derive(Clone)]
 struct Mangled {
     name: String,
     id: Uid,

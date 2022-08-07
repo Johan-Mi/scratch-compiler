@@ -254,7 +254,7 @@ impl SerCtx {
             }),
         );
 
-        Ok(Reporter::from_uid(this))
+        Ok(Reporter::Block(this))
     }
 
     fn emit_stacking(

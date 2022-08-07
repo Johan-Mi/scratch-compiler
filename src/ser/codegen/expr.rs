@@ -17,7 +17,7 @@ impl SerCtx {
         parent: Uid,
     ) -> Result<Reporter> {
         Ok(match expr {
-            Expr::Lit(lit) => Reporter::from_lit(lit),
+            Expr::Lit(lit) => Reporter::Literal(lit.clone()),
             Expr::Sym(sym, span) => match &**sym {
                 "x-pos" => self.simple_symbol("motion_xposition", parent),
                 "y-pos" => self.simple_symbol("motion_yposition", parent),
@@ -31,10 +31,10 @@ impl SerCtx {
                             &[],
                             &[("VALUE", &|_| Ok(json!([sym, null])))],
                         )?
-                    } else if let Some(var) = self.lookup_var(sym) {
-                        Reporter::non_shadow(json!([12, var.name, var.id]))
-                    } else if let Some(list) = self.lookup_list(sym) {
-                        Reporter::non_shadow(json!([13, list.name, list.id]))
+                    } else if let Some(var) = self.lookup_var(sym).cloned() {
+                        Reporter::Variable(var)
+                    } else if let Some(list) = self.lookup_list(sym).cloned() {
+                        Reporter::List(list)
                     } else {
                         return Err(Box::new(Error::UnknownVarOrList {
                             span: *span,
@@ -91,7 +91,7 @@ impl SerCtx {
                     parent,
                     &[
                         ("NUM1", &|_| {
-                            Ok(Reporter::from_lit(&Value::Num(0.0))
+                            Ok(Reporter::Literal(Value::Num(0.0))
                                 .with_empty_shadow())
                         }),
                         ("NUM2", &self.empty_shadow_input(negation)),
@@ -238,7 +238,7 @@ impl SerCtx {
         parent: Uid,
     ) -> Result<Reporter> {
         match args {
-            [] => Ok(Reporter::from_lit(neutral)),
+            [] => Ok(Reporter::Literal(neutral.clone())),
             [single] => self.serialize_expr(single, parent),
             [lhs, rhs @ ..] => self.emit_non_shadow(
                 opcode,
@@ -294,6 +294,6 @@ impl SerCtx {
                 "fields": fields,
             }),
         );
-        Ok(Reporter::from_uid(this))
+        Ok(Reporter::Block(this))
     }
 }

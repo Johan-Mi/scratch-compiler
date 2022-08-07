@@ -1,54 +1,43 @@
-use crate::uid::Uid;
+use crate::{ser::Mangled, uid::Uid};
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
 
-pub struct Reporter {
-    json: Json,
-    shape: Shape,
+pub(super) enum Reporter {
+    Literal(Value),
+    Variable(Mangled),
+    List(Mangled),
+    Block(Uid),
 }
 
 impl Reporter {
-    pub fn from_uid(uid: Uid) -> Self {
-        Self {
-            json: json!(uid),
-            shape: Shape::NonShadow,
-        }
-    }
-
-    pub fn from_lit(lit: &Value) -> Self {
-        Self::shadow(json!([10, lit.to_cow_str()]))
-    }
-
-    pub const fn shadow(json: Json) -> Self {
-        Self {
-            json,
-            shape: Shape::Shadow,
-        }
-    }
-
-    pub const fn non_shadow(json: Json) -> Self {
-        Self {
-            json,
-            shape: Shape::NonShadow,
-        }
-    }
-
     pub fn with_empty_shadow(&self) -> Json {
-        match self.shape {
-            Shape::Shadow => json!([1, self.json]),
-            Shape::NonShadow => json!([3, self.json, [10, ""]]),
+        let json = self.inner_json();
+        if self.is_shadow() {
+            json!([1, json])
+        } else {
+            json!([3, json, [10, ""]])
         }
     }
 
     pub fn without_shadow(&self) -> Json {
-        match self.shape {
-            Shape::Shadow => json!([1, self.json]),
-            Shape::NonShadow => json!([2, self.json]),
+        let json = self.inner_json();
+        if self.is_shadow() {
+            json!([1, json])
+        } else {
+            json!([2, json])
         }
     }
-}
 
-enum Shape {
-    Shadow,
-    NonShadow,
+    fn is_shadow(&self) -> bool {
+        matches!(self, Reporter::Literal(_))
+    }
+
+    fn inner_json(&self) -> Json {
+        match self {
+            Reporter::Literal(lit) => json!([10, lit.to_cow_str()]),
+            Reporter::Variable(var) => json!([12, var.name, var.id]),
+            Reporter::List(list) => json!([13, list.name, list.id]),
+            Reporter::Block(block_id) => json!(block_id),
+        }
+    }
 }
