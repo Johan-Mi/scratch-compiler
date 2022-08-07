@@ -98,5 +98,6 @@ lazy_static! {
         "acos",
         "atan",
         "pressing-key",
+        "to-num",
     ]);
 }
