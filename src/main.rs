@@ -21,6 +21,7 @@ use codespan::Files;
 use gumdrop::Options;
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -38,6 +39,22 @@ struct Opts {
     /// The source file to compile
     #[options(free, required)]
     file: PathBuf,
+
+    /// Dumps the initial AST to a file
+    #[options(no_short, meta = "FILE")]
+    dump_ast: Option<PathBuf>,
+
+    /// Dumps the expanded AST to a file
+    #[options(no_short, meta = "FILE")]
+    dump_expanded: Option<PathBuf>,
+
+    /// Dumps the unoptimized IR to a file
+    #[options(no_short, meta = "FILE")]
+    dump_ir: Option<PathBuf>,
+
+    /// Dumps the optimized IR to a file
+    #[options(no_short, meta = "FILE")]
+    dump_optimized: Option<PathBuf>,
 }
 
 fn main() {
@@ -58,10 +75,28 @@ fn main() {
             return;
         }
     };
+    if let Some(file) = opts.dump_ast {
+        let mut file = fs::File::create(file).unwrap();
+        for ast in &asts {
+            writeln!(file, "{ast:#?}").unwrap();
+        }
+    }
 
     if let Err(err) = expand(asts).and_then(|expanded| {
+        if let Some(file) = opts.dump_expanded {
+            let mut file = fs::File::create(file).unwrap();
+            writeln!(file, "{expanded:#?}").unwrap();
+        }
         let mut program = Program::from_asts(expanded)?;
+        if let Some(file) = opts.dump_ir {
+            let mut file = fs::File::create(file).unwrap();
+            writeln!(file, "{program:#?}").unwrap();
+        }
         program.optimize();
+        if let Some(file) = opts.dump_optimized {
+            let mut file = fs::File::create(file).unwrap();
+            writeln!(file, "{program:#?}").unwrap();
+        }
         write_sb3_file(&program, Path::new("project.sb3"))
     }) {
         err.emit();
