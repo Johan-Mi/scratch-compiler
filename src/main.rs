@@ -18,24 +18,38 @@ use crate::{
     ir::Program, macros::expand, parser::input::Input, ser::write_sb3_file,
 };
 use codespan::Files;
-use std::{fs, path::Path, sync::Mutex};
+use gumdrop::Options;
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    sync::Mutex,
+};
 
 lazy_static::lazy_static! {
     static ref FILES: Mutex<Files<String>> = Mutex::default();
 }
 
+#[derive(Options)]
+/// Compiles Lisp code into Scratch projects.
+struct Opts {
+    /// Displays this help message
+    help: bool,
+
+    /// The source file to compile
+    #[options(free, required)]
+    file: PathBuf,
+}
+
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let source_path = args.next();
-    let source_path = source_path.as_deref().unwrap_or("program.scratch");
-    let input = match fs::read_to_string(source_path) {
+    let opts = Opts::parse_args_default_or_exit();
+    let input = match fs::read_to_string(&opts.file) {
         Ok(input) => input,
         Err(err) => {
             eprintln!("IO error: {err}");
             return;
         }
     };
-    let main_file_id = FILES.lock().unwrap().add(source_path, input.clone());
+    let main_file_id = FILES.lock().unwrap().add(&opts.file, input.clone());
 
     let asts = match parser::program(Input::new(&input, main_file_id)) {
         Ok((_, asts)) => asts,
