@@ -1,7 +1,6 @@
 #![feature(box_patterns)]
 #![feature(stmt_expr_attributes)]
 #![feature(proc_macro_hygiene)]
-#![feature(once_cell)]
 #![feature(drain_filter)]
 
 mod asset;
