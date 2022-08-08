@@ -13,12 +13,27 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
 }
 
 const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
+    const_plus,
     const_minus,
     mul_identities,
     add_identity,
     trigonometry,
     double_minus,
+    redundant_to_num,
 ];
+
+/// Constant folding for `+`
+fn const_plus(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("+", _, ref mut args) = expr
+      && let Some(knowns) = drain_at_least_n_lits(2, args)
+    {
+        let sum = knowns.map(|lit| lit.to_num()).sum();
+        args.push(Expr::Lit(Value::Num(sum)));
+        Dirty(expr)
+    } else {
+        Clean(expr)
+    }
+}
 
 /// Constant folding for `-`.
 fn const_minus(expr: Expr) -> Rewrite<Expr> {
@@ -60,9 +75,11 @@ fn mul_identities(expr: Expr) -> Rewrite<Expr> {
 /// Addition with 0.
 fn add_identity(mut expr: Expr) -> Rewrite<Expr> {
     if let FuncCall("+", _, args) = &mut expr
-      && matches!(&args[..], [Lit(Value::Num(num)), ..] if *num == 0.0)
+      && let Some(index) = args.iter().position(|arg| {
+             matches!(arg, Lit(Value::Num(num)) if *num == 0.0)
+         })
     {
-        args.swap_remove(0);
+        args.swap_remove(index);
         Dirty(expr)
     } else {
         Clean(expr)
@@ -102,5 +119,72 @@ fn double_minus(mut expr: Expr) -> Rewrite<Expr> {
         Dirty(expr)
     } else {
         Clean(expr)
+    }
+}
+
+/// (Sometimes) removes `to-num` if the argument is already a number.
+fn redundant_to_num(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("to-num", _, ref mut args) = expr
+      && let [arg] = &args[..]
+      && is_guaranteed_number(arg)
+    {
+        Dirty(args.pop().unwrap())
+    } else {
+        Clean(expr)
+    }
+}
+
+fn is_guaranteed_number(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        FuncCall(
+            "length"
+                | "str-length"
+                | "mod"
+                | "abs"
+                | "floor"
+                | "ceil"
+                | "sqrt"
+                | "ln"
+                | "log"
+                | "e^"
+                | "ten^"
+                | "sin"
+                | "cos"
+                | "tan"
+                | "asin"
+                | "acos"
+                | "atan"
+                | "to-num",
+            _,
+            _
+        )
+    )
+}
+
+fn drain_at_least_n_lits(
+    n: usize,
+    exprs: &'_ mut Vec<Expr>,
+) -> Option<impl Iterator<Item = Value> + '_> {
+    let mut found_lits = 0;
+    for expr in &*exprs {
+        if expr.is_lit() {
+            found_lits += 1;
+            if found_lits == n {
+                break;
+            }
+        }
+    }
+    if found_lits < n {
+        None
+    } else {
+        Some(
+            exprs
+                .drain_filter(|expr| expr.is_lit())
+                .map(|expr| match expr {
+                    Lit(lit) => lit,
+                    _ => unreachable!(),
+                }),
+        )
     }
 }

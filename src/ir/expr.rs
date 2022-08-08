@@ -47,6 +47,14 @@ impl Expr {
             _ => None,
         }
     }
+
+    /// Returns `true` if the expr is [`Lit`].
+    ///
+    /// [`Lit`]: Expr::Lit
+    #[must_use]
+    pub fn is_lit(&self) -> bool {
+        matches!(self, Self::Lit(..))
+    }
 }
 
 impl TreeWalk<Rewrite<Self>> for Expr {
