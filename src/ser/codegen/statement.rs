@@ -283,6 +283,15 @@ impl SerCtx {
             })
         })?;
 
+        if args.len() != proc.params.len() {
+            return Err(Box::new(Error::CustomProcWrongArgCount {
+                span,
+                proc_name: proc_name.to_owned(),
+                expected: proc.params.len(),
+                got: args.len(),
+            }));
+        }
+
         let this = self.new_uid();
 
         let args: Vec<Json> = args

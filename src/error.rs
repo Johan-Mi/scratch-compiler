@@ -25,6 +25,12 @@ pub enum Error {
     CouldNotFinishZip {
         inner: zip::result::ZipError,
     },
+    CustomProcWrongArgCount {
+        span: Span,
+        proc_name: String,
+        expected: usize,
+        got: usize,
+    },
     FunctionMacroMatchFailed {
         pattern: Span,
         provided: Span,
@@ -119,6 +125,18 @@ impl Error {
                 vec![just_message("could not finish zip archive")
                     .with_notes(vec![inner.to_string()])]
             }
+            CustomProcWrongArgCount {
+                span,
+                proc_name,
+                expected,
+                got,
+            } => vec![wrong_arg_count(
+                "custom procedure",
+                proc_name,
+                *expected,
+                *got,
+                *span,
+            )],
             FunctionMacroMatchFailed {
                 pattern,
                 provided,
