@@ -20,7 +20,8 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     trigonometry,
     zero_minus,
     double_minus,
-    times_negation,
+    times_or_divided_negation,
+    negation_in_subtraction_head,
     add_subtraction,
     add_negation,
     redundant_to_num,
@@ -138,9 +139,9 @@ fn double_minus(mut expr: Expr) -> Rewrite<Expr> {
     }
 }
 
-/// Floats negation in a multiplication outward.
-fn times_negation(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall("*", span, args) = &mut expr
+/// Floats negation in a multiplication or division outward.
+fn times_or_divided_negation(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("*" | "/", span, args) = &mut expr
       && args.iter_mut().any(|e|
         if let FuncCall("-", _, args) = e && args.len() == 1 {
             *e = args.pop().unwrap();
@@ -150,6 +151,20 @@ fn times_negation(mut expr: Expr) -> Rewrite<Expr> {
         }
     )
     {
+        Dirty(FuncCall("-", *span, vec![expr]))
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Floats negation in the head of a subtraction outward.
+fn negation_in_subtraction_head(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall(sym_minus @ "-", span, minus_args) = &mut expr
+      && let [FuncCall("-", _, args), ..] = &mut minus_args[..]
+      && args.len() == 1
+    {
+        *sym_minus = "+";
+        minus_args[0] = args.pop().unwrap();
         Dirty(FuncCall("-", *span, vec![expr]))
     } else {
         Clean(expr)
