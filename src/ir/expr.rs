@@ -3,10 +3,8 @@ use crate::{
     error::{Error, Result},
     span::Span,
 };
-use lazy_static::lazy_static;
 use sb3_stuff::Value;
 use smol_str::SmolStr;
-use std::collections::HashSet;
 use trexp::{Clean, Rewrite, TreeWalk};
 
 #[derive(Debug, Clone)]
@@ -25,7 +23,7 @@ impl Expr {
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
             Ast::Node(box Ast::Sym(func_name, span), args, ..) => {
                 let func_name =
-                    KNOWN_FUNC_NAMES.get(&*func_name).ok_or_else(|| {
+                    KNOWN_FUNC_NAMES.get_key(&*func_name).ok_or_else(|| {
                         Box::new(Error::UnknownFunction { span, func_name })
                     })?;
                 Self::FuncCall(
@@ -73,39 +71,9 @@ impl TreeWalk<Rewrite<Self>> for Expr {
     }
 }
 
-lazy_static! {
-    static ref KNOWN_FUNC_NAMES: HashSet<&'static str> = HashSet::from([
-        "+",
-        "-",
-        "*",
-        "/",
-        "!!",
-        "++",
-        "and",
-        "or",
-        "not",
-        "=",
-        "<",
-        ">",
-        "length",
-        "str-length",
-        "char-at",
-        "mod",
-        "abs",
-        "floor",
-        "ceil",
-        "sqrt",
-        "ln",
-        "log",
-        "e^",
-        "ten^",
-        "sin",
-        "cos",
-        "tan",
-        "asin",
-        "acos",
-        "atan",
-        "pressing-key",
-        "to-num",
-    ]);
-}
+static KNOWN_FUNC_NAMES: phf::Set<&'static str> = phf::phf_set! {
+    "+", "-", "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
+    "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
+    "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
+    "to-num",
+};

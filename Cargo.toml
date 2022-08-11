@@ -17,5 +17,5 @@ zip = { version = "0.6.2", default-features = false, features = ["deflate"] }
 smol_str = "0.1"
 codespan = { git = "https://github.com/Johan-Mi/codespan" }
 codespan-reporting = { git = "https://github.com/Johan-Mi/codespan" }
-lazy_static = "1.4.0"
+phf = { version = "0.11.1", features = ["macros"] }
 gumdrop = "0.8.1"
