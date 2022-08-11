@@ -26,9 +26,7 @@ use std::{
     sync::Mutex,
 };
 
-lazy_static::lazy_static! {
-    static ref FILES: Mutex<Files<String>> = Mutex::default();
-}
+static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
 
 #[derive(Options)]
 /// Compiles Lisp code into Scratch projects.

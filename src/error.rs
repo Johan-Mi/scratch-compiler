@@ -272,11 +272,11 @@ const fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
 type Diagnostic = codespan_reporting::diagnostic::Diagnostic<codespan::FileId>;
 type Label = codespan_reporting::diagnostic::Label<codespan::FileId>;
 
-fn just_message(message: impl Into<String>) -> Diagnostic {
+fn just_message(message: impl ToString) -> Diagnostic {
     Diagnostic::error().with_message(message)
 }
 
-fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
+fn with_span(message: impl ToString, span: Span) -> Diagnostic {
     just_message(message).with_labels(vec![primary(span)])
 }
 
