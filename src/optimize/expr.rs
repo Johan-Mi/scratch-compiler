@@ -263,25 +263,14 @@ fn drain_at_least_n_lits(
     n: usize,
     exprs: &'_ mut Vec<Expr>,
 ) -> Option<impl Iterator<Item = Value> + '_> {
-    let mut found_lits = 0;
-    for expr in &*exprs {
-        if expr.is_lit() {
-            found_lits += 1;
-            if found_lits == n {
-                break;
-            }
-        }
-    }
-    if found_lits < n {
-        None
-    } else {
-        Some(
-            exprs
-                .drain_filter(|expr| expr.is_lit())
-                .map(|expr| match expr {
-                    Lit(lit) => lit,
-                    _ => unreachable!(),
-                }),
-        )
-    }
+    let found_enough_lits =
+        exprs.iter().filter(|expr| expr.is_lit()).take(n).count() == n;
+    found_enough_lits.then(|| {
+        exprs
+            .drain_filter(|expr| expr.is_lit())
+            .map(|expr| match expr {
+                Lit(lit) => lit,
+                _ => unreachable!(),
+            })
+    })
 }
