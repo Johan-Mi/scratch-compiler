@@ -24,6 +24,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     negation_in_subtraction_head,
     add_subtraction,
     add_negation,
+    single_add_or_mul,
     flatten_add,
     redundant_to_num,
 ];
@@ -215,6 +216,18 @@ fn add_negation(mut expr: Expr) -> Rewrite<Expr> {
             subtracted.insert(0, expr);
             Dirty(FuncCall("-", span, subtracted))
         }
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Replaces addition or multipliction with a single argument with just that
+/// argument.
+fn single_add_or_mul(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("+" | "*", _, args) = &mut expr
+      && args.len() == 1
+    {
+        Dirty(args.pop().unwrap())
     } else {
         Clean(expr)
     }
