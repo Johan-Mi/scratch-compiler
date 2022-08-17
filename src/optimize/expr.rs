@@ -24,6 +24,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     negation_in_subtraction_head,
     add_subtraction,
     add_negation,
+    flatten_add,
     redundant_to_num,
 ];
 
@@ -214,6 +215,25 @@ fn add_negation(mut expr: Expr) -> Rewrite<Expr> {
             subtracted.insert(0, expr);
             Dirty(FuncCall("-", span, subtracted))
         }
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Flattens nested addition.
+fn flatten_add(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("+", _, ref mut terms) = expr
+      && let mut nested_sums =
+            terms.drain_filter(|term| matches!(term, FuncCall("+", ..)))
+                 .peekable()
+      && nested_sums.peek().is_some()
+    {
+        let to_flatten = nested_sums.flat_map(|sum| match sum {
+            FuncCall("+", _, inner_terms) => inner_terms,
+            _ => unreachable!(),
+        }).collect::<Vec<_>>();
+        terms.extend(to_flatten);
+        Dirty(expr)
     } else {
         Clean(expr)
     }
