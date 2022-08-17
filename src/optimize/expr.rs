@@ -27,6 +27,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     single_add_or_mul,
     flatten_add,
     redundant_to_num,
+    const_mathops,
 ];
 
 /// Constant folding for `+`
@@ -259,6 +260,34 @@ fn redundant_to_num(mut expr: Expr) -> Rewrite<Expr> {
       && is_guaranteed_number(arg)
     {
         Dirty(args.pop().unwrap())
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Constant folding for math operations.
+fn const_mathops(expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall(op, _, args) = &expr
+      && let [Expr::Lit(arg)] = &args[..]
+    {
+        let n = arg.to_num();
+        Dirty(Expr::Lit(Value::Num(match *op {
+            "abs" => n.abs(),
+            "floor" => n.floor(),
+            "ceil" => n.ceil(),
+            "sqrt" => n.sqrt(),
+            "ln" => n.ln(),
+            "log" => n.log10(),
+            "e^" => n.exp(),
+            "ten^" => 10.0f64.powf(n),
+            "sin" => n.to_radians().sin(),
+            "cos" => n.to_radians().cos(),
+            "tan" => n.to_radians().tan(),
+            "asin" => n.asin().to_degrees(),
+            "acos" => n.acos().to_degrees(),
+            "atan" => n.atan().to_degrees(),
+            _ => return Clean(expr),
+        })))
     } else {
         Clean(expr)
     }
