@@ -20,7 +20,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     add_identity,
     trigonometry,
     zero_minus,
-    double_minus,
+    double_negation,
     times_or_divided_negation,
     negation_in_subtraction_head,
     add_subtraction,
@@ -143,15 +143,13 @@ fn zero_minus(mut expr: Expr) -> Rewrite<Expr> {
     }
 }
 
-/// Double negation just converts the argument to a number.
-fn double_minus(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall(outer_sym @ "-", _, outer_args) = &mut expr
-      && let [FuncCall("-", _, args)] = &mut outer_args[..]
+/// Removes double negation.
+fn double_negation(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("-", _, args) = &mut expr
+      && let [FuncCall("-", _, args)] = &mut args[..]
       && args.len() == 1
     {
-        *outer_sym = "to-num";
-        *outer_args = mem::take(args);
-        Dirty(expr)
+        Dirty(args.pop().unwrap())
     } else {
         Clean(expr)
     }
