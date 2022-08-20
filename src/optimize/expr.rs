@@ -79,18 +79,24 @@ fn const_times(mut expr: Expr) -> Rewrite<Expr> {
 }
 
 /// Multiplication by 0 or 1.
-fn mul_identities(expr: Expr) -> Rewrite<Expr> {
-    match expr {
-        FuncCall("*", span, ref args) => match &args[..] {
-            [Lit(Value::Num(num)), ..] if *num == 0.0 => {
-                Dirty(Lit(Value::Num(0.0)))
-            }
-            [Lit(Value::Num(num)), rest @ ..] if *num == 1.0 => {
-                Dirty(FuncCall("*", span, rest.to_vec()))
-            }
-            _ => Clean(expr),
-        },
-        _ => Clean(expr),
+fn mul_identities(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("*", _, args) = &mut expr {
+        if args
+            .iter()
+            .any(|arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0))
+        {
+            Dirty(Lit(Value::Num(0.0)))
+        } else if let Some(index) = args
+            .iter()
+            .position(|arg| matches!(arg, Lit(Value::Num(num)) if *num == 1.0))
+        {
+            args.swap_remove(index);
+            Dirty(expr)
+        } else {
+            Clean(expr)
+        }
+    } else {
+        Clean(expr)
     }
 }
 
