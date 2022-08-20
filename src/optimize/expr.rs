@@ -1,8 +1,7 @@
 use crate::ir::expr::Expr::{self, *};
 use sb3_stuff::Value;
 use std::mem;
-use trexp::{Bind, Clean, Rewrite, TreeWalk};
-use Rewrite::Dirty;
+use trexp::{Bind, Clean, Dirty, Rewrite, TreeWalk};
 
 pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
     Rewrite::repeat(expr, |e| {
