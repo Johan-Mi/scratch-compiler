@@ -162,8 +162,8 @@ fn flatten_add_sub(mut expr: Expr) -> Rewrite<Expr> {
 fn times_or_divided_negation(mut expr: Expr) -> Rewrite<Expr> {
     if let FuncCall("*" | "/", _, args) = &mut expr
       && args.iter_mut().any(|factor|
-        if let AddSub(positives, negatives) = factor && positives.is_empty() && negatives.len() == 1 {
-            *factor = negatives.pop().unwrap();
+        if let AddSub(positives, negatives) = factor && positives.is_empty() {
+            mem::swap(positives, negatives);
             true
         } else {
             false
