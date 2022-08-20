@@ -12,6 +12,7 @@ pub enum Expr {
     Lit(Value),
     Sym(SmolStr, Span),
     FuncCall(&'static str, Span, Vec<Expr>),
+    AddSub(Vec<Expr>, Vec<Expr>),
 }
 
 impl Expr {
@@ -22,28 +23,42 @@ impl Expr {
             Ast::String(s, ..) => Self::Lit(Value::String(s.into())),
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
             Ast::Node(box Ast::Sym(func_name, span), args, ..) => {
-                let func_name =
-                    KNOWN_FUNC_NAMES.get_key(&*func_name).ok_or_else(|| {
-                        Box::new(Error::UnknownFunction { span, func_name })
-                    })?;
-                Self::FuncCall(
-                    func_name,
-                    span,
-                    args.into_iter()
-                        .map(Self::from_ast)
-                        .collect::<Result<_>>()?,
-                )
+                match &*func_name {
+                    "+" => {
+                        let positives = args
+                            .into_iter()
+                            .map(Self::from_ast)
+                            .collect::<Result<_>>()?;
+                        Self::AddSub(positives, Vec::new())
+                    }
+                    "-" => {
+                        let mut terms = args.into_iter().map(Self::from_ast);
+                        let positive_or_negated = terms.next().unwrap()?;
+                        let terms = terms.collect::<Result<Vec<_>>>()?;
+                        if terms.is_empty() {
+                            Self::AddSub(Vec::new(), vec![positive_or_negated])
+                        } else {
+                            Self::AddSub(vec![positive_or_negated], terms)
+                        }
+                    }
+                    _ => {
+                        let func_name = KNOWN_FUNC_NAMES
+                            .get_key(&*func_name)
+                            .ok_or_else(|| {
+                            Box::new(Error::UnknownFunction { span, func_name })
+                        })?;
+                        Self::FuncCall(
+                            func_name,
+                            span,
+                            args.into_iter()
+                                .map(Self::from_ast)
+                                .collect::<Result<_>>()?,
+                        )
+                    }
+                }
             }
             _ => todo!(),
         })
-    }
-
-    #[must_use]
-    pub const fn as_lit(&self) -> Option<&Value> {
-        match self {
-            Self::Lit(v) => Some(v),
-            _ => None,
-        }
     }
 
     /// Returns `true` if the expr is [`Lit`].
@@ -58,7 +73,7 @@ impl Expr {
 impl TreeWalk<Rewrite<Self>> for Expr {
     fn each_branch(
         self,
-        f: impl FnMut(Self) -> Rewrite<Self>,
+        mut f: impl FnMut(Self) -> Rewrite<Self>,
     ) -> Rewrite<Self> {
         match self {
             Expr::Lit(_) | Expr::Sym(..) => Clean(self),
@@ -67,12 +82,23 @@ impl TreeWalk<Rewrite<Self>> for Expr {
                     |new_args| Self::FuncCall(func_name, func_span, new_args),
                 )
             }
+            Expr::AddSub(positives, negatives) => positives
+                .into_iter()
+                .map(&mut f)
+                .collect::<Rewrite<_>>()
+                .bind(|positives| {
+                    negatives
+                        .into_iter()
+                        .map(f)
+                        .collect::<Rewrite<_>>()
+                        .map(|negatives| Self::AddSub(positives, negatives))
+                }),
         }
     }
 }
 
 static KNOWN_FUNC_NAMES: phf::Set<&'static str> = phf::phf_set! {
-    "+", "-", "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
+    "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
     "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
     "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
     "to-num",

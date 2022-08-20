@@ -46,6 +46,50 @@ impl SerCtx {
             Expr::FuncCall(func_name, span, args) => {
                 self.serialize_func_call(func_name, args, parent, *span)?
             }
+            Expr::AddSub(positives, negatives) => {
+                let addition = |terms, parent| {
+                    self.associative0(
+                        "operator_add",
+                        "NUM1",
+                        "NUM2",
+                        &Value::Num(0.0),
+                        terms,
+                        parent,
+                    )
+                };
+
+                match (positives.is_empty(), negatives.is_empty()) {
+                    (true, true) => Reporter::Literal(Value::Num(0.0)),
+                    (true, false) => self.emit_non_shadow(
+                        "operator_subtract",
+                        parent,
+                        &[
+                            ("NUM1", &|_| Ok(json!([1, [10, ""]]))),
+                            ("NUM2", &|parent| {
+                                Ok(addition(negatives, parent)?
+                                    .with_empty_shadow())
+                            }),
+                        ],
+                        &[],
+                    )?,
+                    (false, true) => addition(positives, parent)?,
+                    (false, false) => self.emit_non_shadow(
+                        "operator_subtract",
+                        parent,
+                        &[
+                            ("NUM1", &|parent| {
+                                Ok(addition(positives, parent)?
+                                    .with_empty_shadow())
+                            }),
+                            ("NUM2", &|parent| {
+                                Ok(addition(negatives, parent)?
+                                    .with_empty_shadow())
+                            }),
+                        ],
+                        &[],
+                    )?,
+                }
+            }
         })
     }
 
@@ -77,42 +121,6 @@ impl SerCtx {
             }
         }
         match func_name {
-            "+" => self.associative0(
-                "operator_add",
-                "NUM1",
-                "NUM2",
-                &Value::Num(0.0),
-                args,
-                parent,
-            ),
-            "-" => match args {
-                [negation] => self.emit_non_shadow(
-                    "operator_subtract",
-                    parent,
-                    &[
-                        ("NUM1", &|_| {
-                            Ok(Reporter::Literal(Value::Num(0.0))
-                                .with_empty_shadow())
-                        }),
-                        ("NUM2", &self.empty_shadow_input(negation)),
-                    ],
-                    &[],
-                ),
-                [lhs, rest @ ..] => self.emit_non_shadow(
-                    "operator_subtract",
-                    parent,
-                    &[
-                        ("NUM1", &self.empty_shadow_input(lhs)),
-                        ("NUM2", &|parent| {
-                            Ok(self
-                                .serialize_func_call("+", rest, parent, span)?
-                                .with_empty_shadow())
-                        }),
-                    ],
-                    &[],
-                ),
-                [] => todo!(),
-            },
             "*" => self.associative0(
                 "operator_multiply",
                 "NUM1",
