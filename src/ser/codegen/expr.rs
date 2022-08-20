@@ -131,7 +131,7 @@ impl SerCtx {
                         ("NUM2", &|parent| {
                             Ok(self
                                 .serialize_func_call(
-                                    "+",
+                                    "*",
                                     denominators,
                                     parent,
                                     span,
