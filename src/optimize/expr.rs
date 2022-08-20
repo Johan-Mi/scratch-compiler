@@ -134,11 +134,11 @@ fn flatten_add_sub(mut expr: Expr) -> Rewrite<Expr> {
             positives.extend(flat_positives.into_iter().flatten());
             negatives.extend(flat_negatives.into_iter().flatten());
             Dirty(expr)
-        } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
+        } else if negatives.iter().any(|term| matches!(term, AddSub(..))) {
             let (flat_negatives, flat_positives): (
                 Vec<Vec<Expr>>,
                 Vec<Vec<Expr>>,
-            ) = positives
+            ) = negatives
                 .drain_filter(|term| matches!(term, AddSub(..)))
                 .map(|term| match term {
                     AddSub(flat_negatives, flat_positives) => {
@@ -162,7 +162,7 @@ fn flatten_add_sub(mut expr: Expr) -> Rewrite<Expr> {
 fn times_or_divided_negation(mut expr: Expr) -> Rewrite<Expr> {
     if let FuncCall("*" | "/", _, args) = &mut expr
       && args.iter_mut().any(|factor|
-        if let AddSub(positives, negatives) = factor && positives.is_empty() && negatives.is_empty() {
+        if let AddSub(positives, negatives) = factor && positives.is_empty() && negatives.len() == 1 {
             *factor = negatives.pop().unwrap();
             true
         } else {
