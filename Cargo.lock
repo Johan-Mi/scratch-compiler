@@ -320,7 +320,7 @@ dependencies = [
 [[package]]
 name = "trexp"
 version = "0.1.0"
-source = "git+https://github.com/Johan-Mi/trexp#a965ae34f684d13a1104b5349618072e424ad9e3"
+source = "git+https://github.com/Johan-Mi/trexp#0b1552d3f001261e7e722e6734c4fe1fe9947ce1"
 
 [[package]]
 name = "unicode-ident"
