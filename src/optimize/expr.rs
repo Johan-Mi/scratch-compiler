@@ -15,6 +15,7 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
 const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     const_plus,
     const_minus,
+    const_times,
     mul_identities,
     add_identity,
     trigonometry,
@@ -26,6 +27,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     add_negation,
     single_add_or_mul,
     flatten_add,
+    distribute_mul_into_sum,
     redundant_to_num,
     const_mathops,
 ];
@@ -61,6 +63,19 @@ fn const_minus(expr: Expr) -> Rewrite<Expr> {
             _ => Clean(expr),
         },
         _ => Clean(expr),
+    }
+}
+
+/// Constant folding for `*`
+fn const_times(mut expr: Expr) -> Rewrite<Expr> {
+    if let FuncCall("*", _, ref mut args) = expr
+      && let Some(knowns) = drain_at_least_n_lits(2, args)
+    {
+        let sum = knowns.map(|lit| lit.to_num()).product();
+        args.push(Expr::Lit(Value::Num(sum)));
+        Dirty(expr)
+    } else {
+        Clean(expr)
     }
 }
 
@@ -247,6 +262,39 @@ fn flatten_add(mut expr: Expr) -> Rewrite<Expr> {
             _ => unreachable!(),
         }).collect::<Vec<_>>();
         terms.extend(to_flatten);
+        Dirty(expr)
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Distributes multiplication by a constant into sums containing at least one
+/// other constant.
+fn distribute_mul_into_sum(mut expr: Expr) -> Rewrite<Expr> {
+    let contains_one_lit =
+        |v: &[Expr]| v.iter().filter(|arg| arg.is_lit()).take(1).count() == 1;
+
+    if let FuncCall("*", span, ref mut args) = expr
+      && let Some(sum_index) = args.iter().position(|arg| {
+             matches!(arg, FuncCall("+", _, args) if contains_one_lit(args))
+         })
+      && contains_one_lit(args)
+    {
+        let mut sum = args.swap_remove(sum_index);
+        let factor = drain_at_least_n_lits(1, args).unwrap().next().unwrap();
+        let terms = match &mut sum {
+            FuncCall("+", _, terms) => terms,
+            _ => unreachable!(),
+        };
+        let known_term = drain_at_least_n_lits(1, terms).unwrap().next().unwrap();
+        args.push(
+            FuncCall("+", span, vec![
+                FuncCall("*", span, vec![
+                    Expr::Lit(factor.clone()), Expr::Lit(known_term),
+                ]),
+                FuncCall("*", span, vec![Expr::Lit(factor), sum]),
+            ]),
+        );
         Dirty(expr)
     } else {
         Clean(expr)
