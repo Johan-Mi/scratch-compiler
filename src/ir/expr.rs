@@ -101,5 +101,5 @@ static KNOWN_FUNC_NAMES: phf::Set<&'static str> = phf::phf_set! {
     "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
     "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
     "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
-    "to-num",
+    "to-num", "random",
 };

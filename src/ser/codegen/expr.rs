@@ -217,6 +217,23 @@ impl SerCtx {
                     got: args.len(),
                 })),
             },
+            "random" => match args {
+                [low, high] => self.emit_non_shadow(
+                    "operator_random",
+                    parent,
+                    &[
+                        ("FROM", &self.shadowless_input(low)),
+                        ("TO", &self.shadowless_input(high)),
+                    ],
+                    &[],
+                ),
+                _ => Err(Box::new(Error::FunctionWrongArgCount {
+                    span,
+                    func_name,
+                    expected: 2,
+                    got: args.len(),
+                })),
+            },
             _ => Err(Box::new(Error::UnknownFunction {
                 span,
                 func_name: func_name.to_owned(),
