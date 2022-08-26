@@ -1,29 +1,36 @@
 use crate::{
     ast::Ast,
     error::{Error, Result},
+    lint::lint_ast,
     parser::{input::Input, program},
     span::Span,
+    Opts,
 };
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs};
 use trexp::{Clean, Dirty, Rewrite, TreeWalk};
 
-pub fn expand(program: Vec<Ast>) -> Result<Vec<Ast>> {
-    let mut ctx = MacroContext::default();
+pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
+    let mut ctx = MacroContext {
+        opts,
+        asts: Vec::new(),
+        symbols: HashMap::new(),
+        functions: HashMap::new(),
+    };
     for ast in program {
         ctx.transform_top_level(ast)?;
     }
     Ok(ctx.asts)
 }
 
-#[derive(Default)]
-struct MacroContext {
+struct MacroContext<'a> {
+    opts: &'a Opts,
     asts: Vec<Ast>,
     symbols: HashMap<String, Ast>,
     functions: HashMap<String, FunctionMacro>,
 }
 
-impl MacroContext {
+impl MacroContext<'_> {
     fn define(&mut self, args: Vec<Ast>, span: Span) -> Result<()> {
         let mut args = args.into_iter();
         let signature = args.next().ok_or_else(|| {
@@ -61,7 +68,7 @@ impl MacroContext {
         [
             |_this: &Self, ast| Self::use_builtin_macros(ast),
             Self::use_user_defined_macros,
-            |_this: &Self, ast| Self::use_inline_include(ast),
+            |this: &Self, ast| this.use_inline_include(ast),
         ]
         .iter()
         .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
@@ -88,7 +95,7 @@ impl MacroContext {
                 self.define(args, span)
             }
             Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                for item in include(&args, span)? {
+                for item in self.include(&args, span)? {
                     self.transform_top_level(item)?;
                 }
                 Ok(())
@@ -182,7 +189,7 @@ impl MacroContext {
         .map_or(Clean(ast), Dirty))
     }
 
-    fn use_inline_include(ast: Ast) -> Result<Rewrite<Ast>> {
+    fn use_inline_include(&self, ast: Ast) -> Result<Rewrite<Ast>> {
         let (head, tail, span) = match ast {
             Ast::Node(head, tail, span) => (head, tail, span),
             _ => return Ok(Clean(ast)),
@@ -198,7 +205,7 @@ impl MacroContext {
                 #[fancy_match]
                 match &item {
                     Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                        include(args, *span).map(Dirty)
+                        self.include(args, *span).map(Dirty)
                     }
                     _ => Ok(Clean(vec![item])),
                 }
@@ -209,17 +216,23 @@ impl MacroContext {
             Ast::Node(head, tail.into_iter().flatten().collect(), span)
         }))
     }
-}
 
-fn include(args: &[Ast], span: Span) -> Result<Vec<Ast>> {
-    match args {
-        [Ast::String(path, ..)] => {
-            let source = fs::read_to_string(path).unwrap();
-            let file_id =
-                crate::FILES.lock().unwrap().add(path, source.clone());
-            Ok(program(Input::new(&source, file_id)).unwrap().1)
+    fn include(&self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
+        match args {
+            [Ast::String(path, ..)] => {
+                let source = fs::read_to_string(path).unwrap();
+                let file_id =
+                    crate::FILES.lock().unwrap().add(path, source.clone());
+                let asts = program(Input::new(&source, file_id)).unwrap().1;
+                if self.opts.lint {
+                    for ast in &asts {
+                        lint_ast(ast);
+                    }
+                }
+                Ok(asts)
+            }
+            _ => Err(Box::new(Error::InvalidArgsForInclude { span })),
         }
-        _ => Err(Box::new(Error::InvalidArgsForInclude { span })),
     }
 }
 

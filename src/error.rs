@@ -261,6 +261,31 @@ impl Error {
     }
 }
 
+pub enum Warning {
+    ParenTooFarLeft { left: Span, right: Span },
+}
+
+impl Warning {
+    pub fn emit(&self) {
+        use Warning::*;
+        let diagnostics = match self {
+            ParenTooFarLeft { left, right } => vec![Diagnostic::warning()
+                .with_message("misleading formatting")
+                .with_labels(vec![primary(*right).with_message(
+                    "this parenthesis is further to the left than its match",
+                ), secondary(*left).with_message("match is here")])],
+        };
+
+        let writer = StandardStream::stderr(ColorChoice::Always);
+        let config = codespan_reporting::term::Config::default();
+        let files = &*FILES.lock().unwrap();
+
+        for diagnostic in &diagnostics {
+            term::emit(&mut writer.lock(), &config, files, diagnostic).unwrap();
+        }
+    }
+}
+
 const fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
     if count == 1 {
         one

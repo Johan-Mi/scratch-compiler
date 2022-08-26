@@ -7,53 +7,24 @@ mod asset;
 mod ast;
 mod error;
 mod ir;
+mod lint;
 mod macros;
 mod optimize;
+mod opts;
 mod parser;
 mod ser;
 mod span;
 mod uid;
 
 use crate::{
-    ir::Program, macros::expand, parser::input::Input, ser::write_sb3_file,
+    ir::Program, lint::lint_ast, macros::expand, opts::Opts,
+    parser::input::Input, ser::write_sb3_file,
 };
 use codespan::Files;
 use gumdrop::Options;
-use std::{
-    fs,
-    io::Write,
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
+use std::{fs, io::Write, path::Path, sync::Mutex};
 
 static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
-
-#[derive(Options)]
-/// Compiles Lisp code into Scratch projects.
-struct Opts {
-    /// Displays this help message
-    help: bool,
-
-    /// The source file to compile
-    #[options(free, required)]
-    file: PathBuf,
-
-    /// Dumps the initial AST to a file
-    #[options(no_short, meta = "FILE")]
-    dump_ast: Option<PathBuf>,
-
-    /// Dumps the expanded AST to a file
-    #[options(no_short, meta = "FILE")]
-    dump_expanded: Option<PathBuf>,
-
-    /// Dumps the unoptimized IR to a file
-    #[options(no_short, meta = "FILE")]
-    dump_ir: Option<PathBuf>,
-
-    /// Dumps the optimized IR to a file
-    #[options(no_short, meta = "FILE")]
-    dump_optimized: Option<PathBuf>,
-}
 
 fn main() {
     let opts = Opts::parse_args_default_or_exit();
@@ -73,14 +44,19 @@ fn main() {
             return;
         }
     };
-    if let Some(file) = opts.dump_ast {
+    if opts.lint {
+        for ast in &asts {
+            lint_ast(ast);
+        }
+    }
+    if let Some(file) = opts.dump_ast.as_deref() {
         let mut file = fs::File::create(file).unwrap();
         for ast in &asts {
             writeln!(file, "{ast:#?}").unwrap();
         }
     }
 
-    if let Err(err) = expand(asts).and_then(|expanded| {
+    if let Err(err) = expand(asts, &opts).and_then(|expanded| {
         if let Some(file) = opts.dump_expanded {
             let mut file = fs::File::create(file).unwrap();
             writeln!(file, "{expanded:#?}").unwrap();
