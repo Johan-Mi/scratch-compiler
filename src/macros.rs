@@ -23,15 +23,13 @@ pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
     Ok(ctx.asts)
 }
 
-struct MacroContext<'a> {
-    opts: &'a Opts,
-    asts: Vec<Ast>,
-    symbols: HashMap<String, Ast>,
-    functions: HashMap<String, FunctionMacro>,
+enum Macro {
+    Symbol(Ast),
+    Function(FunctionMacro),
 }
 
-impl MacroContext<'_> {
-    fn define(&mut self, args: Vec<Ast>, span: Span) -> Result<()> {
+impl Macro {
+    fn parse(args: Vec<Ast>, span: Span) -> Result<(String, Self)> {
         let mut args = args.into_iter();
         let signature = args.next().ok_or_else(|| {
             Box::new(Error::MacroDefinitionMissingSignature { span })
@@ -42,8 +40,7 @@ impl MacroContext<'_> {
                     Box::new(Error::MacroDefinitionMissingBody { span })
                 })?;
                 assert!(args.next().is_none());
-                self.symbols.insert(macro_name, body);
-                Ok(())
+                Ok((macro_name, Self::Symbol(body)))
             }
             Ast::Node(box Ast::Sym(macro_name, ..), params, ..) => {
                 let params = params
@@ -54,14 +51,33 @@ impl MacroContext<'_> {
                     Box::new(Error::MacroDefinitionMissingBody { span })
                 })?;
                 assert!(args.next().is_none());
-                self.functions
-                    .insert(macro_name, FunctionMacro { params, body });
-                Ok(())
+                Ok((macro_name, Self::Function(FunctionMacro { params, body })))
             }
             invalid_signature => Err(Box::new(Error::InvalidMacroSignature {
                 span: invalid_signature.span(),
             })),
         }
+    }
+}
+
+struct MacroContext<'a> {
+    opts: &'a Opts,
+    asts: Vec<Ast>,
+    symbols: HashMap<String, Ast>,
+    functions: HashMap<String, FunctionMacro>,
+}
+
+impl MacroContext<'_> {
+    fn define(&mut self, args: Vec<Ast>, span: Span) -> Result<()> {
+        match Macro::parse(args, span)? {
+            (name, Macro::Symbol(body)) => {
+                self.symbols.insert(name, body);
+            }
+            (name, Macro::Function(func)) => {
+                self.functions.insert(name, func);
+            }
+        }
+        Ok(())
     }
 
     fn transform_shallow(&self, ast: Ast) -> Result<Rewrite<Ast>> {
@@ -69,6 +85,7 @@ impl MacroContext<'_> {
             |_this: &Self, ast| Self::use_builtin_macros(ast),
             Self::use_user_defined_macros,
             |this: &Self, ast| this.use_inline_include(ast),
+            Self::use_anon_macros,
         ]
         .iter()
         .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
@@ -215,6 +232,47 @@ impl MacroContext<'_> {
         Ok(tail.map(|tail| {
             Ast::Node(head, tail.into_iter().flatten().collect(), span)
         }))
+    }
+
+    fn use_anon_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
+        #[fancy_match]
+        match ast {
+            Ast::Node(
+                box Ast::Node(
+                    box Ast::Sym("anon-macro", _),
+                    macro_definition,
+                    def_span,
+                ),
+                args,
+                span,
+            ) => {
+                let func_macro =
+                    match Macro::parse(macro_definition, def_span)?.1 {
+                        Macro::Function(func_macro) => func_macro,
+                        _ => todo!(),
+                    };
+                let num_args = args.len();
+                let num_params = func_macro.params.len();
+                if num_args != num_params {
+                    return Err(Box::new(Error::FunctionMacroWrongArgCount {
+                        span,
+                        macro_name: String::new(), // TODO: make name optional
+                        expected: num_params,
+                        got: num_args,
+                    }));
+                }
+                let mut bindings = HashMap::new();
+                for (param, arg) in func_macro.params.iter().zip(args) {
+                    param.pattern_match(
+                        "", // TODO: make name optional
+                        &self.transform_deep(arg.clone())?.into_inner(),
+                        &mut bindings,
+                    )?;
+                }
+                interpolate(func_macro.body.clone(), &bindings).map(Dirty)
+            }
+            _ => Ok(Clean(ast)),
+        }
     }
 
     fn include(&self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
