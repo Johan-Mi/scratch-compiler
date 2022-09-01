@@ -13,13 +13,12 @@ pub fn optimize_expr(expr: Expr) -> Rewrite<Expr> {
 
 const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     const_add_sub,
-    const_times,
-    mul_identities,
+    const_mul_div,
     add_sub_zero,
+    mul_div_one,
     trigonometry,
     flatten_add_sub,
-    times_or_divided_negation,
-    single_mul,
+    flatten_mul_div,
     distribute_mul_into_sum,
     redundant_to_num,
     const_mathops,
@@ -40,39 +39,34 @@ fn const_add_sub(mut expr: Expr) -> Rewrite<Expr> {
     }
 }
 
-/// Constant folding for `*`
-fn const_times(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall("*", _, ref mut args) = expr
-      && let Some(knowns) = drain_at_least_n_lits(2, args)
+/// Constant folding for multiplication and division.
+fn const_mul_div(mut expr: Expr) -> Rewrite<Expr> {
+    if let MulDiv(numerators, denominators) = &mut expr
+      && numerators.iter().chain(&*denominators).filter(|term| term.is_lit()).take(2).count() == 2
     {
-        let sum = knowns.map(|lit| lit.to_num()).product();
-        args.push(Expr::Lit(Value::Num(sum)));
+        let numerator: f64 = drain_lits(numerators).map(|term| term.to_num()).sum();
+        let denominator: f64 = drain_lits(denominators).map(|term| term.to_num()).sum();
+        let product = numerator / denominator;
+        numerators.push(Lit(Value::Num(product)));
         Dirty(expr)
     } else {
         Clean(expr)
     }
 }
 
-/// Multiplication by 0 or 1.
-fn mul_identities(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall("*", _, args) = &mut expr {
-        if args
-            .iter()
-            .any(|arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0))
-        {
-            Dirty(Lit(Value::Num(0.0)))
-        } else if let Some(index) = args
-            .iter()
-            .position(|arg| matches!(arg, Lit(Value::Num(num)) if *num == 1.0))
-        {
-            args.swap_remove(index);
-            Dirty(expr)
-        } else {
-            Clean(expr)
+/// Multiplication and division by 1.
+fn mul_div_one(mut expr: Expr) -> Rewrite<Expr> {
+    if let MulDiv(numerators, denominators) = &mut expr {
+        for terms in &mut [numerators, denominators] {
+            if let Some(index) = terms.iter().position(
+                |arg| matches!(arg, Lit(Value::Num(num)) if *num == 1.0),
+            ) {
+                terms.swap_remove(index);
+                return Dirty(expr);
+            }
         }
-    } else {
-        Clean(expr)
     }
+    Clean(expr)
 }
 
 /// Addition and subtraction with 0.
@@ -158,30 +152,46 @@ fn flatten_add_sub(mut expr: Expr) -> Rewrite<Expr> {
     }
 }
 
-/// Floats negation in a multiplication or division outward.
-fn times_or_divided_negation(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall("*" | "/", _, args) = &mut expr
-      && args.iter_mut().any(|factor|
-        if let AddSub(positives, negatives) = factor && positives.is_empty() {
-            mem::swap(positives, negatives);
-            true
+/// Flattens nested multiplication and division.
+fn flatten_mul_div(mut expr: Expr) -> Rewrite<Expr> {
+    if let MulDiv(numerators, denominators) = &mut expr {
+        if numerators.len() == 1 && denominators.is_empty() {
+            Dirty(numerators.pop().unwrap())
+        } else if numerators.iter().any(|term| matches!(term, MulDiv(..))) {
+            let (flat_numerators, flat_denominators): (
+                Vec<Vec<Expr>>,
+                Vec<Vec<Expr>>,
+            ) = numerators
+                .drain_filter(|term| matches!(term, MulDiv(..)))
+                .map(|term| match term {
+                    MulDiv(flat_positives, flat_negatives) => {
+                        (flat_positives, flat_negatives)
+                    }
+                    _ => unreachable!(),
+                })
+                .unzip();
+            numerators.extend(flat_numerators.into_iter().flatten());
+            denominators.extend(flat_denominators.into_iter().flatten());
+            Dirty(expr)
+        } else if denominators.iter().any(|term| matches!(term, MulDiv(..))) {
+            let (flat_denominators, flat_numerators): (
+                Vec<Vec<Expr>>,
+                Vec<Vec<Expr>>,
+            ) = denominators
+                .drain_filter(|term| matches!(term, MulDiv(..)))
+                .map(|term| match term {
+                    MulDiv(flat_negatives, flat_positives) => {
+                        (flat_negatives, flat_positives)
+                    }
+                    _ => unreachable!(),
+                })
+                .unzip();
+            numerators.extend(flat_numerators.into_iter().flatten());
+            denominators.extend(flat_denominators.into_iter().flatten());
+            Dirty(expr)
         } else {
-            false
+            Clean(expr)
         }
-    )
-    {
-        Dirty(AddSub(Vec::new(), vec![expr]))
-    } else {
-        Clean(expr)
-    }
-}
-
-/// Replaces multipliction with a single argument with just that argument.
-fn single_mul(mut expr: Expr) -> Rewrite<Expr> {
-    if let FuncCall("*", _, args) = &mut expr
-      && args.len() == 1
-    {
-        Dirty(args.pop().unwrap())
     } else {
         Clean(expr)
     }
@@ -193,7 +203,7 @@ fn distribute_mul_into_sum(mut expr: Expr) -> Rewrite<Expr> {
     let contains_a_lit =
         |v: &[Expr]| v.iter().filter(|arg| arg.is_lit()).take(1).count() == 1;
 
-    if let FuncCall("*", span, ref mut args) = expr
+    if let MulDiv(args, _) = &mut expr
       && let Some(sum_index) = args.iter().position(|arg| {
              matches!(arg, AddSub(positives, negatives) if contains_a_lit(positives) && negatives.is_empty())
          })
@@ -208,10 +218,10 @@ fn distribute_mul_into_sum(mut expr: Expr) -> Rewrite<Expr> {
         let known_term = drain_lits(terms).next().unwrap();
         args.push(
             AddSub(vec![
-                FuncCall("*", span, vec![
+                MulDiv(vec![
                     Expr::Lit(factor.clone()), Expr::Lit(known_term),
-                ]),
-                FuncCall("*", span, vec![Expr::Lit(factor), sum]),
+                ], Vec::new()),
+                MulDiv(vec![Expr::Lit(factor), sum], Vec::new()),
             ], Vec::new()),
         );
         Dirty(expr)
@@ -295,13 +305,4 @@ fn drain_lits(exprs: &mut Vec<Expr>) -> impl Iterator<Item = Value> + '_ {
             Lit(lit) => lit,
             _ => unreachable!(),
         })
-}
-
-fn drain_at_least_n_lits(
-    n: usize,
-    exprs: &'_ mut Vec<Expr>,
-) -> Option<impl Iterator<Item = Value> + '_> {
-    let found_enough_lits =
-        exprs.iter().filter(|expr| expr.is_lit()).take(n).count() == n;
-    found_enough_lits.then(|| drain_lits(exprs))
 }

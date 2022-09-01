@@ -13,6 +13,7 @@ pub enum Expr {
     Sym(SmolStr, Span),
     FuncCall(&'static str, Span, Vec<Expr>),
     AddSub(Vec<Expr>, Vec<Expr>),
+    MulDiv(Vec<Expr>, Vec<Expr>),
 }
 
 impl Expr {
@@ -39,6 +40,26 @@ impl Expr {
                             Self::AddSub(Vec::new(), vec![positive_or_negated])
                         } else {
                             Self::AddSub(vec![positive_or_negated], terms)
+                        }
+                    }
+                    "*" => {
+                        let numerators = args
+                            .into_iter()
+                            .map(Self::from_ast)
+                            .collect::<Result<_>>()?;
+                        Self::MulDiv(numerators, Vec::new())
+                    }
+                    "/" => {
+                        let mut terms = args.into_iter().map(Self::from_ast);
+                        let numerator_or_inverted = terms.next().unwrap()?;
+                        let terms = terms.collect::<Result<Vec<_>>>()?;
+                        if terms.is_empty() {
+                            Self::MulDiv(
+                                Vec::new(),
+                                vec![numerator_or_inverted],
+                            )
+                        } else {
+                            Self::MulDiv(vec![numerator_or_inverted], terms)
                         }
                     }
                     _ => {
@@ -92,6 +113,15 @@ impl TreeWalk<Rewrite<Self>> for Expr {
                         .map(f)
                         .collect::<Rewrite<_>>()
                         .map(|negatives| Self::AddSub(positives, negatives))
+                }),
+            Expr::MulDiv(numerators, denominators) => numerators
+                .into_iter()
+                .map(&mut f)
+                .collect::<Rewrite<_>>()
+                .bind(|numerators| {
+                    denominators.into_iter().map(f).collect::<Rewrite<_>>().map(
+                        |denominators| Self::MulDiv(numerators, denominators),
+                    )
                 }),
         }
     }

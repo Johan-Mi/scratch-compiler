@@ -90,6 +90,50 @@ impl SerCtx {
                     )?,
                 }
             }
+            Expr::MulDiv(numerators, denominators) => {
+                let multiplication = |terms, parent| {
+                    self.associative0(
+                        "operator_multiply",
+                        "NUM1",
+                        "NUM2",
+                        &Value::Num(1.0),
+                        terms,
+                        parent,
+                    )
+                };
+
+                match (numerators.is_empty(), denominators.is_empty()) {
+                    (true, true) => Reporter::Literal(Value::Num(1.0)),
+                    (true, false) => self.emit_non_shadow(
+                        "operator_divide",
+                        parent,
+                        &[
+                            ("NUM1", &|_| Ok(json!([1, [10, "1"]]))),
+                            ("NUM2", &|parent| {
+                                Ok(multiplication(denominators, parent)?
+                                    .with_empty_shadow())
+                            }),
+                        ],
+                        &[],
+                    )?,
+                    (false, true) => multiplication(numerators, parent)?,
+                    (false, false) => self.emit_non_shadow(
+                        "operator_divide",
+                        parent,
+                        &[
+                            ("NUM1", &|parent| {
+                                Ok(multiplication(numerators, parent)?
+                                    .with_empty_shadow())
+                            }),
+                            ("NUM2", &|parent| {
+                                Ok(multiplication(denominators, parent)?
+                                    .with_empty_shadow())
+                            }),
+                        ],
+                        &[],
+                    )?,
+                }
+            }
         })
     }
 
@@ -121,35 +165,6 @@ impl SerCtx {
             }
         }
         match func_name {
-            "*" => self.associative0(
-                "operator_multiply",
-                "NUM1",
-                "NUM2",
-                &Value::Num(1.0),
-                args,
-                parent,
-            ),
-            "/" => match args {
-                [] | [_] => todo!(),
-                [numerator, denominators @ ..] => self.emit_non_shadow(
-                    "operator_divide",
-                    parent,
-                    &[
-                        ("NUM1", &self.empty_shadow_input(numerator)),
-                        ("NUM2", &|parent| {
-                            Ok(self
-                                .serialize_func_call(
-                                    "*",
-                                    denominators,
-                                    parent,
-                                    span,
-                                )?
-                                .with_empty_shadow())
-                        }),
-                    ],
-                    &[],
-                ),
-            },
             "!!" => func!(data_itemoflist(LIST: List, INDEX: Number)),
             "++" => self.associative0(
                 "operator_join",
