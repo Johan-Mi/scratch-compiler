@@ -15,6 +15,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     const_add_sub,
     const_mul_div,
     add_sub_zero,
+    mul_zero,
     mul_div_one,
     trigonometry,
     flatten_add_sub,
@@ -52,6 +53,19 @@ fn const_mul_div(mut expr: Expr) -> Rewrite<Expr> {
     } else {
         Clean(expr)
     }
+}
+
+/// Multiplication by 0.
+fn mul_zero(mut expr: Expr) -> Rewrite<Expr> {
+    if let MulDiv(numerators, _) = &mut expr
+      && let Some(index) = numerators.iter().position(
+             |arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0),
+         )
+    {
+        numerators.swap_remove(index);
+        return Dirty(expr);
+    }
+    Clean(expr)
 }
 
 /// Multiplication and division by 1.
