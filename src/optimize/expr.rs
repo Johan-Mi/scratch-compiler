@@ -45,8 +45,8 @@ fn const_mul_div(mut expr: Expr) -> Rewrite<Expr> {
     if let MulDiv(numerators, denominators) = &mut expr
       && numerators.iter().chain(&*denominators).filter(|term| term.is_lit()).take(2).count() == 2
     {
-        let numerator: f64 = drain_lits(numerators).map(|term| term.to_num()).sum();
-        let denominator: f64 = drain_lits(denominators).map(|term| term.to_num()).sum();
+        let numerator: f64 = drain_lits(numerators).map(|term| term.to_num()).product();
+        let denominator: f64 = drain_lits(denominators).map(|term| term.to_num()).product();
         let product = numerator / denominator;
         numerators.push(Lit(Value::Num(product)));
         Dirty(expr)
@@ -58,14 +58,14 @@ fn const_mul_div(mut expr: Expr) -> Rewrite<Expr> {
 /// Multiplication by 0.
 fn mul_zero(mut expr: Expr) -> Rewrite<Expr> {
     if let MulDiv(numerators, _) = &mut expr
-      && let Some(index) = numerators.iter().position(
+      && numerators.iter().any(
              |arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0),
          )
     {
-        numerators.swap_remove(index);
-        return Dirty(expr);
+        Dirty(Lit(Value::Num(0.0)))
+    } else {
+        Clean(expr)
     }
-    Clean(expr)
 }
 
 /// Multiplication and division by 1.
@@ -178,8 +178,8 @@ fn flatten_mul_div(mut expr: Expr) -> Rewrite<Expr> {
             ) = numerators
                 .drain_filter(|term| matches!(term, MulDiv(..)))
                 .map(|term| match term {
-                    MulDiv(flat_positives, flat_negatives) => {
-                        (flat_positives, flat_negatives)
+                    MulDiv(flat_numerators, flat_denominators) => {
+                        (flat_numerators, flat_denominators)
                     }
                     _ => unreachable!(),
                 })
@@ -194,8 +194,8 @@ fn flatten_mul_div(mut expr: Expr) -> Rewrite<Expr> {
             ) = denominators
                 .drain_filter(|term| matches!(term, MulDiv(..)))
                 .map(|term| match term {
-                    MulDiv(flat_negatives, flat_positives) => {
-                        (flat_negatives, flat_positives)
+                    MulDiv(flat_denominators, flat_numerators) => {
+                        (flat_denominators, flat_numerators)
                     }
                     _ => unreachable!(),
                 })
