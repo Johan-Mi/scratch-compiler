@@ -20,6 +20,7 @@ const EXPR_OPTIMIZATIONS: &[fn(Expr) -> Rewrite<Expr>] = &[
     trigonometry,
     flatten_add_sub,
     flatten_mul_div,
+    mul_div_negation,
     distribute_mul_into_sum,
     redundant_to_num,
     const_mathops,
@@ -206,6 +207,24 @@ fn flatten_mul_div(mut expr: Expr) -> Rewrite<Expr> {
         } else {
             Clean(expr)
         }
+    } else {
+        Clean(expr)
+    }
+}
+
+/// Floats negation in a multiplication or division outward.
+fn mul_div_negation(mut expr: Expr) -> Rewrite<Expr> {
+    if let MulDiv(numerators, denominators) = &mut expr
+      && [numerators, denominators].into_iter().flatten().any(|factor|
+        if let AddSub(positives, negatives) = factor && positives.is_empty() {
+            mem::swap(positives, negatives);
+            true
+        } else {
+            false
+        }
+    )
+    {
+        Dirty(AddSub(Vec::new(), vec![expr]))
     } else {
         Clean(expr)
     }
