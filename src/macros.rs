@@ -85,7 +85,7 @@ impl MacroContext<'_> {
             |_this: &Self, ast| Self::use_builtin_macros(ast),
             Self::use_user_defined_macros,
             |this: &Self, ast| this.use_inline_include(ast),
-            Self::use_anon_macros,
+            Self::use_inline_macros,
         ]
         .iter()
         .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
@@ -234,21 +234,23 @@ impl MacroContext<'_> {
         }))
     }
 
-    fn use_anon_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
+    fn use_inline_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
         #[fancy_match]
         match ast {
             Ast::Node(
                 box Ast::Node(
-                    box Ast::Sym("anon-macro", _),
+                    box Ast::Sym("macro", _),
                     macro_definition,
                     def_span,
                 ),
                 args,
                 span,
             ) => {
-                let func_macro =
-                    match Macro::parse(macro_definition, def_span)?.1 {
-                        Macro::Function(func_macro) => func_macro,
+                let (macro_name, func_macro) =
+                    match Macro::parse(macro_definition, def_span)? {
+                        (macro_name, Macro::Function(func_macro)) => {
+                            (macro_name, func_macro)
+                        }
                         _ => todo!(),
                     };
                 let num_args = args.len();
@@ -256,7 +258,7 @@ impl MacroContext<'_> {
                 if num_args != num_params {
                     return Err(Box::new(Error::FunctionMacroWrongArgCount {
                         span,
-                        macro_name: String::new(), // TODO: make name optional
+                        macro_name,
                         expected: num_params,
                         got: num_args,
                     }));
@@ -264,7 +266,7 @@ impl MacroContext<'_> {
                 let mut bindings = HashMap::new();
                 for (param, arg) in func_macro.params.iter().zip(args) {
                     param.pattern_match(
-                        "", // TODO: make name optional
+                        &macro_name,
                         &self.transform_deep(arg.clone())?.into_inner(),
                         &mut bindings,
                     )?;
