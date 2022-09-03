@@ -6,7 +6,7 @@ pub struct Uid(NonZeroU32);
 
 impl fmt::Display for Uid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "id-{}", self.0)
+        write!(f, "id_{}", self.0)
     }
 }
 
