@@ -1,6 +1,6 @@
 use crate::{
     ast::Ast,
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     span::Span,
 };
 use sb3_stuff::Value;

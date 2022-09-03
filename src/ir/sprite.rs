@@ -1,6 +1,6 @@
 use crate::{
     ast::{all_symbols, Ast},
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     ir::proc::Procedure,
 };
 use fancy_match::fancy_match;

@@ -1,4 +1,4 @@
-use crate::{ast::Ast, error::Warning, span::Span, FILES};
+use crate::{ast::Ast, diagnostic::Warning, span::Span, FILES};
 use codespan::{ByteOffset, Location};
 
 pub fn lint_ast(ast: &Ast) {

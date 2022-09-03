@@ -5,7 +5,7 @@
 
 mod asset;
 mod ast;
-mod error;
+mod diagnostic;
 mod ir;
 mod lint;
 mod macros;

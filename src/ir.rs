@@ -5,7 +5,7 @@ pub mod statement;
 
 use crate::{
     ast::Ast,
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     ir::sprite::Sprite,
 };
 use std::collections::{hash_map::Entry, HashMap};

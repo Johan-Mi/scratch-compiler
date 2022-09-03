@@ -1,6 +1,6 @@
 use crate::{
     ast::Ast,
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     lint::lint_ast,
     parser::{input::Input, program},
     span::Span,

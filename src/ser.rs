@@ -3,7 +3,7 @@ mod sprite;
 
 use crate::{
     asset::Asset,
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     ir::{proc::CustomProcedure, Program},
     uid::Uid,
 };

@@ -1,7 +1,7 @@
 use super::{Mangled, SerCtx};
 use crate::{
     asset::Asset,
-    error::Result,
+    diagnostic::Result,
     ir::{expr::Expr, proc::CustomProcedure, sprite::Sprite},
 };
 use serde_json::{json, Value as Json};

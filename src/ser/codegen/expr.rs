@@ -1,5 +1,5 @@
 use crate::{
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     ser::{
         codegen::{Call, Expr, Param, Reporter},
         SerCtx,

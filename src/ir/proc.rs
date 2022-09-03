@@ -1,6 +1,6 @@
 use crate::{
     ast::{all_symbols, Ast},
-    error::Result,
+    diagnostic::Result,
     ir::{expr::Expr, statement::Statement},
     uid::Uid,
 };

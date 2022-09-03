@@ -3,7 +3,7 @@ mod reporter;
 mod statement;
 
 use crate::{
-    error::{Error, Result},
+    diagnostic::{Error, Result},
     ir::{
         expr::Expr,
         {proc::Procedure, statement::Statement},

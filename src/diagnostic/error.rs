@@ -1,12 +1,7 @@
-use crate::{span::Span, FILES};
-use codespan_reporting::term::{
-    self,
-    termcolor::{ColorChoice, StandardStream},
-};
+use super::{emit_all, plural, primary, secondary, Diagnostic};
+use crate::span::Span;
 use smol_str::SmolStr;
 use std::io;
-
-pub type Result<T> = std::result::Result<T, Box<Error>>;
 
 #[derive(Debug)]
 pub enum Error {
@@ -251,79 +246,9 @@ impl Error {
             )],
         };
 
-        let writer = StandardStream::stderr(ColorChoice::Always);
-        let config = codespan_reporting::term::Config::default();
-        let files = &*FILES.lock().unwrap();
-
-        for diagnostic in &diagnostics {
-            term::emit(&mut writer.lock(), &config, files, diagnostic).unwrap();
-        }
+        emit_all(&diagnostics);
     }
 }
-
-pub enum Warning {
-    ParenTooFarLeft {
-        left: Span,
-        right: Span,
-    },
-    InconsistentIndentation {
-        node: Span,
-        good: Span,
-        offender: Span,
-    },
-}
-
-impl Warning {
-    pub fn emit(&self) {
-        use Warning::*;
-        let diagnostics = match self {
-            ParenTooFarLeft { left, right } => vec![Diagnostic::warning()
-                .with_message("misleading formatting")
-                .with_labels(vec![primary(*right).with_message(
-                    "this parenthesis is further to the left than its match",
-                ), secondary(*left).with_message("match is here")])],
-            InconsistentIndentation {
-                node,
-                good,
-                offender,
-            } => {
-                vec![Diagnostic::warning()
-                    .with_message("inconsistent indentation")
-                    .with_labels(vec![
-                    primary(*node).with_message(
-                        "nodes spanning multiple lines should have the same \
-                        level of indentation for all non-initial lines"
-                    ),
-                    secondary(*good).with_message(
-                        "if this item is indented correctly..."
-                    ),
-                    secondary(*offender).with_message(
-                        "...then this is not"
-                    ),
-                ])]
-            }
-        };
-
-        let writer = StandardStream::stderr(ColorChoice::Always);
-        let config = codespan_reporting::term::Config::default();
-        let files = &*FILES.lock().unwrap();
-
-        for diagnostic in &diagnostics {
-            term::emit(&mut writer.lock(), &config, files, diagnostic).unwrap();
-        }
-    }
-}
-
-const fn plural<'a>(count: usize, one: &'a str, many: &'a str) -> &'a str {
-    if count == 1 {
-        one
-    } else {
-        many
-    }
-}
-
-type Diagnostic = codespan_reporting::diagnostic::Diagnostic<codespan::FileId>;
-type Label = codespan_reporting::diagnostic::Label<codespan::FileId>;
 
 fn just_message(message: impl ToString) -> Diagnostic {
     Diagnostic::error().with_message(message)
@@ -331,14 +256,6 @@ fn just_message(message: impl ToString) -> Diagnostic {
 
 fn with_span(message: impl ToString, span: Span) -> Diagnostic {
     just_message(message).with_labels(vec![primary(span)])
-}
-
-fn primary(span: Span) -> Label {
-    Label::primary(span.file, span.position)
-}
-
-fn secondary(span: Span) -> Label {
-    Label::secondary(span.file, span.position)
 }
 
 fn wrong_arg_count(

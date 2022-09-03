@@ -1,5 +1,5 @@
 use crate::{
-    ast::Ast, error::Result, ir::expr::Expr,
+    ast::Ast, diagnostic::Result, ir::expr::Expr,
     optimize::statement::optimize_stmt, span::Span,
 };
 use std::mem;
