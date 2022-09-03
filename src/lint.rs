@@ -1,5 +1,5 @@
 use crate::{ast::Ast, diagnostic::Warning, span::Span, FILES};
-use codespan::{ByteOffset, Location};
+use codespan::{ByteOffset, Files, Location};
 
 pub fn lint_ast(ast: &Ast) {
     match ast {
@@ -44,37 +44,33 @@ fn paren_too_far_left(span: Span) {
 
 fn inconsistent_indentation(tail: &[Ast], span: Span) {
     let files = FILES.lock().unwrap();
-    let mut current_line = files
-        .location(span.file, span.position.start())
-        .unwrap()
-        .line;
+    let mut already_handled_line = start_location(&files, span).line;
     let mut prev_column = None;
     let mut good = None;
     for ast in tail {
         let subspan = ast.span();
-        let Location { line, column } = files
-            .location(subspan.file, subspan.position.start())
-            .unwrap();
-        if line != current_line {
-            current_line = line;
-            match prev_column {
-                Some(prev_column) => {
-                    if column != prev_column {
-                        drop(files);
-                        Warning::InconsistentIndentation {
-                            node: span,
-                            good: good.unwrap(),
-                            offender: ast.span(),
-                        }
-                        .emit();
-                        return;
+        let Location { line, column } = start_location(&files, subspan);
+        if line != already_handled_line {
+            if let Some(prev_column) = prev_column {
+                if column != prev_column {
+                    drop(files);
+                    Warning::InconsistentIndentation {
+                        node: span,
+                        good: good.unwrap(),
+                        offender: subspan,
                     }
+                    .emit();
+                    return;
                 }
-                None => {
-                    prev_column = Some(column);
-                    good = Some(ast.span());
-                }
+            } else {
+                prev_column = Some(column);
+                good = Some(subspan);
             }
         }
+        already_handled_line = line;
     }
+}
+
+fn start_location(files: &Files<String>, span: Span) -> Location {
+    files.location(span.file, span.position.start()).unwrap()
 }
