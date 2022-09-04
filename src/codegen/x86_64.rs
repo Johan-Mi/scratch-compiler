@@ -156,7 +156,7 @@ impl AsmProgram {
             "++" => match args {
                 [single] => self.generate_expr(single),
                 [lhs, rhs] => {
-                    self.text.push_str("    push 0\n    push 0\n");
+                    self.text.push_str("    sub rsp, 16\n");
                     self.generate_expr(rhs)?;
                     self.cowify();
                     self.generate_expr(lhs)?;
