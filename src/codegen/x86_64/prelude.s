@@ -36,13 +36,13 @@ cowify:
     push rdi
     jmp rax
 .is_false:
-    lea rdi, [str_false+1]
+    mov rdi, str_false
     mov rsi, 5
     push rsi
     push rdi
     jmp rax
 .is_true:
-    lea rdi, [str_true+1]
+    mov rdi, str_true
     mov rsi, 4
     push rsi
     push rdi
