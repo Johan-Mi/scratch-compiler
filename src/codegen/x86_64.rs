@@ -1,10 +1,10 @@
-use sb3_stuff::Value;
-
 use crate::{
-    diagnostic::Result,
+    diagnostic::{Error, Result},
     ir::{expr::Expr, proc::Procedure, statement::Statement, Program},
+    span::Span,
     uid::Uid,
 };
+use sb3_stuff::Value;
 use std::{
     fmt::{self, Write as _},
     fs::File,
@@ -137,8 +137,8 @@ impl AsmProgram {
                 Ok(())
             }
             Expr::Sym(_, _) => todo!(),
-            Expr::FuncCall(func_name, _, args) => {
-                self.generate_func_call(func_name, args)
+            Expr::FuncCall(func_name, span, args) => {
+                self.generate_func_call(func_name, args, *span)
             }
             Expr::AddSub(_, _) => todo!(),
             Expr::MulDiv(_, _) => todo!(),
@@ -149,10 +149,12 @@ impl AsmProgram {
         &mut self,
         func_name: &str,
         args: &[Expr],
+        span: Span,
     ) -> Result<()> {
         match func_name {
+            "!!" => todo!(),
             "++" => match args {
-                [single] => self.generate_expr(single)?,
+                [single] => self.generate_expr(single),
                 [lhs, rhs] => {
                     self.text.push_str("    push 0\n    push 0\n");
                     self.generate_expr(rhs)?;
@@ -179,12 +181,44 @@ impl AsmProgram {
 
                     self.drop_pop();
                     self.drop_pop();
+                    Ok(())
                 }
                 _ => todo!(),
             },
-            _ => todo!(),
+            "and" => todo!(),
+            "or" => todo!(),
+            "not" => todo!(),
+            "=" => todo!(),
+            "<" => todo!(),
+            ">" => todo!(),
+            "length" => todo!(),
+            "str-length" => todo!(),
+            "char-at" => {
+                todo!()
+            }
+            "mod" => todo!(),
+            "abs" => todo!(),
+            "floor" => todo!(),
+            "ceil" => todo!(),
+            "sqrt" => todo!(),
+            "ln" => todo!(),
+            "log" => todo!(),
+            "e^" => todo!(),
+            "ten^" => todo!(),
+            "sin" => todo!(),
+            "cos" => todo!(),
+            "tan" => todo!(),
+            "asin" => todo!(),
+            "acos" => todo!(),
+            "atan" => todo!(),
+            "pressing-key" => todo!(),
+            "to-num" => todo!(),
+            "random" => todo!(),
+            _ => Err(Box::new(Error::UnknownFunction {
+                span,
+                func_name: func_name.to_owned(),
+            })),
         }
-        Ok(())
     }
 
     fn allocate_static_str(&mut self, s: &str) -> Uid {
