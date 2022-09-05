@@ -54,3 +54,48 @@ cowify:
 
 staticstr str_true, db "true"
 staticstr str_false, db "false"
+
+str_length:
+    mov rax, ~0
+.loop:
+    inc rax
+    test rsi, rsi
+    jz .done
+    dec rsi
+    test byte [rdi], 0x80
+    jz .one_byte
+    cmp byte [rdi], 0b11000000
+    jbe .two_bytes
+    cmp byte [rdi], 0b11100000
+    jbe .three_bytes
+    add rsi, 4
+    jmp .loop
+.one_byte:
+    inc rdi
+    jmp .loop
+.two_bytes:
+    add rdi, 2
+    jmp .loop
+.three_bytes:
+    add rdi, 3
+    jmp .loop
+.done:
+    ret
+
+usize_to_double:
+    movq xmm0, rdi
+    punpckldq xmm0, [.LCPI0_0]
+    subpd xmm0, [.LCPI0_1]
+    movapd xmm1, xmm0
+    unpckhpd xmm1, xmm0
+    addsd xmm1, xmm0
+    movq rax, xmm1
+    ret
+.LCPI0_0:
+    dd 1127219200
+    dd 1160773632
+    dd 0
+    dd 0
+.LCPI0_1:
+    dq 0x4330000000000000
+    dq 0x4530000000000000

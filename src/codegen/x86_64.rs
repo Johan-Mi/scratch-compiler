@@ -192,7 +192,24 @@ impl AsmProgram {
             "<" => todo!(),
             ">" => todo!(),
             "length" => todo!(),
-            "str-length" => todo!(),
+            "str-length" => match args {
+                [s] => {
+                    self.text.push_str("    sub rsp, 8\n");
+                    self.generate_expr(s)?;
+                    self.cowify();
+                    self.text.push_str(
+                        "    call str_length
+    mov rdi, rax
+    call usize_to_double
+    mov [rsp+16], rax
+",
+                    );
+                    self.drop_pop();
+                    self.text.push_str("    push 2\n");
+                    Ok(())
+                }
+                _ => todo!(),
+            },
             "char-at" => {
                 todo!()
             }
