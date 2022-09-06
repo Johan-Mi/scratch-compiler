@@ -105,13 +105,13 @@ align 16
     dq 0x4530000000000000
 
 get_bool:
-    mov rax, [rsp]
+    mov rax, [rsp+8]
     cmp rax, 2
     jb .done
     je .is_number
-    test qword [rsp+8], 1
+    test qword [rsp+16], 1
     jnz .might_be_str_0
-    cmp qword [rsp+8], 5
+    cmp qword [rsp+16], 5
     je .might_be_str_false
     mov rax, 0
 .done:
@@ -132,7 +132,7 @@ get_bool:
     andn rax, rdx, rsi
     ret
 .is_number:
-    movq xmm0, [rsp+8]
+    movq xmm0, [rsp+16]
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
     setne al
