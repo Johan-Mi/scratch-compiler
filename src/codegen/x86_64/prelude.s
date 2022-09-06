@@ -113,7 +113,8 @@ get_bool:
     jnz .might_be_str_0
     cmp qword [rsp+16], 5
     je .might_be_str_false
-    mov rax, 0
+    test qword [rsp+16], ~0
+    setnz al
 .done:
     ret
 .might_be_str_0:
@@ -124,12 +125,12 @@ get_bool:
     mov edi, [rax]
     and edi, ~0x20
     cmp edi, "FALS"
-    setne dl
+    setne al
     mov dil, [rax+4]
     and dil, ~0x20
     cmp dil, 'E'
-    sete sil
-    andn rax, rdx, rsi
+    setne dil
+    or al, dil
     ret
 .is_number:
     movq xmm0, [rsp+16]
