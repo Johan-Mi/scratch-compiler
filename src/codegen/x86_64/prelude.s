@@ -61,23 +61,26 @@ str_length:
     inc rax
     test rsi, rsi
     jz .done
-    dec rsi
     test byte [rdi], 0x80
     jz .one_byte
     cmp byte [rdi], 0b11000000
     jbe .two_bytes
     cmp byte [rdi], 0b11100000
     jbe .three_bytes
-    add rsi, 4
+    add rdi, 4
+    sub rsi, 4
     jmp .loop
 .one_byte:
     inc rdi
+    dec rsi
     jmp .loop
 .two_bytes:
     add rdi, 2
+    sub rsi, 2
     jmp .loop
 .three_bytes:
     add rdi, 3
+    sub rsi, 3
     jmp .loop
 .done:
     ret
@@ -99,3 +102,37 @@ usize_to_double:
 .LCPI0_1:
     dq 0x4330000000000000
     dq 0x4530000000000000
+
+get_bool:
+    mov rax, [rsp]
+    cmp rax, 2
+    jb .done
+    je .is_number
+    test qword [rsp+8], 1
+    jnz .might_be_str_0
+    cmp qword [rsp+8], 5
+    je .might_be_str_false
+    mov rax, 0
+.done:
+    ret
+.might_be_str_0:
+    cmp byte [rax], '0'
+    setne al
+    ret
+.might_be_str_false:
+    mov edi, [rax]
+    and edi, ~0x20
+    cmp edi, "FALS"
+    setne dl
+    mov dil, [rax+4]
+    and dil, ~0x20
+    cmp dil, 'E'
+    sete sil
+    andn rax, rdx, rsi
+    ret
+.is_number:
+    movq xmm0, [rsp+8]
+    xorpd xmm1, xmm1
+    ucomisd xmm0, xmm1
+    setne al
+    ret

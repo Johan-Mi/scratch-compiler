@@ -73,7 +73,29 @@ impl AsmProgram {
             Statement::Do(stmts) => stmts
                 .iter()
                 .try_for_each(|stmt| self.generate_statement(stmt)),
-            Statement::IfElse { .. } => todo!(),
+            Statement::IfElse {
+                condition,
+                if_true,
+                if_false,
+            } => {
+                let else_label = self.new_uid();
+                let end_label = self.new_uid();
+                self.generate_expr(condition)?;
+                self.get_bool();
+                writeln!(
+                    self.text,
+                    "    test rax, rax
+    jz {else_label}"
+                )
+                .unwrap();
+                self.generate_statement(if_true)?;
+                writeln!(self.text, "    jmp {end_label}").unwrap();
+                self.emit(Label(else_label));
+                self.generate_statement(if_false)?;
+                self.emit(Label(end_label));
+                self.drop_pop();
+                Ok(())
+            }
             Statement::Repeat { .. } => todo!(),
             Statement::Forever(body) => {
                 let loop_label = self.new_uid();
@@ -82,8 +104,34 @@ impl AsmProgram {
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
                 Ok(())
             }
-            Statement::Until { .. } => todo!(),
-            Statement::While { .. } => todo!(),
+            Statement::Until { condition, body }
+            | Statement::While { condition, body } => {
+                let loop_label = self.new_uid();
+                let after_loop = self.new_uid();
+                let end_condition = if matches!(stmt, Statement::Until { .. }) {
+                    "jnz"
+                } else {
+                    "jz"
+                };
+                self.text.push_str("    sub rsp, 8\n");
+                self.emit(Label(loop_label));
+                self.generate_expr(condition)?;
+                self.get_bool();
+                self.text.push_str("    mov [rsp+16], rax\n");
+                self.drop_pop();
+                writeln!(
+                    self.text,
+                    "    mov rax, [rsp]
+    test rax, rax
+    {} {after_loop}",
+                    end_condition,
+                )
+                .unwrap();
+                self.generate_statement(body)?;
+                self.text.push_str("    jmp {loop_label}\n");
+                self.emit(Label(after_loop));
+                Ok(())
+            }
             Statement::For { .. } => todo!(),
         }
     }
@@ -301,6 +349,10 @@ impl AsmProgram {
 
     fn drop_pop(&mut self) {
         self.text.push_str("    call drop_pop\n");
+    }
+
+    fn get_bool(&mut self) {
+        self.text.push_str("    call get_bool\n");
     }
 }
 
