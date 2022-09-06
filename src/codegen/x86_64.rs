@@ -315,12 +315,20 @@ impl AsmProgram {
             Value::String(s) => {
                 let string_id = self.allocate_static_str(s);
                 let len = s.len();
+                if let Ok(len) = u32::try_from(len) {
+                    writeln!(self.text, "    push {len}").unwrap();
+                } else {
+                    writeln!(
+                        self.text,
+                        "    mov rax, {len}
+    push rax"
+                    )
+                    .unwrap();
+                }
                 writeln!(
                     self.text,
-                    "    mov rax, {len}
-    push rax
-    mov rcx, {string_id}
-    push rcx",
+                    "    mov rax, {string_id}
+    push rax",
                 )
                 .unwrap();
             }
