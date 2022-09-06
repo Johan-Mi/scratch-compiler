@@ -94,6 +94,7 @@ usize_to_double:
     addsd xmm1, xmm0
     movq rax, xmm1
     ret
+align 16
 .LCPI0_0:
     dd 1127219200
     dd 1160773632
