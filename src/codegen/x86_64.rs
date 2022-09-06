@@ -235,7 +235,17 @@ impl AsmProgram {
             },
             "and" => todo!(),
             "or" => todo!(),
-            "not" => todo!(),
+            "not" => match args {
+                [operand] => {
+                    self.text.push_str("    sub rsp, 16\n");
+                    self.generate_expr(operand)?;
+                    self.get_bool();
+                    self.text.push_str("    mov [rsp+16], rax\n");
+                    self.drop_pop();
+                    Ok(())
+                }
+                _ => todo!(),
+            },
             "=" => todo!(),
             "<" => todo!(),
             ">" => todo!(),
