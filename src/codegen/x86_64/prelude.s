@@ -15,7 +15,7 @@ drop_pop:
     pop rdi
     add rsp, 8
     cmp rdi, 2
-    jb .dont_free
+    jbe .dont_free
     test edi, 1
     jne .dont_free
     push rax
@@ -28,7 +28,7 @@ cowify:
     pop rdi
     pop rsi
     cmp rdi, 1
-    jl .is_false
+    jb .is_false
     jz .is_true
     cmp rdi, 2
     jz .is_number
