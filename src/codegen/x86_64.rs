@@ -114,8 +114,7 @@ impl AsmProgram {
     test rax, rax
     jz {after_loop}
     dec rax
-    push rax
-    "
+    push rax"
                 )
                 .unwrap();
                 self.generate_statement(body)?;
