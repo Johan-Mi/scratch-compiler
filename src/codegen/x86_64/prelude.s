@@ -138,3 +138,43 @@ get_bool:
     ucomisd xmm0, xmm1
     setne al
     ret
+
+get_double:
+    cmp qword [rsp+8], 2
+    je .is_number
+    cmp qword [rsp+8], 1
+    je .is_true
+    jb .is_false
+    mov rax, 60
+    mov rdi, 98
+    syscall
+.is_number:
+    movq xmm0, [rsp+16]
+    ret
+.is_true:
+    mov rax, __?float64?__(1.0)
+    movq xmm0, rax
+    ret
+.is_false:
+    xorpd xmm0, xmm0
+    ret
+
+double_to_usize:
+        cvttsd2si rax, xmm0
+        mov rcx, rax
+        sar rcx, 63
+        movapd xmm1, xmm0
+        subsd xmm1, [.LCPI0_0]
+        cvttsd2si rdx, xmm1
+        and rdx, rcx
+        or rdx, rax
+        xor ecx, ecx
+        xorpd xmm1, xmm1
+        ucomisd xmm0, xmm1
+        cmovae rcx, rdx
+        ucomisd xmm0, [.LCPI0_1]
+        mov rax, -1
+        cmovbe rax, rcx
+        ret
+.LCPI0_0: dq 0x43e0000000000000
+.LCPI0_1: dq 0x43efffffffffffff

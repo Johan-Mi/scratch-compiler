@@ -96,7 +96,33 @@ impl AsmProgram {
                 self.drop_pop();
                 Ok(())
             }
-            Statement::Repeat { .. } => todo!(),
+            Statement::Repeat { times, body } => {
+                let loop_label = self.new_uid();
+                let after_loop = self.new_uid();
+                self.text.push_str("    sub rsp, 8\n");
+                self.generate_expr(times)?;
+                self.get_double();
+                self.text.push_str(
+                    "    call double_to_usize
+    mov [rsp+16], rax\n",
+                );
+                self.drop_pop();
+                self.emit(Label(loop_label));
+                writeln!(
+                    self.text,
+                    "    pop rax
+    test rax, rax
+    jz {after_loop}
+    dec rax
+    push rax
+    "
+                )
+                .unwrap();
+                self.generate_statement(body)?;
+                writeln!(self.text, "    jmp {loop_label}").unwrap();
+                self.emit(Label(after_loop));
+                Ok(())
+            }
             Statement::Forever(body) => {
                 let loop_label = self.new_uid();
                 self.emit(Label(loop_label));
@@ -371,6 +397,10 @@ impl AsmProgram {
 
     fn get_bool(&mut self) {
         self.text.push_str("    call get_bool\n");
+    }
+
+    fn get_double(&mut self) {
+        self.text.push_str("    call get_double\n");
     }
 }
 
