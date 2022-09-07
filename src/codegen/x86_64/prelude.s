@@ -123,7 +123,7 @@ get_bool:
     ret
 .might_be_str_false:
     mov edi, [rax]
-    and edi, ~0x20
+    and edi, ~0x20202020
     cmp edi, "FALS"
     setne al
     mov dil, [rax+4]
