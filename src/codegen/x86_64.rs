@@ -288,7 +288,7 @@ impl AsmProgram {
     call malloc
     mov [rsp+32], rax
     mov rdi, rax
-    mov rdx, rsi
+    mov rdx, [rsp+8]
     mov rsi, [rsp]
     call memcpy
     mov rdi, rax
