@@ -54,6 +54,7 @@ cowify:
 
 staticstr str_true, db "true"
 staticstr str_false, db "false"
+staticstr str_empty, db ""
 
 str_length:
     mov rax, ~0
@@ -83,6 +84,73 @@ str_length:
     sub rsi, 3
     jmp .loop
 .done:
+    ret
+
+char_at:
+    test rdx, rdx
+    jz .return_empty_string
+.loop:
+    test rsi, rsi
+    jz .return_empty_string
+    dec rdx
+    test rdx, rdx
+    jz .found_correct_index
+    test byte [rdi], 0x80
+    jz .one_byte
+    test byte [rdi], 0b00100000
+    jz .two_bytes
+    test byte [rdi], 0b00010000
+    jz .three_bytes
+    add rdi, 4
+    sub rsi, 4
+    jmp .loop
+.one_byte:
+    inc rdi
+    dec rsi
+    jmp .loop
+.two_bytes:
+    add rdi, 2
+    sub rsi, 2
+    jmp .loop
+.three_bytes:
+    add rdi, 3
+    sub rsi, 3
+    jmp .loop
+.found_correct_index:
+    push rdi
+    mov rdi, 4
+    call malloc
+    pop rdi
+    test byte [rdi], 0x80
+    jz .write_one_byte
+    cmp byte [rdi], 0b00100000
+    jz .write_two_bytes
+    cmp byte [rdi], 0b00010000
+    jz .write_three_bytes
+    mov edi, [rdi]
+    mov dword [rax], edi
+    mov rdx, 4
+    ret
+.write_one_byte:
+    mov dil, [rdi]
+    mov [rax], dil
+    mov rdx, 1
+    ret
+.write_two_bytes:
+    mov di, [rdi]
+    mov [rax], di
+    mov rdx, 2
+    ret
+.write_three_bytes:
+    mov si, [rdi]
+    mov [rax], si
+    mov dil, [rdi+2]
+    mov [rax+2], dil
+    mov rdx, 3
+    ret
+.return_empty_string:
+    mov rax, str_empty
+    mov rdx, 0
     ret
 
 usize_to_double:

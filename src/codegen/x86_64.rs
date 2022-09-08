@@ -340,9 +340,28 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
-            "char-at" => {
-                todo!()
-            }
+            "char-at" => match args {
+                [s, index] => {
+                    self.text.push_str("    sub rsp, 16\n");
+                    self.generate_expr(s)?;
+                    self.cowify();
+                    self.generate_expr(index)?;
+                    self.get_double();
+                    self.text.push_str(
+                        "    call double_to_usize
+    mov rdx, rax
+    mov rdi, [rsp+16]
+    mov rsi, [rsp+24]
+    call char_at
+    mov [rsp+32], rax
+    mov [rsp+40], rdx\n",
+                    );
+                    self.drop_pop();
+                    self.drop_pop();
+                    Ok(())
+                }
+                _ => todo!(),
+            },
             "mod" => todo!(),
             "abs" => todo!(),
             "floor" => todo!(),
