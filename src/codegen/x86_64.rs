@@ -312,7 +312,18 @@ impl AsmProgram {
             "acos" => todo!(),
             "atan" => todo!(),
             "pressing-key" => todo!(),
-            "to-num" => todo!(),
+            "to-num" => match args {
+                [operand] => {
+                    self.text.push_str("    sub rsp, 8\n");
+                    self.generate_expr(operand)?;
+                    self.get_double();
+                    self.text.push_str("    movq [rsp+16], xmm0\n");
+                    self.drop_pop();
+                    self.text.push_str("    push 2\n");
+                    Ok(())
+                }
+                _ => todo!(),
+            },
             "random" => todo!(),
             _ => Err(Box::new(Error::UnknownFunction {
                 span,
