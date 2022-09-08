@@ -37,3 +37,9 @@ impl Generator {
         Uid(counter)
     }
 }
+
+impl Default for Generator {
+    fn default() -> Self {
+        Self::new()
+    }
+}

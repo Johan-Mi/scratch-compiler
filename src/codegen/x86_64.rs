@@ -6,6 +6,7 @@ use crate::{
 };
 use sb3_stuff::Value;
 use std::{
+    collections::HashMap,
     fmt::{self, Write as _},
     fs::File,
     io::Write as _,
@@ -14,11 +15,7 @@ use std::{
 };
 
 pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
-    let mut asm_program = AsmProgram {
-        uid_generator: crate::uid::Generator::new(),
-        entry_points: Vec::new(),
-        text: String::new(),
-    };
+    let mut asm_program = AsmProgram::default();
 
     for (name, procs) in iter::once(&program.stage)
         .chain(program.sprites.values())
@@ -35,10 +32,13 @@ pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Default)]
 struct AsmProgram {
     uid_generator: crate::uid::Generator,
     entry_points: Vec<Uid>,
     text: String,
+    local_vars: HashMap<String, Uid>,
+    var_ids: Vec<Uid>,
 }
 
 impl AsmProgram {
@@ -51,6 +51,16 @@ impl AsmProgram {
     }
 
     fn generate_proc(&mut self, name: &str, proc: &Procedure) -> Result<Uid> {
+        self.local_vars = proc
+            .variables
+            .iter()
+            .map(|name| {
+                let uid = self.new_uid();
+                self.var_ids.push(uid);
+                (name.clone(), uid)
+            })
+            .collect();
+
         match name {
             "when-flag-clicked" => {
                 assert!(proc.params.is_empty());
@@ -198,6 +208,28 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
+            ":=" => match args {
+                [Expr::Sym(var_name, _), value] => {
+                    let var_id = self.lookup_var(var_name).unwrap();
+                    writeln!(
+                        self.text,
+                        "    push qword [{var_id}+8]
+    push qword [{var_id}]"
+                    )
+                    .unwrap();
+                    self.generate_expr(value)?;
+                    writeln!(
+                        self.text,
+                        "    pop rax
+    mov [{var_id}], rax
+    pop rax
+    mov [{var_id}+8], rax"
+                    )
+                    .unwrap();
+                    self.drop_pop();
+                }
+                _ => todo!(),
+            },
             _ => todo!(),
         }
         Ok(())
@@ -209,12 +241,27 @@ impl AsmProgram {
                 self.push_lit(lit);
                 Ok(())
             }
-            Expr::Sym(_, _) => todo!(),
+            Expr::Sym(sym, _) => self.generate_symbol(sym),
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span)
             }
             Expr::AddSub(_, _) => todo!(),
             Expr::MulDiv(_, _) => todo!(),
+        }
+    }
+
+    fn generate_symbol(&mut self, sym: &str) -> Result<()> {
+        if let Some(var_id) = self.lookup_var(sym) {
+            writeln!(
+                self.text,
+                "    mov rdi, [{var_id}]
+    mov rsi, [{var_id}+8]
+    call clone_value"
+            )
+            .unwrap();
+            Ok(())
+        } else {
+            todo!()
         }
     }
 
@@ -412,6 +459,10 @@ impl AsmProgram {
     fn get_double(&mut self) {
         self.text.push_str("    call get_double\n");
     }
+
+    fn lookup_var(&self, name: &str) -> Option<Uid> {
+        self.local_vars.get(name).copied()
+    }
 }
 
 impl fmt::Display for AsmProgram {
@@ -420,15 +471,20 @@ impl fmt::Display for AsmProgram {
         for entry_point in &self.entry_points {
             writeln!(f, "    call {entry_point}")?;
         }
-        write!(
+        writeln!(
             f,
             r#"    mov rax, 60
     mov rdi, 0
     syscall
 
-{}"#,
+{}
+section .data
+align 8"#,
             self.text,
         )?;
+        for var_id in &self.var_ids {
+            writeln!(f, "{var_id}: dq 2, 0")?;
+        }
         Ok(())
     }
 }

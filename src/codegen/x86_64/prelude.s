@@ -178,3 +178,21 @@ double_to_usize:
         ret
 .LCPI0_0: dq 0x43e0000000000000
 .LCPI0_1: dq 0x43efffffffffffff
+
+clone_value:
+    push rdi
+    push qword [rsp+8]
+    mov [rsp+16], rsi
+    cmp rdi, 2
+    jbe .done
+    test rdi, 1
+    jnz .done
+    mov rdi, rsi
+    call malloc
+    mov rdi, rax
+    mov rsi, [rsp+8]
+    mov rdx, [rsp+16]
+    call memcpy
+    mov [rsp+8], rax
+.done:
+    ret
