@@ -63,9 +63,9 @@ str_length:
     jz .done
     test byte [rdi], 0x80
     jz .one_byte
-    cmp byte [rdi], 0b11000000
+    cmp byte [rdi], 0b11011111
     jbe .two_bytes
-    cmp byte [rdi], 0b11100000
+    cmp byte [rdi], 0b11101111
     jbe .three_bytes
     add rdi, 4
     sub rsi, 4
