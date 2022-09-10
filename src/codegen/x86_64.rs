@@ -93,8 +93,7 @@ impl AsmProgram {
             } => {
                 let else_label = self.new_uid();
                 let end_label = self.new_uid();
-                self.generate_expr(condition)?;
-                self.get_bool();
+                self.generate_bool_expr(condition)?;
                 writeln!(
                     self.text,
                     "    test rax, rax
@@ -106,20 +105,16 @@ impl AsmProgram {
                 self.emit(Label(else_label));
                 self.generate_statement(if_false)?;
                 self.emit(Label(end_label));
-                self.drop_pop();
                 Ok(())
             }
             Statement::Repeat { times, body } => {
                 let loop_label = self.new_uid();
                 let after_loop = self.new_uid();
-                self.text.push_str("    sub rsp, 8\n");
-                self.generate_expr(times)?;
-                self.get_double();
+                self.generate_double_expr(times)?;
                 self.text.push_str(
                     "    call double_to_usize
-    mov [rsp+16], rax\n",
+    push rax\n",
                 );
-                self.drop_pop();
                 self.emit(Label(loop_label));
                 writeln!(
                     self.text,
@@ -151,18 +146,12 @@ impl AsmProgram {
                 } else {
                     "jz"
                 };
-                self.text.push_str("    sub rsp, 8\n");
                 self.emit(Label(loop_label));
-                self.generate_expr(condition)?;
-                self.get_bool();
-                self.text.push_str("    mov [rsp+16], rax\n");
-                self.drop_pop();
+                self.generate_bool_expr(condition)?;
                 writeln!(
                     self.text,
-                    "    mov rax, [rsp]
-    test rax, rax
-    {} {after_loop}",
-                    end_condition,
+                    "    test rax, rax
+    {end_condition} {after_loop}",
                 )
                 .unwrap();
                 self.generate_statement(body)?;
@@ -196,17 +185,17 @@ impl AsmProgram {
                         )
                         .unwrap();
                     } else {
-                        self.generate_expr(message)?;
-                        self.cowify();
+                        self.generate_cow_expr(message)?;
                         self.text.push_str(
-                            "    mov rdx, rsi
-    mov rsi, rdi
+                            "    push rdx
+    push rax
+    mov rsi, rax
     mov rax, 1
     mov rdi, 1
     syscall
+    call drop_pop_cow
 ",
                         );
-                        self.drop_pop();
                     }
                 }
                 _ => todo!(),
@@ -214,22 +203,16 @@ impl AsmProgram {
             ":=" => match args {
                 [Expr::Sym(var_name, _), value] => {
                     let var_id = self.lookup_var(var_name).unwrap();
+                    self.generate_any_expr(value)?;
                     writeln!(
                         self.text,
                         "    push qword [{var_id}+8]
-    push qword [{var_id}]"
-                    )
-                    .unwrap();
-                    self.generate_expr(value)?;
-                    writeln!(
-                        self.text,
-                        "    pop rax
+    push qword [{var_id}]
     mov [{var_id}], rax
-    pop rax
-    mov [{var_id}+8], rax"
+    mov [{var_id}+8], rdx
+    call drop_pop_any"
                     )
                     .unwrap();
-                    self.drop_pop();
                 }
                 _ => todo!(),
             },
@@ -256,7 +239,7 @@ impl AsmProgram {
                 self.text,
                 "    mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]
-    call clone_value"
+    call clone_any"
             )
             .unwrap();
             Ok(Typ::Any)
@@ -276,31 +259,37 @@ impl AsmProgram {
             "++" => match args {
                 [single] => self.generate_expr(single),
                 [lhs, rhs] => {
-                    self.text.push_str("    sub rsp, 16\n");
-                    self.generate_expr(rhs)?;
-                    self.cowify();
-                    self.generate_expr(lhs)?;
-                    self.cowify();
+                    self.generate_cow_expr(rhs)?;
                     self.text.push_str(
-                        "    mov rdi, [rsp+24]
-    add rdi, rsi
-    mov [rsp+40], rdi
+                        "    push rdx
+    sub rsp, 8
+    push rdx
+    push rax
+",
+                    );
+                    self.generate_cow_expr(lhs)?;
+                    self.text.push_str(
+                        "    add [rsp+24], rdx
+    push rdx
+    push rax
+    mov rdi, [rsp+40]
     call malloc
     mov [rsp+32], rax
     mov rdi, rax
-    mov rdx, [rsp+8]
     mov rsi, [rsp]
+    mov rdx, [rsp+8]
     call memcpy
     mov rdi, rax
     add rdi, [rsp+8]
     mov rsi, [rsp+16]
     mov rdx, [rsp+24]
     call memcpy
+    call drop_pop_cow
+    call drop_pop_cow
+    pop rax
+    pop rdx
 ",
                     );
-
-                    self.drop_pop();
-                    self.drop_pop();
                     Ok(Typ::OwnedString)
                 }
                 _ => todo!(),
@@ -309,11 +298,8 @@ impl AsmProgram {
             "or" => todo!(),
             "not" => match args {
                 [operand] => {
-                    self.text.push_str("    sub rsp, 16\n");
-                    self.generate_expr(operand)?;
-                    self.get_bool();
-                    self.text.push_str("    mov [rsp+16], rax\n");
-                    self.drop_pop();
+                    self.generate_bool_expr(operand)?;
+                    self.text.push_str("    xor rax, 1\n");
                     Ok(Typ::Bool)
                 }
                 _ => todo!(),
@@ -324,40 +310,47 @@ impl AsmProgram {
             "length" => todo!(),
             "str-length" => match args {
                 [s] => {
-                    self.text.push_str("    sub rsp, 8\n");
-                    self.generate_expr(s)?;
-                    self.cowify();
+                    self.generate_cow_expr(s)?;
                     self.text.push_str(
-                        "    call str_length
+                        "    sub rsp, 8
+    push rdx
+    push rax
+    call str_length
     mov rdi, rax
     call usize_to_double
-    mov [rsp+16], rax
+    movq [rsp+16], xmm0
+    call drop_pop_cow
+    movq xmm0, [rsp]
+    add rsp, 8
 ",
                     );
-                    self.drop_pop();
-                    self.text.push_str("    push 2\n");
                     Ok(Typ::Double)
                 }
                 _ => todo!(),
             },
             "char-at" => match args {
                 [s, index] => {
-                    self.text.push_str("    sub rsp, 16\n");
-                    self.generate_expr(s)?;
-                    self.cowify();
-                    self.generate_expr(index)?;
-                    self.get_double();
+                    self.generate_cow_expr(s)?;
+                    self.text.push_str(
+                        "    sub rsp, 16
+    push rdx
+    push rax
+",
+                    );
+                    self.generate_double_expr(index)?;
                     self.text.push_str(
                         "    call double_to_usize
     mov rdx, rax
-    mov rdi, [rsp+16]
-    mov rsi, [rsp+24]
+    mov rdi, [rsp]
+    mov rsi, [rsp+8]
     call char_at
-    mov [rsp+32], rax
-    mov [rsp+40], rdx\n",
+    mov [rsp+16], rax
+    mov [rsp+24], rdx
+    call drop_pop_cow
+    pop rax
+    pop rdx
+",
                     );
-                    self.drop_pop();
-                    self.drop_pop();
                     Ok(Typ::OwnedString)
                 }
                 _ => todo!(),
@@ -380,12 +373,7 @@ impl AsmProgram {
             "pressing-key" => todo!(),
             "to-num" => match args {
                 [operand] => {
-                    self.text.push_str("    sub rsp, 8\n");
-                    self.generate_expr(operand)?;
-                    self.get_double();
-                    self.text.push_str("    movq [rsp+16], xmm0\n");
-                    self.drop_pop();
-                    self.text.push_str("    push 2\n");
+                    self.generate_double_expr(operand)?;
                     Ok(Typ::Double)
                 }
                 _ => todo!(),
@@ -419,68 +407,97 @@ impl AsmProgram {
                 writeln!(
                     self.text,
                     "    mov rax, {bits}
-    push rax
-    push 2",
+    movq xmm0, rax"
                 )
                 .unwrap();
                 Typ::Double
             }
             Value::String(s) => {
                 let string_id = self.allocate_static_str(s);
-                let len = s.len();
-                if let Ok(len) = u32::try_from(len) {
-                    writeln!(self.text, "    push {len}").unwrap();
-                } else {
-                    writeln!(
-                        self.text,
-                        "    mov rax, {len}
-    push rax"
-                    )
-                    .unwrap();
-                }
                 writeln!(
                     self.text,
                     "    mov rax, {string_id}
-    push rax",
+    mov rdx, {}",
+                    s.len(),
                 )
                 .unwrap();
                 Typ::StaticStr
             }
             Value::Bool(false) => {
-                self.text.push_str(
-                    "    push 0
-    push 0\n",
-                );
+                self.text.push_str("    mov rax, 0\n");
                 Typ::Bool
             }
             Value::Bool(true) => {
-                self.text.push_str(
-                    "    push 0
-    push 1\n",
-                );
+                self.text.push_str("    mov rax, 1\n");
                 Typ::Bool
             }
         }
     }
 
-    fn cowify(&mut self) {
-        self.text.push_str("    call cowify\n");
-    }
-
-    fn drop_pop(&mut self) {
-        self.text.push_str("    call drop_pop\n");
-    }
-
-    fn get_bool(&mut self) {
-        self.text.push_str("    call get_bool\n");
-    }
-
-    fn get_double(&mut self) {
-        self.text.push_str("    call get_double\n");
-    }
-
     fn lookup_var(&self, name: &str) -> Option<Uid> {
         self.local_vars.get(name).copied()
+    }
+
+    fn generate_bool_expr(&mut self, expr: &Expr) -> Result<()> {
+        match self.generate_expr(expr)? {
+            Typ::Double => self.text.push_str("    call double_to_bool\n"),
+            Typ::Bool => {}
+            Typ::StaticStr => {
+                self.text.push_str("    call static_str_to_bool\n")
+            }
+            Typ::OwnedString => {
+                self.text.push_str("    call owned_string_to_bool\n")
+            }
+            Typ::Any => self.text.push_str("    call any_to_bool\n"),
+        }
+        Ok(())
+    }
+
+    fn generate_double_expr(&mut self, expr: &Expr) -> Result<()> {
+        match self.generate_expr(expr)? {
+            Typ::Double => {}
+            Typ::Bool => self.text.push_str("    call bool_to_double\n"),
+            Typ::StaticStr => {
+                self.text.push_str("    call static_str_to_double\n")
+            }
+            Typ::OwnedString => {
+                self.text.push_str("    call owned_string_to_double\n")
+            }
+            Typ::Any => self.text.push_str(
+                "    mov rdi, rax
+    mov rsi, rdx
+    call any_to_double
+",
+            ),
+        }
+        Ok(())
+    }
+
+    fn generate_cow_expr(&mut self, expr: &Expr) -> Result<()> {
+        match self.generate_expr(expr)? {
+            Typ::Double => self.text.push_str("    call double_to_string\n"),
+            Typ::Bool => self.text.push_str("    call bool_to_static_str\n"),
+            Typ::StaticStr | Typ::OwnedString => {}
+            Typ::Any => self.text.push_str(
+                "    mov rdi, rax
+    mov rsi, rdx
+    call any_to_cow
+",
+            ),
+        }
+        Ok(())
+    }
+
+    fn generate_any_expr(&mut self, expr: &Expr) -> Result<()> {
+        match self.generate_expr(expr)? {
+            Typ::Double => self.text.push_str(
+                "    movq rdx, xmm0
+    mov rax, 2
+",
+            ),
+            Typ::Bool | Typ::StaticStr | Typ::OwnedString | Typ::Any => {}
+        }
+        Ok(())
     }
 }
 

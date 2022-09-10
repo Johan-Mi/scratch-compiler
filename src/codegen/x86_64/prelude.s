@@ -10,43 +10,47 @@ extern malloc, free, memcpy
 %endmacro
 
 section .text
-drop_pop:
+drop_pop_any:
     pop rax
     pop rdi
     add rsp, 8
     cmp rdi, 2
     jbe .dont_free
     test edi, 1
-    jne .dont_free
+    jnz .dont_free
     push rax
     jmp free
 .dont_free:
     jmp rax
 
-cowify:
+drop_pop_cow:
     pop rax
     pop rdi
-    pop rsi
+    add rsp, 8
+    test rdi, 1
+    jnz .dont_free
+    push rax
+    jmp free
+.dont_free:
+    jmp rax
+
+any_to_cow:
     cmp rdi, 1
     jb .is_false
-    jz .is_true
+    je .is_true
     cmp rdi, 2
-    jz .is_number
-    push rsi
-    push rdi
-    jmp rax
+    je .is_number
+    mov rax, rdi
+    mov rdx, rsi
+    ret
 .is_false:
-    mov rdi, str_false
-    mov rsi, 5
-    push rsi
-    push rdi
-    jmp rax
+    mov rax, str_false
+    mov rdx, 5
+    ret
 .is_true:
-    mov rdi, str_true
-    mov rsi, 4
-    push rsi
-    push rdi
-    jmp rax
+    mov rax, str_true
+    mov rdx, 4
+    ret
 .is_number:
     mov rax, 60
     mov rdi, 99
@@ -154,13 +158,12 @@ char_at:
     ret
 
 usize_to_double:
-    movq xmm0, rdi
-    punpckldq xmm0, [.LCPI0_0]
-    subpd xmm0, [.LCPI0_1]
-    movapd xmm1, xmm0
-    unpckhpd xmm1, xmm0
-    addsd xmm1, xmm0
-    movq rax, xmm1
+    movq xmm1, rdi
+    punpckldq xmm1, [.LCPI0_0]
+    subpd xmm1, [.LCPI0_1]
+    movapd xmm0, xmm1
+    unpckhpd xmm0, xmm1
+    addsd xmm0, xmm1
     ret
 align 16
 .LCPI0_0:
@@ -172,7 +175,7 @@ align 16
     dq 0x4330000000000000
     dq 0x4530000000000000
 
-get_bool:
+any_to_bool:
     mov rax, [rsp+8]
     cmp rax, 2
     jb .done
@@ -207,17 +210,17 @@ get_bool:
     setne al
     ret
 
-get_double:
-    cmp qword [rsp+8], 2
+any_to_double:
+    cmp rdi, 2
     je .is_number
-    cmp qword [rsp+8], 1
+    cmp rdi, 1
     je .is_true
     jb .is_false
     mov rax, 60
     mov rdi, 98
     syscall
 .is_number:
-    movq xmm0, [rsp+16]
+    movq xmm0, rsi
     ret
 .is_true:
     mov rax, __?float64?__(1.0)
@@ -228,39 +231,40 @@ get_double:
     ret
 
 double_to_usize:
-        cvttsd2si rax, xmm0
-        mov rcx, rax
-        sar rcx, 63
-        movapd xmm1, xmm0
-        subsd xmm1, [.LCPI0_0]
-        cvttsd2si rdx, xmm1
-        and rdx, rcx
-        or rdx, rax
-        xor ecx, ecx
-        xorpd xmm1, xmm1
-        ucomisd xmm0, xmm1
-        cmovae rcx, rdx
-        ucomisd xmm0, [.LCPI0_1]
-        mov rax, -1
-        cmovbe rax, rcx
-        ret
+    cvttsd2si rax, xmm0
+    mov rcx, rax
+    sar rcx, 63
+    movapd xmm1, xmm0
+    subsd xmm1, [.LCPI0_0]
+    cvttsd2si rdx, xmm1
+    and rdx, rcx
+    or rdx, rax
+    xor ecx, ecx
+    xorpd xmm1, xmm1
+    ucomisd xmm0, xmm1
+    cmovae rcx, rdx
+    ucomisd xmm0, [.LCPI0_1]
+    mov rax, -1
+    cmovbe rax, rcx
+    ret
+align 8
 .LCPI0_0: dq 0x43e0000000000000
 .LCPI0_1: dq 0x43efffffffffffff
 
-clone_value:
-    push rdi
-    push qword [rsp+8]
-    mov [rsp+16], rsi
+clone_any:
     cmp rdi, 2
     jbe .done
-    test rdi, 1
-    jnz .done
+    push rsi
+    push rdi
     mov rdi, rsi
     call malloc
     mov rdi, rax
-    mov rsi, [rsp+8]
-    mov rdx, [rsp+16]
+    pop rsi
+    mov rdx, [rsp]
     call memcpy
-    mov [rsp+8], rax
+    pop rdx
+    ret
 .done:
+    mov rax, rdi
+    mov rdx, rsi
     ret
