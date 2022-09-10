@@ -1,3 +1,5 @@
+mod typ;
+
 use crate::{
     diagnostic::{Error, Result},
     ir::{expr::Expr, proc::Procedure, statement::Statement, Program},
@@ -13,6 +15,7 @@ use std::{
     iter,
     path::Path,
 };
+use typ::Typ;
 
 pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
     let mut asm_program = AsmProgram::default();
@@ -235,12 +238,9 @@ impl AsmProgram {
         Ok(())
     }
 
-    fn generate_expr(&mut self, expr: &Expr) -> Result<()> {
+    fn generate_expr(&mut self, expr: &Expr) -> Result<Typ> {
         match expr {
-            Expr::Lit(lit) => {
-                self.push_lit(lit);
-                Ok(())
-            }
+            Expr::Lit(lit) => Ok(self.push_lit(lit)),
             Expr::Sym(sym, _) => self.generate_symbol(sym),
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span)
@@ -250,7 +250,7 @@ impl AsmProgram {
         }
     }
 
-    fn generate_symbol(&mut self, sym: &str) -> Result<()> {
+    fn generate_symbol(&mut self, sym: &str) -> Result<Typ> {
         if let Some(var_id) = self.lookup_var(sym) {
             writeln!(
                 self.text,
@@ -259,7 +259,7 @@ impl AsmProgram {
     call clone_value"
             )
             .unwrap();
-            Ok(())
+            Ok(Typ::Any)
         } else {
             todo!()
         }
@@ -270,7 +270,7 @@ impl AsmProgram {
         func_name: &str,
         args: &[Expr],
         span: Span,
-    ) -> Result<()> {
+    ) -> Result<Typ> {
         match func_name {
             "!!" => todo!(),
             "++" => match args {
@@ -301,7 +301,7 @@ impl AsmProgram {
 
                     self.drop_pop();
                     self.drop_pop();
-                    Ok(())
+                    Ok(Typ::OwnedString)
                 }
                 _ => todo!(),
             },
@@ -314,7 +314,7 @@ impl AsmProgram {
                     self.get_bool();
                     self.text.push_str("    mov [rsp+16], rax\n");
                     self.drop_pop();
-                    Ok(())
+                    Ok(Typ::Bool)
                 }
                 _ => todo!(),
             },
@@ -336,7 +336,7 @@ impl AsmProgram {
                     );
                     self.drop_pop();
                     self.text.push_str("    push 2\n");
-                    Ok(())
+                    Ok(Typ::Double)
                 }
                 _ => todo!(),
             },
@@ -358,7 +358,7 @@ impl AsmProgram {
                     );
                     self.drop_pop();
                     self.drop_pop();
-                    Ok(())
+                    Ok(Typ::OwnedString)
                 }
                 _ => todo!(),
             },
@@ -386,7 +386,7 @@ impl AsmProgram {
                     self.text.push_str("    movq [rsp+16], xmm0\n");
                     self.drop_pop();
                     self.text.push_str("    push 2\n");
-                    Ok(())
+                    Ok(Typ::Double)
                 }
                 _ => todo!(),
             },
@@ -412,7 +412,7 @@ impl AsmProgram {
         uid
     }
 
-    fn push_lit(&mut self, lit: &Value) {
+    fn push_lit(&mut self, lit: &Value) -> Typ {
         match lit {
             Value::Num(num) => {
                 let bits = num.to_bits();
@@ -423,6 +423,7 @@ impl AsmProgram {
     push 2",
                 )
                 .unwrap();
+                Typ::Double
             }
             Value::String(s) => {
                 let string_id = self.allocate_static_str(s);
@@ -443,22 +444,21 @@ impl AsmProgram {
     push rax",
                 )
                 .unwrap();
+                Typ::StaticStr
             }
             Value::Bool(false) => {
-                writeln!(
-                    self.text,
+                self.text.push_str(
                     "    push 0
-    push 0",
-                )
-                .unwrap();
+    push 0\n",
+                );
+                Typ::Bool
             }
             Value::Bool(true) => {
-                writeln!(
-                    self.text,
+                self.text.push_str(
                     "    push 0
-    push 1",
-                )
-                .unwrap();
+    push 1\n",
+                );
+                Typ::Bool
             }
         }
     }
