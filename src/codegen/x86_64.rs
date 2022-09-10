@@ -228,7 +228,67 @@ impl AsmProgram {
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span)
             }
-            Expr::AddSub(_, _) => todo!(),
+            Expr::AddSub(positives, negatives) => {
+                match (&positives[..], &negatives[..]) {
+                    ([], []) => {
+                        self.push_lit(&Value::Num(0.0));
+                    }
+                    ([initial, positives @ ..], negatives) => {
+                        self.generate_double_expr(initial)?;
+                        self.text.push_str(
+                            "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                        );
+                        for term in positives {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    addsd xmm0, [rsp]
+    movq [rsp], xmm0
+",
+                            );
+                        }
+                        for term in negatives {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    movq xmm1, [rsp]
+    subsd xmm1, xmm0
+    movq [rsp], xmm1
+",
+                            );
+                        }
+                        self.text.push_str(
+                            "    movq xmm0, [rsp]
+    add rsp, 16
+",
+                        );
+                    }
+                    ([], [initial, negatives @ ..]) => {
+                        self.generate_double_expr(initial)?;
+                        self.text.push_str(
+                            "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                        );
+                        for term in negatives {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    addsd xmm0, [rsp]
+    movq [rsp], xmm0
+",
+                            );
+                        }
+                        self.text.push_str(
+                            "    mov rax, (1 << 63)
+    xor [rsp], rax
+    movq xmm0, [rsp]
+    add rsp, 8
+",
+                        );
+                    }
+                }
+                Ok(Typ::Double)
+            }
             Expr::MulDiv(_, _) => todo!(),
         }
     }
