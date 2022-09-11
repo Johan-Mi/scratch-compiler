@@ -52,9 +52,8 @@ any_to_cow:
     mov rdx, 4
     ret
 .is_number:
-    mov rax, 60
-    mov rdi, 99
-    syscall
+    movq xmm0, rsi
+    jmp double_to_cow
 
 staticstr str_true, db "true"
 staticstr str_false, db "false"
@@ -268,3 +267,43 @@ clone_any:
     mov rax, rdi
     mov rdx, rsi
     ret
+
+double_to_cow:
+    movq rdi, xmm0
+    mov rax, ((1 << 11) - 1) << 52
+    cmp rdi, rax
+    je .is_infinity
+    mov rax, ((1 << 12) - 1) << 52
+    cmp rdi, rax
+    je .is_minus_infinity
+    shl rdi, 1
+    test rdi, rdi
+    jz .is_zero
+    shr rdi, 53
+    cmp rdi, (1 << 11) - 1
+    je .is_nan
+    ; TODO
+    mov rax, 1
+    mov rdi, 97
+    syscall
+.is_infinity:
+    mov rax, str_Infinity
+    mov rdx, 8
+    ret
+.is_minus_infinity:
+    mov rax, str_minus_Infinity
+    mov rdx, 9
+    ret
+.is_zero:
+    mov rax, str_0
+    mov rdx, 1
+    ret
+.is_nan:
+    mov rax, str_NaN
+    mov rdx, 3
+    ret
+
+staticstr str_Infinity, db "Infinity"
+staticstr str_minus_Infinity, db "-Infinity"
+staticstr str_0, db "0"
+staticstr str_NaN, db "NaN"

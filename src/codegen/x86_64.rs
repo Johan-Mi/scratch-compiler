@@ -564,7 +564,7 @@ impl AsmProgram {
 
     fn generate_cow_expr(&mut self, expr: &Expr) -> Result<()> {
         match self.generate_expr(expr)? {
-            Typ::Double => self.text.push_str("    call double_to_string\n"),
+            Typ::Double => self.text.push_str("    call double_to_cow\n"),
             Typ::Bool => self.text.push_str("    call bool_to_static_str\n"),
             Typ::StaticStr | Typ::OwnedString => {}
             Typ::Any => self.text.push_str(
