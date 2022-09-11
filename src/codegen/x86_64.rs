@@ -160,7 +160,43 @@ impl AsmProgram {
                 self.emit(after_loop);
                 Ok(())
             }
-            Statement::For { .. } => todo!(),
+            Statement::For {
+                counter,
+                times,
+                body,
+            } => {
+                let var_id = self.lookup_var(&counter.0).unwrap();
+                let loop_label = LocalLabel(self.new_uid());
+                let after_loop = LocalLabel(self.new_uid());
+                self.generate_double_expr(times)?;
+                self.text.push_str(
+                    "    call double_to_usize
+    push rax
+    push qword 0
+",
+                );
+                self.emit(loop_label);
+                writeln!(
+                    self.text,
+                    "    pop rdi
+    cmp rdi, [rsp]
+    jae {after_loop}
+    inc rdi
+    push rdi
+    push qword [{var_id}+8]
+    push qword [{var_id}]
+    mov qword [{var_id}], 2
+    call usize_to_double
+    movq [{var_id}+8], xmm0
+    call drop_pop_any"
+                )
+                .unwrap();
+                self.generate_statement(body)?;
+                writeln!(self.text, "    jmp {loop_label}").unwrap();
+                self.emit(after_loop);
+                self.text.push_str("    add rsp, 8\n");
+                Ok(())
+            }
         }
     }
 
