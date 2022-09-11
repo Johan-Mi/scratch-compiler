@@ -92,8 +92,8 @@ impl AsmProgram {
                 if_true,
                 if_false,
             } => {
-                let else_label = self.new_uid();
-                let end_label = self.new_uid();
+                let else_label = LocalLabel(self.new_uid());
+                let end_label = LocalLabel(self.new_uid());
                 self.generate_bool_expr(condition)?;
                 writeln!(
                     self.text,
@@ -103,20 +103,20 @@ impl AsmProgram {
                 .unwrap();
                 self.generate_statement(if_true)?;
                 writeln!(self.text, "    jmp {end_label}").unwrap();
-                self.emit(Label(else_label));
+                self.emit(else_label);
                 self.generate_statement(if_false)?;
-                self.emit(Label(end_label));
+                self.emit(end_label);
                 Ok(())
             }
             Statement::Repeat { times, body } => {
-                let loop_label = self.new_uid();
-                let after_loop = self.new_uid();
+                let loop_label = LocalLabel(self.new_uid());
+                let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
                 self.text.push_str(
                     "    call double_to_usize
     push rax\n",
                 );
-                self.emit(Label(loop_label));
+                self.emit(loop_label);
                 writeln!(
                     self.text,
                     "    pop rax
@@ -128,26 +128,26 @@ impl AsmProgram {
                 .unwrap();
                 self.generate_statement(body)?;
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
-                self.emit(Label(after_loop));
+                self.emit(after_loop);
                 Ok(())
             }
             Statement::Forever(body) => {
-                let loop_label = self.new_uid();
-                self.emit(Label(loop_label));
+                let loop_label = LocalLabel(self.new_uid());
+                self.emit(loop_label);
                 self.generate_statement(body)?;
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
                 Ok(())
             }
             Statement::Until { condition, body }
             | Statement::While { condition, body } => {
-                let loop_label = self.new_uid();
-                let after_loop = self.new_uid();
+                let loop_label = LocalLabel(self.new_uid());
+                let after_loop = LocalLabel(self.new_uid());
                 let end_condition = if matches!(stmt, Statement::Until { .. }) {
                     "jnz"
                 } else {
                     "jz"
                 };
-                self.emit(Label(loop_label));
+                self.emit(loop_label);
                 self.generate_bool_expr(condition)?;
                 writeln!(
                     self.text,
@@ -157,7 +157,7 @@ impl AsmProgram {
                 .unwrap();
                 self.generate_statement(body)?;
                 self.text.push_str("    jmp {loop_label}\n");
-                self.emit(Label(after_loop));
+                self.emit(after_loop);
                 Ok(())
             }
             Statement::For { .. } => todo!(),
@@ -598,5 +598,20 @@ struct Label<T>(T);
 impl<T: fmt::Display> Emit for Label<T> {
     fn emit(self, program: &mut AsmProgram) {
         writeln!(program.text, "{}:", self.0).unwrap();
+    }
+}
+
+#[derive(Clone, Copy)]
+struct LocalLabel<T>(T);
+
+impl<T: fmt::Display> fmt::Display for LocalLabel<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, ".{}", self.0)
+    }
+}
+
+impl<T: fmt::Display> Emit for LocalLabel<T> {
+    fn emit(self, program: &mut AsmProgram) {
+        writeln!(program.text, "{}:", self).unwrap();
     }
 }
