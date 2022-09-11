@@ -42,6 +42,7 @@ struct AsmProgram {
     text: String,
     local_vars: HashMap<String, Uid>,
     var_ids: Vec<Uid>,
+    static_strs: Vec<(Uid, String)>,
 }
 
 impl AsmProgram {
@@ -448,15 +449,7 @@ impl AsmProgram {
 
     fn allocate_static_str(&mut self, s: &str) -> Uid {
         let uid = self.new_uid();
-        write!(self.text, "staticstr {uid}, db ").unwrap();
-        for (i, byte) in s.bytes().enumerate() {
-            if i == 0 {
-                write!(self.text, "{byte}").unwrap();
-            } else {
-                write!(self.text, ",{byte}").unwrap();
-            }
-        }
-        self.text.push('\n');
+        self.static_strs.push((uid, s.to_owned()));
         uid
     }
 
@@ -580,6 +573,17 @@ align 8"#,
         )?;
         for var_id in &self.var_ids {
             writeln!(f, "{var_id}: dq 2, 0")?;
+        }
+        for (str_id, s) in &self.static_strs {
+            write!(f, "staticstr {str_id}, db ")?;
+            for (i, byte) in s.bytes().enumerate() {
+                if i == 0 {
+                    write!(f, "{byte}")?;
+                } else {
+                    write!(f, ",{byte}")?;
+                }
+            }
+            writeln!(f)?;
         }
         Ok(())
     }
