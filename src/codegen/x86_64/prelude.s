@@ -269,6 +269,10 @@ clone_any:
     ret
 
 double_to_cow:
+    xorpd xmm1, xmm1
+    ucomisd xmm0, xmm1
+    jp .is_nan
+    je .is_zero
     movq rdi, xmm0
     mov rax, ((1 << 11) - 1) << 52
     cmp rdi, rax
@@ -276,12 +280,6 @@ double_to_cow:
     mov rax, ((1 << 12) - 1) << 52
     cmp rdi, rax
     je .is_minus_infinity
-    shl rdi, 1
-    test rdi, rdi
-    jz .is_zero
-    shr rdi, 53
-    cmp rdi, (1 << 11) - 1
-    je .is_nan
     ; TODO
     mov rax, 1
     mov rdi, 97
