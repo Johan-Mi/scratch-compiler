@@ -391,8 +391,27 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
-            "and" => todo!(),
-            "or" => todo!(),
+            "and" | "or" => match args {
+                [] => Ok(self.push_lit(&Value::Bool(func_name == "and"))),
+                [single] => self.generate_expr(single),
+                [rest @ .., last] => {
+                    let short_circuit = LocalLabel(self.new_uid());
+                    let short_circuit_condition =
+                        if func_name == "and" { "jz" } else { "jnz" };
+                    for arg in rest {
+                        self.generate_bool_expr(arg)?;
+                        writeln!(
+                            self.text,
+                            "    test rax, rax
+    {short_circuit_condition} {short_circuit}",
+                        )
+                        .unwrap();
+                    }
+                    self.generate_bool_expr(last)?;
+                    self.emit(short_circuit);
+                    Ok(Typ::Bool)
+                }
+            },
             "not" => match args {
                 [operand] => {
                     self.generate_bool_expr(operand)?;
