@@ -126,9 +126,9 @@ char_at:
     pop rdi
     test byte [rdi], 0x80
     jz .write_one_byte
-    cmp byte [rdi], 0b00100000
+    test byte [rdi], 0b00100000
     jz .write_two_bytes
-    cmp byte [rdi], 0b00010000
+    test byte [rdi], 0b00010000
     jz .write_three_bytes
     mov edi, [rdi]
     mov dword [rax], edi
