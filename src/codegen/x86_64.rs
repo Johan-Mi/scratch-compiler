@@ -183,12 +183,12 @@ impl AsmProgram {
     jae {after_loop}
     inc rdi
     push rdi
-    push qword [{var_id}+8]
     push qword [{var_id}]
     mov qword [{var_id}], 2
     call usize_to_double
     movq [{var_id}+8], xmm0
-    call drop_pop_any"
+    pop rdi
+    call drop_any"
                 )
                 .unwrap();
                 self.generate_statement(body)?;
@@ -243,11 +243,10 @@ impl AsmProgram {
                     self.generate_any_expr(value)?;
                     writeln!(
                         self.text,
-                        "    push qword [{var_id}+8]
-    push qword [{var_id}]
+                        "    mov rdi, [{var_id}]
     mov [{var_id}], rax
     mov [{var_id}+8], rdx
-    call drop_pop_any"
+    call drop_any"
                     )
                     .unwrap();
                 }

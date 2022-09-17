@@ -10,18 +10,14 @@ extern malloc, free, memcpy
 %endmacro
 
 section .text
-drop_pop_any:
-    pop rax
-    pop rdi
-    add rsp, 8
+drop_any:
     cmp rdi, 2
     jbe .dont_free
     test edi, 1
     jnz .dont_free
-    push rax
     jmp free
 .dont_free:
-    jmp rax
+    ret
 
 drop_pop_cow:
     pop rax
