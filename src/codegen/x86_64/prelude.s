@@ -249,6 +249,8 @@ align 8
 clone_any:
     cmp rdi, 2
     jbe .done
+    test rdi, 1
+    jnz .done
     push rsi
     push rdi
     mov rdi, rsi
