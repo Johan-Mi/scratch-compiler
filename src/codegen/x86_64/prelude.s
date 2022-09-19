@@ -171,35 +171,42 @@ align 16
     dq 0x4530000000000000
 
 any_to_bool:
-    mov rax, [rsp+8]
-    cmp rax, 2
+    cmp rdi, 2
     jb .done
     je .is_number
-    test qword [rsp+16], 1
-    jnz .might_be_str_0
-    cmp qword [rsp+16], 5
+    push word 0
+    cmp rsi, 1
+    je .might_be_str_0
+    cmp rsi, 5
     je .might_be_str_false
-    test qword [rsp+16], ~0
+    test rsi, rsi
     setnz al
+    push rax
+    call drop_any
+    pop rax
 .done:
     ret
 .might_be_str_0:
-    cmp byte [rax], '0'
-    setne al
+    cmp byte [rdi], '0'
+    setne [rsp]
+    call drop_any
+    pop ax
     ret
 .might_be_str_false:
-    mov edi, [rax]
+    mov edi, [rdi]
     and edi, ~0x20202020
     cmp edi, "FALS"
-    setne al
-    mov dil, [rax+4]
+    setne [rsp]
+    mov dil, [rdi+4]
     and dil, ~0x20
     cmp dil, 'E'
-    setne dil
-    or al, dil
+    setne al
+    or [rsp], al
+    call drop_any
+    pop ax
     ret
 .is_number:
-    movq xmm0, [rsp+16]
+    movq xmm0, rsi
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
     setne al
