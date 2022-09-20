@@ -2,6 +2,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(proc_macro_hygiene)]
 #![feature(drain_filter)]
+#![feature(let_chains)]
 
 mod asset;
 mod ast;
