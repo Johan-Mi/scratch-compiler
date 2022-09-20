@@ -82,8 +82,10 @@ impl AsmProgram {
     fn generate_statement(&mut self, stmt: &Statement) -> Result<()> {
         match stmt {
             Statement::ProcCall {
-                proc_name, args, ..
-            } => self.generate_proc_call(proc_name, args),
+                proc_name,
+                args,
+                proc_span,
+            } => self.generate_proc_call(proc_name, args, *proc_span),
             Statement::Do(stmts) => stmts
                 .iter()
                 .try_for_each(|stmt| self.generate_statement(stmt)),
@@ -204,6 +206,7 @@ impl AsmProgram {
         &mut self,
         proc_name: &str,
         args: &[Expr],
+        span: Span,
     ) -> Result<()> {
         match proc_name {
             "print" => match args {
@@ -252,7 +255,12 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
-            _ => todo!(),
+            _ => {
+                return Err(Box::new(Error::UnknownProc {
+                    span,
+                    proc_name: proc_name.to_owned(),
+                }))
+            }
         }
         Ok(())
     }
