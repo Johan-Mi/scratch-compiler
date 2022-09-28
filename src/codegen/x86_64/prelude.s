@@ -1,6 +1,6 @@
 global main
 
-extern malloc, free, memcpy
+extern malloc, free, memcpy, realloc
 
 %macro staticstr 2+
     [section .rodata]
@@ -359,3 +359,69 @@ staticstr str_Infinity, db "Infinity"
 staticstr str_minus_Infinity, db "-Infinity"
 staticstr str_0, db "0"
 staticstr str_NaN, db "NaN"
+
+list_ensure_extra_capacity:
+    mov rax, rdi
+    mov rsi, [rdi+16]
+    cmp [rdi+8], rsi
+    jb .done
+    push rdi
+    shl rsi, 5
+    add rsi, 16
+    mov rdi, [rdi]
+    call realloc
+    mov rdi, rax
+    pop rax
+    mov [rax], rdi
+    shl qword [rax+16], 1
+    inc qword [rax+16]
+.done:
+    ret
+
+list_append:
+    push rdx
+    push rsi
+    call list_ensure_extra_capacity
+    mov rdi, [rax+8]
+    shl rdi, 4
+    mov rsi, [rax]
+    pop qword [rsi+rdi]
+    pop qword [rsi+rdi+8]
+    inc qword [rax+8]
+    ret
+
+list_get:
+    cmp rdi, 2
+    jbe .numeric_index
+    cmp rsi, 4
+    jne .numeric_index
+    mov eax, [rdi]
+    and eax, ~0x202020
+    cmp eax, "LAST"
+    jne .numeric_index
+    cmp qword [rdx+8], 0
+    jz .out_of_bounds
+    mov rax, [rdx+8]
+    shl rax, 4
+    mov rsi, [rdx]
+    mov rdi, [rsi+rax-16]
+    mov rsi, [rsi+rax-8]
+    jmp clone_any
+.numeric_index:
+    push rdx
+    call any_to_double
+    call double_to_usize
+    pop rdx
+    dec rax
+    jc .out_of_bounds
+    cmp rax, [rdx+8]
+    jae .out_of_bounds
+    shl rax, 4
+    mov rsi, [rdx]
+    mov rdi, [rsi+rax]
+    mov rsi, [rsi+rax+8]
+    call clone_any
+.out_of_bounds:
+    mov rax, str_empty
+    xor rdx, rdx
+    ret

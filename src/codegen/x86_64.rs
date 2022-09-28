@@ -41,7 +41,9 @@ struct AsmProgram {
     entry_points: Vec<Uid>,
     text: String,
     local_vars: HashMap<String, Uid>,
+    local_lists: HashMap<String, Uid>,
     var_ids: Vec<Uid>,
+    list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
 }
 
@@ -61,6 +63,15 @@ impl AsmProgram {
             .map(|name| {
                 let uid = self.new_uid();
                 self.var_ids.push(uid);
+                (name.clone(), uid)
+            })
+            .collect();
+        self.local_lists = proc
+            .lists
+            .iter()
+            .map(|name| {
+                let uid = self.new_uid();
+                self.list_ids.push(uid);
                 (name.clone(), uid)
             })
             .collect();
@@ -255,6 +266,20 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
+            "append" => match args {
+                [Expr::Sym(list_name, _), value] => {
+                    let list_id = self.lookup_list(list_name).unwrap();
+                    self.generate_any_expr(value)?;
+                    writeln!(
+                        self.text,
+                        "    mov rdi, {list_id}
+    mov rsi, rax
+    call list_append"
+                    )
+                    .unwrap();
+                }
+                _ => todo!(),
+            },
             _ => {
                 return Err(Box::new(Error::UnknownProc {
                     span,
@@ -359,7 +384,22 @@ impl AsmProgram {
         span: Span,
     ) -> Result<Typ> {
         match func_name {
-            "!!" => todo!(),
+            "!!" => match args {
+                [Expr::Sym(list_name, _), index] => {
+                    let list_id = self.lookup_list(list_name).unwrap();
+                    self.generate_any_expr(index)?;
+                    writeln!(
+                        self.text,
+                        "    mov rdi, rax
+    mov rsi, rdx
+    mov rdx, {list_id}
+    call list_get"
+                    )
+                    .unwrap();
+                    Ok(Typ::Any)
+                }
+                _ => todo!(),
+            },
             "++" => match args {
                 [single] => self.generate_expr(single),
                 [lhs, rhs] => {
@@ -430,7 +470,19 @@ impl AsmProgram {
             "=" => todo!(),
             "<" => todo!(),
             ">" => todo!(),
-            "length" => todo!(),
+            "length" => match args {
+                [Expr::Sym(list_name, ..)] => {
+                    let list_id = self.lookup_list(list_name).unwrap();
+                    writeln!(
+                        self.text,
+                        "    mov rdi, [{list_id}+8]
+    call usize_to_double"
+                    )
+                    .unwrap();
+                    Ok(Typ::Double)
+                }
+                _ => todo!(),
+            },
             "str-length" => match args {
                 [s] => {
                     self.generate_cow_expr(s)?;
@@ -553,6 +605,10 @@ impl AsmProgram {
         self.local_vars.get(name).copied()
     }
 
+    fn lookup_list(&self, name: &str) -> Option<Uid> {
+        self.local_lists.get(name).copied()
+    }
+
     fn generate_bool_expr(&mut self, expr: &Expr) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => self.text.push_str("    call double_to_bool\n"),
@@ -646,6 +702,10 @@ align 8"#,
                 }
             }
             writeln!(f)?;
+        }
+        f.write_str("\nsection .bss\n")?;
+        for list_id in &self.list_ids {
+            writeln!(f, "{list_id}: resq 3")?;
         }
         Ok(())
     }
