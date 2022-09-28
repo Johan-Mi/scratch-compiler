@@ -179,6 +179,7 @@ any_to_bool:
     je .might_be_str_0
     cmp rsi, 5
     je .might_be_str_false
+    xor eax, eax
     test rsi, rsi
     setnz al
     push rax
@@ -206,6 +207,7 @@ any_to_bool:
     pop ax
     ret
 .is_number:
+    xor eax, eax
     movq xmm0, rsi
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
@@ -322,6 +324,7 @@ double_to_cow:
     ; Adjust for exponent 0 behaving like 1
     mov rsi, EXPONENT_MASK
     test rdi, rsi
+    mov esi, 0
     setnz sil
     sub r9, rsi
     ; Add leading 1 to normal numbers
