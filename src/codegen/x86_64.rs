@@ -693,13 +693,9 @@ align 8"#,
             writeln!(f, "{var_id}: dq 2, 0")?;
         }
         for (str_id, s) in &self.static_strs {
-            write!(f, "staticstr {str_id}, db ")?;
-            for (i, byte) in s.bytes().enumerate() {
-                if i == 0 {
-                    write!(f, "{byte}")?;
-                } else {
-                    write!(f, ",{byte}")?;
-                }
+            write!(f, "staticstr {str_id}, db \"\"")?;
+            for byte in s.bytes() {
+                write!(f, ",{byte}")?;
             }
             writeln!(f)?;
         }
