@@ -414,7 +414,7 @@ list_get:
     call any_to_double
     call double_to_usize
     pop rdx
-    dec rax
+    sub rax, 1
     jc .out_of_bounds
     cmp rax, [rdx+8]
     jae .out_of_bounds
