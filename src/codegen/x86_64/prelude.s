@@ -14,8 +14,7 @@ drop_any:
     cmp rdi, 2
     jbe .dont_free
     test edi, 1
-    jnz .dont_free
-    jmp free
+    jz free
 .dont_free:
     ret
 
