@@ -1,4 +1,4 @@
-use crate::{ser::Mangled, uid::Uid};
+use crate::{codegen::sb3::Mangled, uid::Uid};
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
 

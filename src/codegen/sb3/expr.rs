@@ -1,9 +1,6 @@
 use crate::{
+    codegen::sb3::{Call, Expr, Param, Reporter, SerCtx},
     diagnostic::{Error, Result},
-    ser::{
-        codegen::{Call, Expr, Param, Reporter},
-        SerCtx,
-    },
     span::Span,
     uid::Uid,
 };

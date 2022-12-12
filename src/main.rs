@@ -6,6 +6,7 @@
 
 mod asset;
 mod ast;
+mod codegen;
 mod diagnostic;
 mod ir;
 mod lint;
@@ -13,17 +14,16 @@ mod macros;
 mod optimize;
 mod opts;
 mod parser;
-mod ser;
 mod span;
 mod uid;
 
 use crate::{
-    ir::Program, lint::lint_ast, macros::expand, opts::Opts,
-    parser::input::Input, ser::write_sb3_file,
+    codegen::write_program, ir::Program, lint::lint_ast, macros::expand,
+    opts::Opts, parser::input::Input,
 };
 use codespan::Files;
 use gumdrop::Options;
-use std::{fs, io::Write, path::Path, sync::Mutex};
+use std::{fs, io::Write, sync::Mutex};
 
 static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
 
@@ -58,21 +58,21 @@ fn main() {
     }
 
     if let Err(err) = expand(asts, &opts).and_then(|expanded| {
-        if let Some(file) = opts.dump_expanded {
+        if let Some(file) = &opts.dump_expanded {
             let mut file = fs::File::create(file).unwrap();
             writeln!(file, "{expanded:#?}").unwrap();
         }
         let mut program = Program::from_asts(expanded)?;
-        if let Some(file) = opts.dump_ir {
+        if let Some(file) = &opts.dump_ir {
             let mut file = fs::File::create(file).unwrap();
             writeln!(file, "{program:#?}").unwrap();
         }
         program.optimize();
-        if let Some(file) = opts.dump_optimized {
+        if let Some(file) = &opts.dump_optimized {
             let mut file = fs::File::create(file).unwrap();
             writeln!(file, "{program:#?}").unwrap();
         }
-        write_sb3_file(&program, Path::new("project.sb3"))
+        write_program(&program, &opts)
     }) {
         err.emit();
     }

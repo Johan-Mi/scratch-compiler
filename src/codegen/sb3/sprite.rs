@@ -8,7 +8,7 @@ use serde_json::{json, Value as Json};
 use std::collections::HashMap;
 
 impl SerCtx {
-    pub(super) fn serialize_sprite(
+    pub fn serialize_sprite(
         &mut self,
         name: &str,
         sprite: &Sprite,

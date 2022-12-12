@@ -1,10 +1,7 @@
 use crate::{
+    codegen::sb3::{Call, Param, SerCtx},
     diagnostic::{Error, Result},
     ir::{expr::Expr, statement::Statement},
-    ser::{
-        codegen::{Call, Param},
-        SerCtx,
-    },
     span::Span,
     uid::Uid,
 };
