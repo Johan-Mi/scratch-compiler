@@ -93,7 +93,6 @@ char_at:
     test rsi, rsi
     jz .return_empty_string
     dec rdx
-    test rdx, rdx
     jz .found_correct_index
     test byte [rdi], 0x80
     jz .one_byte
