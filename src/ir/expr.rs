@@ -86,7 +86,7 @@ impl Expr {
     ///
     /// [`Lit`]: Expr::Lit
     #[must_use]
-    pub fn is_lit(&self) -> bool {
+    pub const fn is_lit(&self) -> bool {
         matches!(self, Self::Lit(..))
     }
 }
@@ -97,13 +97,13 @@ impl TreeWalk<Rewrite<Self>> for Expr {
         mut f: impl FnMut(Self) -> Rewrite<Self>,
     ) -> Rewrite<Self> {
         match self {
-            Expr::Lit(_) | Expr::Sym(..) => Clean(self),
-            Expr::FuncCall(func_name, func_span, args) => {
+            Self::Lit(_) | Self::Sym(..) => Clean(self),
+            Self::FuncCall(func_name, func_span, args) => {
                 args.into_iter().map(f).collect::<Rewrite<_>>().map(
                     |new_args| Self::FuncCall(func_name, func_span, new_args),
                 )
             }
-            Expr::AddSub(positives, negatives) => positives
+            Self::AddSub(positives, negatives) => positives
                 .into_iter()
                 .map(&mut f)
                 .collect::<Rewrite<_>>()
@@ -114,7 +114,7 @@ impl TreeWalk<Rewrite<Self>> for Expr {
                         .collect::<Rewrite<_>>()
                         .map(|negatives| Self::AddSub(positives, negatives))
                 }),
-            Expr::MulDiv(numerators, denominators) => numerators
+            Self::MulDiv(numerators, denominators) => numerators
                 .into_iter()
                 .map(&mut f)
                 .collect::<Rewrite<_>>()

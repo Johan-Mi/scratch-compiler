@@ -46,7 +46,7 @@ impl FromStr for Target {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "sb3" => Ok(Target::SB3),
+            "sb3" => Ok(Self::SB3),
             _ => Err(InvalidTarget(s.to_owned())),
         }
     }

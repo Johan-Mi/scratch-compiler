@@ -115,14 +115,12 @@ fn parse_costume_decl(costumes: &mut HashMap<String, PathBuf>, args: Vec<Ast>) {
     // TODO: Error handling
     let mut args = args.into_iter();
     while let Some(name) = args.next() {
-        let name = match name {
-            Ast::String(name, ..) => name,
-            _ => todo!(),
+        let Ast::String(name, ..) = name else {
+            todo!();
         };
         let path = args.next().unwrap();
-        let path = match path {
-            Ast::String(path, ..) => path,
-            _ => todo!(),
+        let Ast::String(path, ..) = path else {
+            todo!();
         };
         costumes.insert(name, path.into());
     }

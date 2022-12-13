@@ -211,11 +211,10 @@ impl SerCtx {
                 );
             }
             "when-received" => {
-                let broadcast_name = match &proc.params[..] {
-                    [Expr::Lit(Value::String(broadcast_name))] => {
-                        broadcast_name
-                    }
-                    _ => todo!(),
+                let [Expr::Lit(Value::String(broadcast_name))] =
+                    &proc.params[..]
+                else {
+                    todo!();
                 };
                 let (body, _) = self.serialize_stmt(&proc.body, this, None)?;
                 self.emit_block(

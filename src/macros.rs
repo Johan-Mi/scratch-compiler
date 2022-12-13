@@ -84,7 +84,7 @@ impl MacroContext<'_> {
         [
             |_this: &Self, ast| Self::use_builtin_macros(ast),
             Self::use_user_defined_macros,
-            |this: &Self, ast| this.use_inline_include(ast),
+            Self::use_inline_include,
             Self::use_inline_macros,
         ]
         .iter()
@@ -207,9 +207,8 @@ impl MacroContext<'_> {
     }
 
     fn use_inline_include(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        let (head, tail, span) = match ast {
-            Ast::Node(head, tail, span) => (head, tail, span),
-            _ => return Ok(Clean(ast)),
+        let Ast::Node(head, tail, span) = ast else {
+            return Ok(Clean(ast));
         };
 
         if !tail.iter().any(|item| item.is_the_function_call("include")) {
@@ -246,12 +245,9 @@ impl MacroContext<'_> {
                 args,
                 span,
             ) => {
-                let (macro_name, func_macro) =
-                    match Macro::parse(macro_definition, def_span)? {
-                        (macro_name, Macro::Function(func_macro)) => {
-                            (macro_name, func_macro)
-                        }
-                        _ => todo!(),
+                let (macro_name, Macro::Function(func_macro)) =
+                    Macro::parse(macro_definition, def_span)? else {
+                        todo!();
                     };
                 let num_args = args.len();
                 let num_params = func_macro.params.len();
@@ -331,7 +327,7 @@ impl Parameter {
                     name,
                     subparams
                         .into_iter()
-                        .map(Parameter::from_ast)
+                        .map(Self::from_ast)
                         .collect::<Result<_>>()?,
                     span,
                 ))
@@ -347,11 +343,11 @@ impl Parameter {
         bindings: &mut HashMap<String, Ast>,
     ) -> Result<()> {
         match self {
-            Parameter::Var(var) => {
+            Self::Var(var) => {
                 assert!(bindings.insert(var.clone(), ast.clone()).is_none());
                 Ok(())
             }
-            Parameter::Constructor(name, subparams, span) => match ast {
+            Self::Constructor(name, subparams, span) => match ast {
                 Ast::Node(box Ast::Sym(sym, _), subtrees, _)
                     if sym == name && subparams.len() == subtrees.len() =>
                 {

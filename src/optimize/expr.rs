@@ -244,9 +244,8 @@ fn distribute_mul_into_sum(mut expr: Expr) -> Rewrite<Expr> {
     {
         let mut sum = args.swap_remove(sum_index);
         let factor = drain_lits(args).next().unwrap();
-        let terms = match &mut sum {
-            AddSub(positives, _) => positives,
-            _ => unreachable!(),
+        let AddSub(terms, _) = &mut sum else {
+            unreachable!();
         };
         let known_term = drain_lits(terms).next().unwrap();
         args.push(

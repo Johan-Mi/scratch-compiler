@@ -28,16 +28,16 @@ impl Reporter {
         }
     }
 
-    fn is_shadow(&self) -> bool {
-        matches!(self, Reporter::Literal(_))
+    const fn is_shadow(&self) -> bool {
+        matches!(self, Self::Literal(_))
     }
 
     fn inner_json(&self) -> Json {
         match self {
-            Reporter::Literal(lit) => json!([10, lit.to_cow_str()]),
-            Reporter::Variable(var) => json!([12, var.name, var.id]),
-            Reporter::List(list) => json!([13, list.name, list.id]),
-            Reporter::Block(block_id) => json!(block_id),
+            Self::Literal(lit) => json!([10, lit.to_cow_str()]),
+            Self::Variable(var) => json!([12, var.name, var.id]),
+            Self::List(list) => json!([13, list.name, list.id]),
+            Self::Block(block_id) => json!(block_id),
         }
     }
 }
