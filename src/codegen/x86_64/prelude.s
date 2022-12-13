@@ -424,7 +424,7 @@ list_get:
     mov rsi, [rdx]
     mov rdi, [rsi+rax]
     mov rsi, [rsi+rax+8]
-    call clone_any
+    jmp clone_any
 .out_of_bounds:
     lea rax, [str_empty]
     xor rdx, rdx
