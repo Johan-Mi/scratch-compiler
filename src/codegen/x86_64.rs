@@ -614,10 +614,10 @@ impl AsmProgram {
             Typ::Double => self.text.push_str("    call double_to_bool\n"),
             Typ::Bool => {}
             Typ::StaticStr => {
-                self.text.push_str("    call static_str_to_bool\n")
+                self.text.push_str("    call static_str_to_bool\n");
             }
             Typ::OwnedString => {
-                self.text.push_str("    call owned_string_to_bool\n")
+                self.text.push_str("    call owned_string_to_bool\n");
             }
             Typ::Any => self.text.push_str("    call any_to_bool\n"),
         }
@@ -629,10 +629,10 @@ impl AsmProgram {
             Typ::Double => {}
             Typ::Bool => self.text.push_str("    call bool_to_double\n"),
             Typ::StaticStr => {
-                self.text.push_str("    call static_str_to_double\n")
+                self.text.push_str("    call static_str_to_double\n");
             }
             Typ::OwnedString => {
-                self.text.push_str("    call owned_string_to_double\n")
+                self.text.push_str("    call owned_string_to_double\n");
             }
             Typ::Any => self.text.push_str(
                 "    mov rdi, rax
@@ -730,6 +730,6 @@ impl<T: fmt::Display> fmt::Display for LocalLabel<T> {
 
 impl<T: fmt::Display> Emit for LocalLabel<T> {
     fn emit(self, program: &mut AsmProgram) {
-        writeln!(program.text, "{}:", self).unwrap();
+        writeln!(program.text, "{self}:").unwrap();
     }
 }

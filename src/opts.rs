@@ -48,7 +48,7 @@ impl FromStr for Target {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "sb3" => Ok(Self::SB3),
-            "x86_64" => Ok(Target::X86_64),
+            "x86_64" => Ok(Self::X86_64),
             _ => Err(InvalidTarget(s.to_owned())),
         }
     }
