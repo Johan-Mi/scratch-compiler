@@ -272,7 +272,7 @@ impl AsmProgram {
                     self.generate_any_expr(value)?;
                     writeln!(
                         self.text,
-                        "    mov rdi, {list_id}
+                        "    lea rdi, [{list_id}]
     mov rsi, rax
     call list_append"
                     )
@@ -392,7 +392,7 @@ impl AsmProgram {
                         self.text,
                         "    mov rdi, rax
     mov rsi, rdx
-    mov rdx, {list_id}
+    lea rdx, [{list_id}]
     call list_get"
                     )
                     .unwrap();
@@ -417,17 +417,17 @@ impl AsmProgram {
     push rdx
     push rax
     mov rdi, [rsp+40]
-    call malloc
+    call malloc wrt ..plt
     mov [rsp+32], rax
     mov rdi, rax
     mov rsi, [rsp]
     mov rdx, [rsp+8]
-    call memcpy
+    call memcpy wrt ..plt
     mov rdi, rax
     add rdi, [rsp+8]
     mov rsi, [rsp+16]
     mov rdx, [rsp+24]
-    call memcpy
+    call memcpy wrt ..plt
     call drop_pop_cow
     call drop_pop_cow
     pop rax
@@ -583,7 +583,7 @@ impl AsmProgram {
                 let string_id = self.allocate_static_str(s);
                 writeln!(
                     self.text,
-                    "    mov rax, {string_id}
+                    "    lea rax, [{string_id}]
     mov rdx, {}",
                     s.len(),
                 )

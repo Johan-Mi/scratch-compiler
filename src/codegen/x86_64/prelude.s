@@ -1,3 +1,5 @@
+default rel
+
 global main
 
 extern malloc, free, memcpy, realloc
@@ -14,7 +16,7 @@ drop_any:
     cmp rdi, 2
     jbe .dont_free
     test edi, 1
-    jz free
+    jz free wrt ..plt
 .dont_free:
     ret
 
@@ -25,7 +27,7 @@ drop_pop_cow:
     test rdi, 1
     jnz .dont_free
     push rax
-    jmp free
+    jmp free wrt ..plt
 .dont_free:
     jmp rax
 
@@ -39,11 +41,11 @@ any_to_cow:
     mov rdx, rsi
     ret
 .is_false:
-    mov rax, str_false
+    lea rax, [str_false]
     mov rdx, 5
     ret
 .is_true:
-    mov rax, str_true
+    lea rax, [str_true]
     mov rdx, 4
     ret
 .is_number:
@@ -117,7 +119,7 @@ char_at:
 .found_correct_index:
     push rdi
     mov rdi, 4
-    call malloc
+    call malloc wrt ..plt
     pop rdi
     test byte [rdi], 0x80
     jz .write_one_byte
@@ -147,7 +149,7 @@ char_at:
     mov rdx, 3
     ret
 .return_empty_string:
-    mov rax, str_empty
+    lea rax, [str_empty]
     mov rdx, 0
     ret
 
@@ -262,11 +264,11 @@ clone_any:
     push rsi
     push rdi
     mov rdi, rsi
-    call malloc
+    call malloc wrt ..plt
     mov rdi, rax
     pop rsi
     mov rdx, [rsp]
-    call memcpy
+    call memcpy wrt ..plt
     pop rdx
     ret
 .done:
@@ -297,7 +299,7 @@ double_to_cow:
     sub rsp, 8
     movq [rsp], xmm0
     mov rdi, 32
-    call malloc
+    call malloc wrt ..plt
     mov rdx, rax ; Pointer to next character in buffer
     pop rdi ; Original number
     ; Handle negative numbers
@@ -341,19 +343,19 @@ double_to_cow:
     sub rdx, rax ; Convert character pointer to length
     ret
 .is_infinity:
-    mov rax, str_Infinity
+    lea rax, [str_Infinity]
     mov rdx, 8
     ret
 .is_minus_infinity:
-    mov rax, str_minus_Infinity
+    lea rax, [str_minus_Infinity]
     mov rdx, 9
     ret
 .is_zero:
-    mov rax, str_0
+    lea rax, [str_0]
     mov rdx, 1
     ret
 .is_nan:
-    mov rax, str_NaN
+    lea rax, [str_NaN]
     mov rdx, 3
     ret
 
@@ -371,7 +373,7 @@ list_ensure_extra_capacity:
     shl rsi, 5
     add rsi, 16
     mov rdi, [rdi]
-    call realloc
+    call realloc wrt ..plt
     mov rdi, rax
     pop rax
     mov [rax], rdi
@@ -424,6 +426,6 @@ list_get:
     mov rsi, [rsi+rax+8]
     call clone_any
 .out_of_bounds:
-    mov rax, str_empty
+    lea rax, [str_empty]
     xor rdx, rdx
     ret
