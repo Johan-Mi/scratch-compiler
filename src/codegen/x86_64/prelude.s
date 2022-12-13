@@ -149,7 +149,7 @@ char_at:
     ret
 .return_empty_string:
     lea rax, [str_empty]
-    mov rdx, 0
+    xor edx, edx
     ret
 
 usize_to_double:
