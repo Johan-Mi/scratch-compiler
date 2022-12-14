@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, realloc
+extern malloc, free, memcpy, realloc, asprintf
 
 %macro staticstr 2+
     [section .rodata]
@@ -278,12 +278,9 @@ clone_any:
 %assign EXPONENT_LENGTH 11
 %assign MANTISSA_LENGTH 52
 %assign EXPONENT_MASK ((1 << EXPONENT_LENGTH) - 1) << MANTISSA_LENGTH
-%assign MANTISSA_MASK (1 << MANTISSA_LENGTH) - 1
 %assign SIGN_MASK 1 << 63
-%assign EXPONENT_BIAS 1023
 
 double_to_cow:
-    ; Loosely based on the Ryū algorithm by Ulf Adams
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
     jp .is_nan
@@ -296,50 +293,12 @@ double_to_cow:
     cmp rdi, rax
     je .is_minus_infinity
     sub rsp, 8
-    movq [rsp], xmm0
-    mov rdi, 32
-    call malloc wrt ..plt
-    mov rdx, rax ; Pointer to next character in buffer
-    pop rdi ; Original number
-    ; Handle negative numbers
-    shl rdi, 1 ; Remove the sign bit
-    jnc .positive
-    mov byte [rdx], '-'
-    inc rdx
-.positive:
-    shr rdi, 1 ; Undo the sign removal shift
-    ; Extract exponent into R9
-    mov r9, rdi
-    shr r9, MANTISSA_LENGTH
-    sub r9, EXPONENT_BIAS + MANTISSA_LENGTH + 1
-    ; Extract mantissa into R8
-    mov r8, rdi
-    shl r8, EXPONENT_LENGTH + 1
-    shr r8, EXPONENT_LENGTH + 1
-    ; Adjust exponent to account for trailing zeros in mantissa
-    tzcnt rcx, r8
-    add r9, rcx
-    ; R9 now contains the integral binary exponent
-    ;
-    ; Adjust for exponent 0 behaving like 1
-    mov rsi, EXPONENT_MASK
-    test rdi, rsi
-    mov esi, 0
-    setnz sil
-    sub r9, rsi
-    ; Add leading 1 to normal numbers
-    shl rsi, MANTISSA_LENGTH
-    or r8, rsi
-    ; Ensure that the mantissa has exactly 2 trailing zeros
-    shr r8, cl
-    shl r8, 2
-    ; R8 contains 4 * the smallest possible integral binary mantissa
-    ; TODO
-    mov rax, 60
-    mov rdi, 97
-    syscall
-.done:
-    sub rdx, rax ; Convert character pointer to length
+    mov rdi, rsp
+    mov eax, 1
+    lea rsi, [.fmt]
+    call asprintf wrt ..plt
+    mov rdx, rax
+    pop rax
     ret
 .is_infinity:
     lea rax, [str_Infinity]
@@ -357,6 +316,7 @@ double_to_cow:
     lea rax, [str_NaN]
     mov rdx, 3
     ret
+.fmt: db "%g", 0
 
 staticstr str_Infinity, db "Infinity"
 staticstr str_minus_Infinity, db "-Infinity"
