@@ -680,9 +680,8 @@ impl fmt::Display for AsmProgram {
         }
         writeln!(
             f,
-            r#"    mov rax, 60
-    mov rdi, 0
-    syscall
+            r#"    xor eax, eax
+    ret
 
 {}
 section .data
