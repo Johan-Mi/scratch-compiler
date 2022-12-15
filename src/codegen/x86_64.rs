@@ -591,11 +591,11 @@ impl AsmProgram {
                 Typ::StaticStr
             }
             Value::Bool(false) => {
-                self.text.push_str("    mov rax, 0\n");
+                self.text.push_str("    xor eax, eax\n");
                 Typ::Bool
             }
             Value::Bool(true) => {
-                self.text.push_str("    mov rax, 1\n");
+                self.text.push_str("    mov eax, 1\n");
                 Typ::Bool
             }
         }
