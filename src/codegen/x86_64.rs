@@ -292,7 +292,7 @@ impl AsmProgram {
     fn generate_expr(&mut self, expr: &Expr) -> Result<Typ> {
         match expr {
             Expr::Lit(lit) => Ok(self.push_lit(lit)),
-            Expr::Sym(sym, _) => self.generate_symbol(sym),
+            Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span),
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span)
             }
@@ -361,7 +361,7 @@ impl AsmProgram {
         }
     }
 
-    fn generate_symbol(&mut self, sym: &str) -> Result<Typ> {
+    fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<Typ> {
         if let Some(var_id) = self.lookup_var(sym) {
             writeln!(
                 self.text,
@@ -372,7 +372,10 @@ impl AsmProgram {
             .unwrap();
             Ok(Typ::Any)
         } else {
-            todo!()
+            Err(Box::new(Error::UnknownVarOrList {
+                span,
+                sym_name: sym.into(),
+            }))
         }
     }
 
