@@ -132,16 +132,14 @@ impl AsmProgram {
                 self.emit(loop_label);
                 writeln!(
                     self.text,
-                    "    pop rax
-    test rax, rax
-    jz {after_loop}
-    dec rax
-    push rax"
+                    "    sub qword [rsp], 1
+    jc {after_loop}"
                 )
                 .unwrap();
                 self.generate_statement(body)?;
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
+                self.text.push_str("    add rsp, 8\n");
                 Ok(())
             }
             Statement::Forever(body) => {
