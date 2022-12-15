@@ -382,6 +382,15 @@ impl AsmProgram {
         args: &[Expr],
         span: Span,
     ) -> Result<Typ> {
+        let mut mathop = |code| match args {
+            [operand] => {
+                self.generate_double_expr(operand)?;
+                self.text.push_str(code);
+                Ok(Typ::Double)
+            }
+            _ => todo!(),
+        };
+
         match func_name {
             "!!" => match args {
                 [Expr::Sym(list_name, _), index] => {
@@ -530,10 +539,15 @@ impl AsmProgram {
                 _ => todo!(),
             },
             "mod" => todo!(),
-            "abs" => todo!(),
-            "floor" => todo!(),
-            "ceil" => todo!(),
-            "sqrt" => todo!(),
+            "abs" => mathop(
+                "    mov rax, (1 << 63) - 1
+    movq xmm1, rax
+    andpd xmm0, xmm1
+",
+            ),
+            "floor" => mathop("    roundsd xmm0, xmm0, 1\n"),
+            "ceil" => mathop("    roundsd xmm0, xmm0, 2\n"),
+            "sqrt" => mathop("    sqrtsd xmm0, xmm0\n"),
             "ln" => todo!(),
             "log" => todo!(),
             "e^" => todo!(),
