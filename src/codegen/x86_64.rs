@@ -256,6 +256,7 @@ impl AsmProgram {
                     writeln!(
                         self.text,
                         "    mov rdi, [{var_id}]
+    mov rsi, [{var_id}+8]
     mov [{var_id}], rax
     mov [{var_id}+8], rdx
     call drop_any"
