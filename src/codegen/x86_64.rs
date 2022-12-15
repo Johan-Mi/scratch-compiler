@@ -266,8 +266,8 @@ impl AsmProgram {
                 _ => todo!(),
             },
             "append" => match args {
-                [Expr::Sym(list_name, _), value] => {
-                    let list_id = self.lookup_list(list_name).unwrap();
+                [Expr::Sym(list_name, list_span), value] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
                     self.generate_any_expr(value)?;
                     writeln!(
                         self.text,
@@ -393,8 +393,8 @@ impl AsmProgram {
 
         match func_name {
             "!!" => match args {
-                [Expr::Sym(list_name, _), index] => {
-                    let list_id = self.lookup_list(list_name).unwrap();
+                [Expr::Sym(list_name, list_span), index] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
                     self.generate_any_expr(index)?;
                     writeln!(
                         self.text,
@@ -479,8 +479,8 @@ impl AsmProgram {
             "<" => todo!(),
             ">" => todo!(),
             "length" => match args {
-                [Expr::Sym(list_name, ..)] => {
-                    let list_id = self.lookup_list(list_name).unwrap();
+                [Expr::Sym(list_name, list_span)] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
                     writeln!(
                         self.text,
                         "    mov rdi, [{list_id}+8]
@@ -618,8 +618,13 @@ impl AsmProgram {
         self.local_vars.get(name).copied()
     }
 
-    fn lookup_list(&self, name: &str) -> Option<Uid> {
-        self.local_lists.get(name).copied()
+    fn lookup_list(&self, name: &str, span: Span) -> Result<Uid> {
+        self.local_lists.get(name).copied().ok_or_else(|| {
+            Box::new(Error::UnknownList {
+                span,
+                list_name: name.into(),
+            })
+        })
     }
 
     fn generate_bool_expr(&mut self, expr: &Expr) -> Result<()> {
