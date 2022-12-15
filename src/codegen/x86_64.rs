@@ -227,7 +227,7 @@ impl AsmProgram {
                             self.text,
                             "    mov rax, 1
     mov rdi, 1
-    mov rsi, {message_id}
+    lea rsi, [{message_id}]
     mov rdx, {}
     syscall",
                             message.len(),
