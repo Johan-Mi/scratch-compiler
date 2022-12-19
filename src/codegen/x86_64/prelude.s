@@ -12,6 +12,9 @@ extern malloc, free, memcpy, realloc, asprintf
 %endmacro
 
 section .text
+drop_pop_any:
+    pop rdi
+    add rsp, 8
 drop_any:
     cmp rdi, 2
     jbe .dont_free

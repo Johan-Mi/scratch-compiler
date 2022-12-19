@@ -2,33 +2,26 @@ mod typ;
 
 use crate::{
     diagnostic::{Error, Result},
-    ir::{expr::Expr, proc::Procedure, statement::Statement, Program},
+    ir::{
+        expr::Expr, proc::Procedure, sprite::Sprite, statement::Statement,
+        Program,
+    },
     span::Span,
     uid::Uid,
 };
 use sb3_stuff::Value;
+use smol_str::SmolStr;
 use std::{
     collections::HashMap,
     fmt::{self, Write as _},
     fs::File,
     io::Write as _,
-    iter,
     path::Path,
 };
 use typ::Typ;
 
 pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
-    let mut asm_program = AsmProgram::default();
-
-    for (name, procs) in iter::once(&program.stage)
-        .chain(program.sprites.values())
-        .flat_map(|sprite| &sprite.procedures)
-    {
-        for proc in procs {
-            asm_program.generate_proc(name, proc)?;
-        }
-    }
-
+    let asm_program = AsmProgram::try_from(program)?;
     let mut file = File::create(path).unwrap();
     write!(file, "{asm_program}").unwrap();
 
@@ -45,6 +38,22 @@ struct AsmProgram {
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
+    custom_procs: HashMap<String, CustomProcedure>,
+}
+
+impl TryFrom<&Program> for AsmProgram {
+    type Error = Box<Error>;
+
+    fn try_from(program: &Program) -> Result<Self> {
+        let mut this = Self::default();
+
+        this.generate_sprite(&program.stage)?;
+        for sprite in program.sprites.values() {
+            this.generate_sprite(sprite)?;
+        }
+
+        Ok(this)
+    }
 }
 
 impl AsmProgram {
@@ -54,6 +63,50 @@ impl AsmProgram {
 
     fn emit<T: Emit>(&mut self, t: T) {
         t.emit(self);
+    }
+
+    fn generate_sprite(&mut self, sprite: &Sprite) -> Result<()> {
+        self.custom_procs = sprite
+            .procedures
+            .iter()
+            .filter_map(|(name, proc)| match &**name {
+                "when-flag-clicked" | "when-cloned" | "when-received" => None,
+                _ => {
+                    assert_eq!(
+                        1,
+                        proc.len(),
+                        "duplicate definition of custom procdeure `{name}`"
+                    );
+                    Some((
+                        name.into(),
+                        CustomProcedure {
+                            id: self.new_uid(),
+                            params: proc[0]
+                                .params
+                                .iter()
+                                .map(|param| match param {
+                                    Expr::Sym(sym, ..) => {
+                                        (sym.clone(), self.new_uid())
+                                    }
+                                    _ => todo!(
+                                        "invalid parameter to custom\
+                                    procedure definition:\n{param:#?}"
+                                    ),
+                                })
+                                .collect(),
+                        },
+                    ))
+                }
+            })
+            .collect();
+
+        for (name, procs) in &sprite.procedures {
+            for proc in procs {
+                self.generate_proc(name, proc)?;
+            }
+        }
+
+        Ok(())
     }
 
     fn generate_proc(&mut self, name: &str, proc: &Procedure) -> Result<Uid> {
@@ -86,7 +139,35 @@ impl AsmProgram {
                 self.text.push_str("    ret\n");
                 Ok(proc_id)
             }
-            _ => todo!(),
+            "when-cloned" => todo!(),
+            "when-received" => todo!(),
+            _ => {
+                let proc_id = self.new_uid();
+                self.entry_points.push(proc_id);
+                self.emit(Label(proc_id));
+                self.text.push_str(
+                    "    push rbp
+    mov rbp, rsp
+",
+                );
+                self.generate_statement(&proc.body)?;
+                self.text.push_str("    pop rbp\n");
+
+                // Drop parameters
+                if let Some(drop_calls_needed) =
+                    proc.params.len().checked_sub(1)
+                {
+                    for _ in 0..drop_calls_needed {
+                        self.text.push_str("    call drop_pop_any\n");
+                    }
+                    // Use a tail call for the final parameter
+                    self.text.push_str("    jmp drop_pop_any\n");
+                } else {
+                    self.text.push_str("    ret\n");
+                }
+
+                Ok(proc_id)
+            }
         }
     }
 
@@ -279,12 +360,7 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
-            _ => {
-                return Err(Box::new(Error::UnknownProc {
-                    span,
-                    proc_name: proc_name.to_owned(),
-                }))
-            }
+            _ => self.generate_custom_proc_call(proc_name, args, span)?,
         }
         Ok(())
     }
@@ -691,6 +767,42 @@ impl AsmProgram {
         }
         Ok(())
     }
+
+    fn generate_custom_proc_call(
+        &mut self,
+        proc_name: &str,
+        args: &[Expr],
+        span: Span,
+    ) -> Result<()> {
+        let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
+            Box::new(Error::UnknownProc {
+                span,
+                proc_name: proc_name.to_owned(),
+            })
+        })?;
+        let proc_id = proc.id;
+
+        if args.len() != proc.params.len() {
+            return Err(Box::new(Error::CustomProcWrongArgCount {
+                span,
+                proc_name: proc_name.to_owned(),
+                expected: proc.params.len(),
+                got: args.len(),
+            }));
+        }
+
+        for arg in args {
+            self.generate_any_expr(arg)?;
+            self.text.push_str(
+                "    push rsi
+    push rdi
+",
+            );
+        }
+
+        writeln!(self.text, "    call {proc_id}").unwrap();
+        Ok(())
+    }
 }
 
 impl fmt::Display for AsmProgram {
@@ -752,4 +864,9 @@ impl<T: fmt::Display> Emit for LocalLabel<T> {
     fn emit(self, program: &mut AsmProgram) {
         writeln!(program.text, "{self}:").unwrap();
     }
+}
+
+struct CustomProcedure {
+    id: Uid,
+    pub params: Vec<(SmolStr, Uid)>,
 }
