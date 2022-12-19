@@ -16,6 +16,7 @@ use std::{
     fmt::{self, Write as _},
     fs::File,
     io::Write as _,
+    iter,
     path::Path,
 };
 use typ::Typ;
@@ -35,6 +36,8 @@ struct AsmProgram {
     text: String,
     local_vars: HashMap<String, Uid>,
     local_lists: HashMap<String, Uid>,
+    global_vars: HashMap<String, Uid>,
+    global_lists: HashMap<String, Uid>,
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
@@ -46,6 +49,23 @@ impl TryFrom<&Program> for AsmProgram {
 
     fn try_from(program: &Program) -> Result<Self> {
         let mut this = Self::default();
+
+        this.global_vars = program
+            .stage
+            .variables
+            .iter()
+            .cloned()
+            .zip(iter::repeat_with(|| this.new_uid()))
+            .collect();
+        this.global_lists = program
+            .stage
+            .lists
+            .iter()
+            .cloned()
+            .zip(iter::repeat_with(|| this.new_uid()))
+            .collect();
+        this.var_ids.extend(this.global_vars.values());
+        this.list_ids.extend(this.global_lists.values());
 
         this.generate_sprite(&program.stage)?;
         for sprite in program.sprites.values() {
@@ -694,16 +714,23 @@ impl AsmProgram {
     }
 
     fn lookup_var(&self, name: &str) -> Option<Uid> {
-        self.local_vars.get(name).copied()
+        self.global_vars
+            .get(name)
+            .or_else(|| self.local_vars.get(name))
+            .copied()
     }
 
     fn lookup_list(&self, name: &str, span: Span) -> Result<Uid> {
-        self.local_lists.get(name).copied().ok_or_else(|| {
-            Box::new(Error::UnknownList {
-                span,
-                list_name: name.into(),
+        self.global_lists
+            .get(name)
+            .or_else(|| self.local_lists.get(name))
+            .copied()
+            .ok_or_else(|| {
+                Box::new(Error::UnknownList {
+                    span,
+                    list_name: name.into(),
+                })
             })
-        })
     }
 
     fn generate_bool_expr(&mut self, expr: &Expr) -> Result<()> {
