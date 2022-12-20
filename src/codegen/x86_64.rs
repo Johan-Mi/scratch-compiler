@@ -36,6 +36,8 @@ struct AsmProgram {
     text: String,
     local_vars: HashMap<String, Uid>,
     local_lists: HashMap<String, Uid>,
+    sprite_vars: HashMap<String, Uid>,
+    sprite_lists: HashMap<String, Uid>,
     global_vars: HashMap<String, Uid>,
     global_lists: HashMap<String, Uid>,
     var_ids: Vec<Uid>,
@@ -69,6 +71,21 @@ impl TryFrom<&Program> for AsmProgram {
 
         this.generate_sprite(&program.stage)?;
         for sprite in program.sprites.values() {
+            this.sprite_vars = sprite
+                .variables
+                .iter()
+                .cloned()
+                .zip(iter::repeat_with(|| this.new_uid()))
+                .collect();
+            this.sprite_lists = sprite
+                .lists
+                .iter()
+                .cloned()
+                .zip(iter::repeat_with(|| this.new_uid()))
+                .collect();
+            this.var_ids.extend(this.sprite_vars.values());
+            this.list_ids.extend(this.sprite_lists.values());
+
             this.generate_sprite(sprite)?;
         }
 
@@ -714,16 +731,18 @@ impl AsmProgram {
     }
 
     fn lookup_var(&self, name: &str) -> Option<Uid> {
-        self.global_vars
+        self.local_vars
             .get(name)
-            .or_else(|| self.local_vars.get(name))
+            .or_else(|| self.sprite_vars.get(name))
+            .or_else(|| self.global_vars.get(name))
             .copied()
     }
 
     fn lookup_list(&self, name: &str, span: Span) -> Result<Uid> {
-        self.global_lists
+        self.local_lists
             .get(name)
-            .or_else(|| self.local_lists.get(name))
+            .or_else(|| self.sprite_lists.get(name))
+            .or_else(|| self.global_lists.get(name))
             .copied()
             .ok_or_else(|| {
                 Box::new(Error::UnknownList {
