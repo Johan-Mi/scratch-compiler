@@ -24,12 +24,6 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new() -> Self {
-        Self {
-            counter: Cell::new(NonZeroU32::new(1).unwrap()),
-        }
-    }
-
     pub fn new_uid(&self) -> Uid {
         let counter = self.counter.get();
         self.counter
@@ -40,6 +34,8 @@ impl Generator {
 
 impl Default for Generator {
     fn default() -> Self {
-        Self::new()
+        Self {
+            counter: Cell::new(NonZeroU32::new(1).unwrap()),
+        }
     }
 }

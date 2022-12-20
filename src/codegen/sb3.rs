@@ -37,7 +37,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
             Box::new(Error::CouldNotCreateProjectJson { inner: err })
         })?;
 
-    let uid_gen = crate::uid::Generator::new();
+    let uid_gen = crate::uid::Generator::default();
 
     let global_vars = program
         .stage
