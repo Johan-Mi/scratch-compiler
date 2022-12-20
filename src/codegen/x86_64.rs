@@ -197,10 +197,16 @@ impl AsmProgram {
     mov rbp, rsp
 ",
                 );
-                let stop_label = self.new_uid();
-                self.proc_stop_label = Some(stop_label);
+                let stop_label = if proc.params.is_empty() {
+                    None
+                } else {
+                    Some(self.new_uid())
+                };
+                self.proc_stop_label = stop_label;
                 self.generate_statement(&proc.body)?;
-                self.emit(LocalLabel(stop_label));
+                if let Some(stop_label) = stop_label {
+                    self.emit(LocalLabel(stop_label));
+                }
                 self.text.push_str("    pop rbp\n");
 
                 // Drop parameters
