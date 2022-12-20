@@ -180,7 +180,6 @@ impl AsmProgram {
             "when-received" => todo!(),
             _ => {
                 let proc_id = self.custom_procs.get(name).as_ref().unwrap().id;
-                self.entry_points.push(proc_id);
                 self.emit(Label(proc_id));
                 self.text.push_str(
                     "    push rbp
