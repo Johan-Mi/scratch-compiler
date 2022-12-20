@@ -470,7 +470,67 @@ impl AsmProgram {
                 }
                 Ok(Typ::Double)
             }
-            Expr::MulDiv(_, _) => todo!(),
+            Expr::MulDiv(numerators, denominators) => {
+                match (&numerators[..], &denominators[..]) {
+                    ([], []) => {
+                        self.push_lit(&Value::Num(1.0));
+                    }
+                    ([initial, numerators @ ..], denominators) => {
+                        self.generate_double_expr(initial)?;
+                        self.text.push_str(
+                            "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                        );
+                        for term in numerators {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    mulsd xmm0, [rsp]
+    movq [rsp], xmm0
+",
+                            );
+                        }
+                        for term in denominators {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    movq xmm1, [rsp]
+    divsd xmm1, xmm0
+    movq [rsp], xmm1
+",
+                            );
+                        }
+                        self.text.push_str(
+                            "    movq xmm0, [rsp]
+    add rsp, 16
+",
+                        );
+                    }
+                    ([], [initial, denominators @ ..]) => {
+                        self.generate_double_expr(initial)?;
+                        self.text.push_str(
+                            "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                        );
+                        for term in denominators {
+                            self.generate_double_expr(term)?;
+                            self.text.push_str(
+                                "    mulsd xmm0, [rsp]
+    movq [rsp], xmm0
+",
+                            );
+                        }
+                        self.text.push_str(
+                            "    mov rax, __?float64?__(1.0)
+    movq xmm0, rax
+    divsd xmm0, [rsp]
+    add rsp, 8
+",
+                        );
+                    }
+                }
+                Ok(Typ::Double)
+            }
         }
     }
 
