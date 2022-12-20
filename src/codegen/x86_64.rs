@@ -440,7 +440,7 @@ impl AsmProgram {
                         }
                         self.text.push_str(
                             "    movq xmm0, [rsp]
-    add rsp, 16
+    add rsp, 8
 ",
                         );
                     }
@@ -501,7 +501,7 @@ impl AsmProgram {
                         }
                         self.text.push_str(
                             "    movq xmm0, [rsp]
-    add rsp, 16
+    add rsp, 8
 ",
                         );
                     }
