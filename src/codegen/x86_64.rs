@@ -591,9 +591,82 @@ impl AsmProgram {
                 }
                 _ => todo!(),
             },
-            "=" => todo!(),
-            "<" => todo!(),
-            ">" => todo!(),
+            "=" => match args {
+                [lhs, rhs] => {
+                    match self.generate_expr(lhs)? {
+                        Typ::Double => {
+                            self.text.push_str(
+                                "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                            );
+                            match self.generate_expr(rhs)? {
+                                Typ::Double => self.text.push_str(
+                                    "    movq xmm1, [rsp]
+    xor eax, eax
+    ucomisd xmm0, xmm1
+    sete al
+",
+                                ),
+                                Typ::Bool => {
+                                    self.text.push_str("    xor eax, eax\n");
+                                }
+                                Typ::StaticStr => todo!(),
+                                Typ::OwnedString => todo!(),
+                                Typ::Any => todo!(),
+                            }
+                            self.text.push_str("    add rsp, 8\n");
+                        }
+                        Typ::Bool => todo!(),
+                        Typ::StaticStr => todo!(),
+                        Typ::OwnedString => todo!(),
+                        Typ::Any => todo!(),
+                    };
+                    Ok(Typ::Bool)
+                }
+                _ => todo!(),
+            },
+            "<" | ">" => match args {
+                [lhs, rhs] => {
+                    match self.generate_expr(lhs)? {
+                        Typ::Double => {
+                            self.text.push_str(
+                                "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                            );
+                            match self.generate_expr(rhs)? {
+                                Typ::Double => {
+                                    let condition = if func_name == "<" {
+                                        'b'
+                                    } else {
+                                        'a'
+                                    };
+                                    writeln!(
+                                        self.text,
+                                        "    movq xmm1, [rsp]
+    xor eax, eax
+    ucomisd xmm1, xmm0
+    set{condition} al",
+                                    )
+                                    .unwrap();
+                                }
+                                Typ::Bool => todo!(),
+                                Typ::StaticStr => todo!(),
+                                Typ::OwnedString => todo!(),
+                                Typ::Any => todo!(),
+                            }
+                            self.text.push_str("    add rsp, 8\n");
+                        }
+                        Typ::Bool => todo!(),
+                        Typ::StaticStr => todo!(),
+                        Typ::OwnedString => todo!(),
+                        Typ::Any => todo!(),
+                    };
+                    Ok(Typ::Bool)
+                }
+                _ => todo!(),
+            },
             "length" => match args {
                 [Expr::Sym(list_name, list_span)] => {
                     let list_id = self.lookup_list(list_name, *list_span)?;
