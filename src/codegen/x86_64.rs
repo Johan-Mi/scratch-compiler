@@ -44,6 +44,7 @@ struct AsmProgram {
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
     custom_procs: HashMap<String, CustomProcedure>,
+    proc_stop_label: Option<Uid>,
 }
 
 impl TryFrom<&Program> for AsmProgram {
@@ -169,6 +170,7 @@ impl AsmProgram {
         match name {
             "when-flag-clicked" => {
                 assert!(proc.params.is_empty());
+                self.proc_stop_label = None;
                 let proc_id = self.new_uid();
                 self.entry_points.push(proc_id);
                 self.emit(Label(proc_id));
@@ -186,7 +188,10 @@ impl AsmProgram {
     mov rbp, rsp
 ",
                 );
+                let stop_label = self.new_uid();
+                self.proc_stop_label = Some(stop_label);
                 self.generate_statement(&proc.body)?;
+                self.emit(LocalLabel(stop_label));
                 self.text.push_str("    pop rbp\n");
 
                 // Drop parameters
@@ -393,6 +398,17 @@ impl AsmProgram {
     call list_append"
                     )
                     .unwrap();
+                }
+                _ => todo!(),
+            },
+            "stop-this-script" => match args {
+                [] => {
+                    self.text.push_str("    mov rsp, rbp\n");
+                    if let Some(stop_label) = self.proc_stop_label {
+                        writeln!(self.text, "    jmp .{stop_label}").unwrap();
+                    } else {
+                        self.text.push_str("    ret\n");
+                    }
                 }
                 _ => todo!(),
             },
