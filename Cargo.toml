@@ -1,5 +1,5 @@
 [package]
-name = "scratch-compiler-rs"
+name = "scratch-compiler"
 version = "0.1.0"
 edition = "2021"
 
