@@ -174,8 +174,17 @@ impl AsmProgram {
                 let proc_id = self.new_uid();
                 self.entry_points.push(proc_id);
                 self.emit(Label(proc_id));
+                self.text.push_str(
+                    "    push rbp
+    mov rbp, rsp
+",
+                );
                 self.generate_statement(&proc.body)?;
-                self.text.push_str("    ret\n");
+                self.text.push_str(
+                    "    pop rbp
+    ret
+",
+                );
                 Ok(proc_id)
             }
             "when-cloned" => todo!(),
@@ -407,7 +416,11 @@ impl AsmProgram {
                     if let Some(stop_label) = self.proc_stop_label {
                         writeln!(self.text, "    jmp .{stop_label}").unwrap();
                     } else {
-                        self.text.push_str("    ret\n");
+                        self.text.push_str(
+                            "    pop rbp
+    ret
+",
+                        );
                     }
                 }
                 _ => todo!(),
