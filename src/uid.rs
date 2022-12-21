@@ -24,16 +24,18 @@ pub struct Generator {
 }
 
 impl Generator {
-    pub fn new() -> Self {
-        Self {
-            counter: Cell::new(NonZeroU32::new(1).unwrap()),
-        }
-    }
-
     pub fn new_uid(&self) -> Uid {
         let counter = self.counter.get();
         self.counter
             .set(counter.checked_add(1).expect("ran out of UIDs"));
         Uid(counter)
+    }
+}
+
+impl Default for Generator {
+    fn default() -> Self {
+        Self {
+            counter: Cell::new(NonZeroU32::new(1).unwrap()),
+        }
     }
 }
