@@ -23,17 +23,17 @@ use crate::{
 };
 use codespan::Files;
 use gumdrop::Options;
-use std::{fs, io::Write, sync::Mutex};
+use std::{fs, io::Write, process::ExitCode, sync::Mutex};
 
 static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
 
-fn main() {
+fn main() -> ExitCode {
     let opts = Opts::parse_args_default_or_exit();
     let input = match fs::read_to_string(&opts.file) {
         Ok(input) => input,
         Err(err) => {
             eprintln!("IO error: {err}");
-            return;
+            return ExitCode::FAILURE;
         }
     };
     let main_file_id = FILES.lock().unwrap().add(&opts.file, input.clone());
@@ -42,7 +42,7 @@ fn main() {
         Ok((_, asts)) => asts,
         Err(err) => {
             eprintln!("{err}");
-            return;
+            return ExitCode::FAILURE;
         }
     };
     if opts.lint {
@@ -75,5 +75,8 @@ fn main() {
         write_program(&program, &opts)
     }) {
         err.emit();
+        return ExitCode::FAILURE;
     }
+
+    ExitCode::SUCCESS
 }
