@@ -353,6 +353,15 @@ impl AsmProgram {
         args: &[Expr],
         span: Span,
     ) -> Result<()> {
+        let wrong_arg_count = |expected| {
+            Err(Box::new(Error::BuiltinProcWrongArgCount {
+                span,
+                proc_name: proc_name.to_owned(),
+                expected,
+                got: args.len(),
+            }))
+        };
+
         match proc_name {
             "print" => match args {
                 [message] => {
@@ -383,7 +392,7 @@ impl AsmProgram {
                         );
                     }
                 }
-                _ => todo!(),
+                _ => return wrong_arg_count(1),
             },
             ":=" => match args {
                 [Expr::Sym(var_name, _), value] => {
@@ -399,7 +408,7 @@ impl AsmProgram {
                     )
                     .unwrap();
                 }
-                _ => todo!(),
+                _ => return wrong_arg_count(2),
             },
             "append" => match args {
                 [Expr::Sym(list_name, list_span), value] => {
@@ -413,7 +422,7 @@ impl AsmProgram {
                     )
                     .unwrap();
                 }
-                _ => todo!(),
+                _ => return wrong_arg_count(2),
             },
             "stop-this-script" => match args {
                 [] => {
@@ -428,7 +437,7 @@ impl AsmProgram {
                         );
                     }
                 }
-                _ => todo!(),
+                _ => return wrong_arg_count(0),
             },
             _ => self.generate_custom_proc_call(proc_name, args, span)?,
         }

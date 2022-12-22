@@ -160,10 +160,19 @@ impl AsmProgram {
 
     fn generate_func_call(
         &mut self,
-        func_name: &str,
+        func_name: &'static str,
         args: &[Expr],
         span: Span,
     ) -> Result<Typ> {
+        let wrong_arg_count = |expected| {
+            Err(Box::new(Error::FunctionWrongArgCount {
+                span,
+                func_name,
+                expected,
+                got: args.len(),
+            }))
+        };
+
         let mut mathop = |code| match args {
             [operand] => {
                 self.generate_double_expr(operand)?;
@@ -188,7 +197,7 @@ impl AsmProgram {
                     .unwrap();
                     Ok(Typ::Any)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(2),
             },
             "++" => match args {
                 [single] => self.generate_expr(single),
@@ -255,7 +264,7 @@ impl AsmProgram {
                     self.text.push_str("    xor rax, 1\n");
                     Ok(Typ::Bool)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(1),
             },
             "=" => match args {
                 [lhs, rhs] => {
@@ -290,7 +299,7 @@ impl AsmProgram {
                     };
                     Ok(Typ::Bool)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(2),
             },
             "<" | ">" => match args {
                 [lhs, rhs] => {
@@ -331,7 +340,7 @@ impl AsmProgram {
                     };
                     Ok(Typ::Bool)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(2),
             },
             "length" => match args {
                 [Expr::Sym(list_name, list_span)] => {
@@ -344,7 +353,7 @@ impl AsmProgram {
                     .unwrap();
                     Ok(Typ::Double)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(1),
             },
             "str-length" => match args {
                 [s] => {
@@ -364,7 +373,7 @@ impl AsmProgram {
                     );
                     Ok(Typ::Double)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(1),
             },
             "char-at" => match args {
                 [s, index] => {
@@ -391,7 +400,7 @@ impl AsmProgram {
                     );
                     Ok(Typ::OwnedString)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(2),
             },
             "mod" => todo!(),
             "abs" => mathop(
@@ -419,7 +428,7 @@ impl AsmProgram {
                     self.generate_double_expr(operand)?;
                     Ok(Typ::Double)
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(1),
             },
             "random" => todo!(),
             _ => Err(Box::new(Error::UnknownFunction {
