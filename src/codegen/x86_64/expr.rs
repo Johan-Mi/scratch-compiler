@@ -179,7 +179,7 @@ impl AsmProgram {
                 self.text.push_str(code);
                 Ok(Typ::Double)
             }
-            _ => todo!(),
+            _ => wrong_arg_count(1),
         };
 
         match func_name {
