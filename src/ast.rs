@@ -82,25 +82,6 @@ impl<E> TreeWalk<Result<Rewrite<Self>, E>> for Ast {
     }
 }
 
-impl TreeWalk<Rewrite<Self>> for Ast {
-    fn each_branch(
-        self,
-        mut f: impl FnMut(Self) -> Rewrite<Self>,
-    ) -> Rewrite<Self> {
-        match self {
-            Self::Num(..) | Self::String(..) | Self::Sym(..) => Clean(self),
-            Self::Node(head, tail, span) => f(*head).bind(|head| {
-                tail.into_iter()
-                    .map(f)
-                    .collect::<Rewrite<_>>()
-                    .map(|tail| Self::Node(Box::new(head), tail, span))
-            }),
-            Self::Unquote(unquoted, span) => f(*unquoted)
-                .map(|unquoted| Self::Unquote(Box::new(unquoted), span)),
-        }
-    }
-}
-
 pub fn all_symbols(asts: Vec<Ast>) -> Vec<String> {
     asts.into_iter()
         .map(|ast| match ast {
