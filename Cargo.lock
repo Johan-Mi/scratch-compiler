@@ -58,6 +58,7 @@ dependencies = [
 [[package]]
 name = "fancy-match"
 version = "0.1.0"
+source = "git+https://github.com/Johan-Mi/fancy-match#5828a423cf30acca3329a5e52ffde5ee5d3b8c69"
 dependencies = [
  "quote",
  "syn",
