@@ -52,6 +52,9 @@ pub enum Error {
     InvalidItemInSprite {
         span: Span,
     },
+    InvalidMacroParameter {
+        span: Span,
+    },
     InvalidMacroSignature {
         span: Span,
     },
@@ -65,6 +68,9 @@ pub enum Error {
     SpriteMissingName {
         span: Span,
         candidate_symbol: Option<Span>,
+    },
+    SymbolMacroInInlinePosition {
+        span: Span,
     },
     SymConcatEmptySymbol {
         span: Span,
@@ -179,6 +185,15 @@ impl Error {
             InvalidItemInSprite { span } => {
                 vec![with_span("invalid arguments in sprite", *span)]
             }
+            InvalidMacroParameter { span } => {
+                vec![with_span("invalid macro parameter", *span).with_notes(
+                    vec![
+                        "expected symbol or node consisiting of a symbol and \
+                        more parameters"
+                            .to_owned(),
+                    ],
+                )]
+            }
             InvalidMacroSignature { span } => {
                 vec![with_span("invalid macro signature", *span)]
             }
@@ -216,6 +231,10 @@ impl Error {
                     vec![diagnostic]
                 }
             }
+            SymbolMacroInInlinePosition { span } => vec![with_span(
+                "symbol macro cannot be used in inline position",
+                *span,
+            )],
             SymConcatEmptySymbol { span } => vec![
                 with_span("`sym-concat!` cannot create an empty symbol", *span),
                 Diagnostic::help().with_message(

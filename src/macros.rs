@@ -247,7 +247,7 @@ impl MacroContext<'_> {
             ) => {
                 let (macro_name, Macro::Function(func_macro)) =
                     Macro::parse(macro_definition, def_span)? else {
-                        todo!();
+                        return Err(Box::new(Error::SymbolMacroInInlinePosition { span }));
                     };
                 let num_args = args.len();
                 let num_params = func_macro.params.len();
@@ -332,7 +332,9 @@ impl Parameter {
                     span,
                 ))
             }
-            _ => todo!(),
+            _ => {
+                Err(Box::new(Error::InvalidMacroParameter { span: ast.span() }))
+            }
         }
     }
 
