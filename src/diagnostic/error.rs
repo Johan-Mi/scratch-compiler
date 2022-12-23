@@ -61,6 +61,9 @@ pub enum Error {
     InvalidParameterForCustomProcDef {
         span: Span,
     },
+    InvalidTopLevelItem {
+        span: Span,
+    },
     MacroDefinitionMissingBody {
         span: Span,
     },
@@ -204,6 +207,11 @@ impl Error {
                 "invalid parameter for custom procedure definition",
             )
             .with_labels(vec![primary(*span).with_message("expected symbol")])],
+            InvalidTopLevelItem { span } => {
+                vec![just_message("invalid top-level item")
+                    .with_labels(vec![primary(*span)
+                        .with_message("expected macro or sprite definition")])]
+            }
             MacroDefinitionMissingBody { span } => {
                 vec![with_span("macro definition is missing a body", *span)]
             }
