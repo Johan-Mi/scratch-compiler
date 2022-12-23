@@ -63,9 +63,7 @@ impl Expr {
                     }
                     _ => {
                         let func_name =
-                            KNOWN_FUNC_NAMES.get_key(&*func_name).ok_or_else(
-                                || Error::UnknownFunction { span, func_name },
-                            )?;
+                            KNOWN_FUNC_NAMES.get_key(&*func_name).ok_or(Error::UnknownFunction { span, func_name })?;
                         Self::FuncCall(
                             func_name,
                             span,
