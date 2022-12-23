@@ -479,10 +479,10 @@ impl AsmProgram {
         span: Span,
     ) -> Result<()> {
         let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
-            Box::new(Error::UnknownProc {
+            Error::UnknownProc {
                 span,
                 proc_name: proc_name.to_owned(),
-            })
+            }
         })?;
         let proc_id = proc.id;
 
