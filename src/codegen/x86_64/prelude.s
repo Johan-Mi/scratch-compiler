@@ -198,13 +198,13 @@ any_to_bool:
     pop ax
     ret
 .might_be_str_false:
-    mov edi, [rdi]
-    and edi, ~0x20202020
-    cmp edi, "FALS"
+    mov edx, [rdi]
+    and edx, ~0x20202020
+    cmp edx, "FALS"
     setne [rsp]
-    mov dil, [rdi+4]
-    and dil, ~0x20
-    cmp dil, 'E'
+    mov dl, [rdi+4]
+    and dl, ~0x20
+    cmp dl, 'E'
     setne al
     or [rsp], al
     call drop_any
