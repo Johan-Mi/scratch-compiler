@@ -121,7 +121,7 @@ impl AsmProgram {
                             params: proc[0]
                                 .params
                                 .iter()
-                                .map(|param| match param {
+                                .map(|(param, _)| match param {
                                     Expr::Sym(sym, ..) => {
                                         (sym.clone(), self.new_uid())
                                     }
