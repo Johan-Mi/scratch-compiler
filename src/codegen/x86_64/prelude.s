@@ -13,8 +13,9 @@ extern malloc, free, memcpy, realloc, asprintf
 
 section .text
 drop_pop_any:
+    pop rax
     pop rdi
-    add rsp, 8
+    mov [rsp], rax
 drop_any:
     cmp rdi, 2
     jbe .dont_free
