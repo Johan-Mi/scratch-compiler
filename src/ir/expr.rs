@@ -18,7 +18,6 @@ pub enum Expr {
 
 impl Expr {
     pub fn from_ast(ast: Ast) -> Result<Self> {
-        // TODO: Error handling
         Ok(match ast {
             Ast::Num(num, ..) => Self::Lit(Value::Num(num)),
             Ast::String(s, ..) => Self::Lit(Value::String(s.into())),
@@ -78,7 +77,14 @@ impl Expr {
                     }
                 }
             }
-            _ => todo!(),
+            Ast::Node(not_a_symbol, ..) => {
+                return Err(Box::new(Error::FunctionNameMustBeSymbol {
+                    span: not_a_symbol.span(),
+                }))
+            }
+            Ast::Unquote(_, span) => {
+                return Err(Box::new(Error::UnquoteOutsideOfMacro { span }))
+            }
         })
     }
 

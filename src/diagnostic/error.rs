@@ -37,6 +37,9 @@ pub enum Error {
         expected: usize,
         got: usize,
     },
+    FunctionNameMustBeSymbol {
+        span: Span,
+    },
     FunctionWrongArgCount {
         span: Span,
         func_name: &'static str,
@@ -95,6 +98,9 @@ pub enum Error {
     UnknownVarOrList {
         span: Span,
         sym_name: SmolStr,
+    },
+    UnquoteOutsideOfMacro {
+        span: Span,
     },
 }
 
@@ -162,6 +168,9 @@ impl Error {
                 *got,
                 *span,
             )],
+            FunctionNameMustBeSymbol { span } => {
+                vec![with_span("function name must be a symbol", *span)]
+            }
             FunctionWrongArgCount {
                 span,
                 func_name,
@@ -261,6 +270,10 @@ impl Error {
             }
             UnknownVarOrList { span, sym_name } => vec![with_span(
                 format!("unknown variable or list: `{sym_name}`"),
+                *span,
+            )],
+            UnquoteOutsideOfMacro { span } => vec![with_span(
+                "unquote can only be used in macro definitions",
                 *span,
             )],
         };

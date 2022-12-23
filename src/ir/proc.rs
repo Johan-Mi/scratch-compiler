@@ -30,10 +30,10 @@ impl Procedure {
             #[fancy_match]
             match stmt_or_decl {
                 Ast::Node(box Ast::Sym("variables", ..), var_decls, ..) => {
-                    variables.extend(all_symbols(var_decls));
+                    variables.extend(all_symbols(var_decls).unwrap());
                 }
                 Ast::Node(box Ast::Sym("lists", ..), list_decls, ..) => {
-                    lists.extend(all_symbols(list_decls));
+                    lists.extend(all_symbols(list_decls).unwrap());
                 }
                 _ => body.push(Statement::from_ast(stmt_or_decl)?),
             }

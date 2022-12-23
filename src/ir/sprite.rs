@@ -51,8 +51,8 @@ impl Sprite {
             let span = decl.span();
             match decl {
                 Ast::Node(box Ast::Sym(sym, ..), tail, ..) => match &*sym {
-                    "variables" => variables.extend(all_symbols(tail)),
-                    "lists" => lists.extend(all_symbols(tail)),
+                    "variables" => variables.extend(all_symbols(tail).unwrap()),
+                    "lists" => lists.extend(all_symbols(tail).unwrap()),
                     "costumes" => parse_costume_decl(&mut costumes, tail),
                     "proc" => {
                         let (name, proc) = Procedure::from_asts(tail)?;
