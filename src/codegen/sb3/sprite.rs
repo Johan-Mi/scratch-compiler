@@ -1,7 +1,7 @@
 use super::{Mangled, SerCtx};
 use crate::{
     asset::Asset,
-    diagnostic::Result,
+    diagnostic::{Error, Result},
     ir::{expr::Expr, proc::CustomProcedure, sprite::Sprite},
 };
 use serde_json::{json, Value as Json};
@@ -67,35 +67,33 @@ impl SerCtx {
         self.custom_procs = sprite
             .procedures
             .iter()
-            .filter_map(|(name, proc)| match &**name {
-                "when-flag-clicked" | "when-cloned" | "when-received" => None,
+            .map(|(name, proc)| match &**name {
+                "when-flag-clicked" | "when-cloned" | "when-received" => {
+                    Ok(None)
+                }
                 _ => {
                     assert_eq!(
                         1,
                         proc.len(),
                         "duplicate definition of custom procdeure `{name}`"
                     );
-                    Some((
-                        name.into(),
-                        CustomProcedure {
-                            params: proc[0]
-                                .params
-                                .iter()
-                                .map(|param| match param {
-                                    Expr::Sym(sym, ..) => {
-                                        (sym.clone(), self.new_uid())
-                                    }
-                                    _ => todo!(
-                                        "invalid parameter to custom\
-                                    procedure definition:\n{param:#?}"
-                                    ),
-                                })
-                                .collect(),
-                        },
-                    ))
+                    let params = proc[0]
+                        .params
+                        .iter()
+                        .map(|(param, span)| match param {
+                            Expr::Sym(sym, ..) => {
+                                Ok((sym.clone(), self.new_uid()))
+                            }
+                            _ => Err(Error::InvalidParameterForCustomProcDef {
+                                span: *span,
+                            }),
+                        })
+                        .collect::<std::result::Result<_, _>>()?;
+                    Ok(Some((name.into(), CustomProcedure { params })))
                 }
             })
-            .collect();
+            .filter_map(Result::transpose)
+            .collect::<Result<_>>()?;
 
         let blocks = self.serialize_procs(&sprite.procedures)?;
 

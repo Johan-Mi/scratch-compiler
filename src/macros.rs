@@ -31,13 +31,13 @@ enum Macro {
 impl Macro {
     fn parse(args: Vec<Ast>, span: Span) -> Result<(String, Self)> {
         let mut args = args.into_iter();
-        let signature = args.next().ok_or_else(|| {
-            Box::new(Error::MacroDefinitionMissingSignature { span })
-        })?;
+        let signature = args
+            .next()
+            .ok_or_else(|| Error::MacroDefinitionMissingSignature { span })?;
         match signature {
             Ast::Sym(macro_name, ..) => {
                 let body = args.next().ok_or_else(|| {
-                    Box::new(Error::MacroDefinitionMissingBody { span })
+                    Error::MacroDefinitionMissingBody { span }
                 })?;
                 assert!(args.next().is_none());
                 Ok((macro_name, Self::Symbol(body)))
@@ -48,7 +48,7 @@ impl Macro {
                     .map(Parameter::from_ast)
                     .collect::<Result<_>>()?;
                 let body = args.next().ok_or_else(|| {
-                    Box::new(Error::MacroDefinitionMissingBody { span })
+                    Error::MacroDefinitionMissingBody { span }
                 })?;
                 assert!(args.next().is_none());
                 Ok((macro_name, Self::Function(FunctionMacro { params, body })))

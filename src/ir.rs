@@ -34,7 +34,7 @@ impl Program {
 
         let stage = sprites
             .remove("Stage")
-            .ok_or_else(|| Box::new(Error::ProgramMissingStage))?;
+            .ok_or_else(|| Error::ProgramMissingStage)?;
 
         Ok(Self { stage, sprites })
     }

@@ -33,9 +33,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     // TODO: Error handling
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file("project.json", FileOptions::default())
-        .map_err(|err| {
-            Box::new(Error::CouldNotCreateProjectJson { inner: err })
-        })?;
+        .map_err(|err| Error::CouldNotCreateProjectJson { inner: err })?;
 
     let uid_gen = crate::uid::Generator::default();
 
@@ -111,9 +109,9 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
 
     let buf = zip
         .finish()
-        .map_err(|err| Box::new(Error::CouldNotFinishZip { inner: err }))?;
+        .map_err(|err| Error::CouldNotFinishZip { inner: err })?;
     fs::write(path, buf.into_inner())
-        .map_err(|err| Box::new(Error::CouldNotCreateSb3File { inner: err }))?;
+        .map_err(|err| Error::CouldNotCreateSb3File { inner: err })?;
 
     Ok(())
 }
@@ -211,7 +209,7 @@ impl SerCtx {
                 );
             }
             "when-received" => {
-                let [Expr::Lit(Value::String(broadcast_name))] =
+                let [(Expr::Lit(Value::String(broadcast_name)), _)] =
                     &proc.params[..]
                 else {
                     todo!();
@@ -236,12 +234,11 @@ impl SerCtx {
                 self.proc_args = proc
                     .params
                     .iter()
-                    .map(|param| match param {
+                    .map(|(param, _)| match param {
                         Expr::Sym(sym, ..) => sym.clone(),
-                        _ => todo!(
-                            "invalid parameter to custom procedure definition:\
-                            \n{param:#?}"
-                        ),
+                        // This check is already performed when setting
+                        // `self.proc_args`
+                        _ => unreachable!(),
                     })
                     .collect::<Vec<_>>();
 
@@ -263,7 +260,7 @@ impl SerCtx {
                 let argumentdefaults =
                     serde_json::to_string(&[""].repeat(proc.params.len()))
                         .unwrap();
-                let reporters = proc.params.iter().map(|param| {
+                let reporters = proc.params.iter().map(|(param, _)| {
                     Result::Ok(
                         self.serialize_expr(param, this)?.without_shadow(),
                     )
@@ -340,12 +337,11 @@ impl SerCtx {
         span: Span,
     ) -> impl Fn(Uid) -> Result<Json> + 's {
         move |_| {
-            let var = self.lookup_var(var_name).ok_or_else(|| {
-                Box::new(Error::UnknownVar {
+            let var =
+                self.lookup_var(var_name).ok_or_else(|| Error::UnknownVar {
                     span,
                     var_name: var_name.into(),
-                })
-            })?;
+                })?;
             Ok(json!([var.name, var.id]))
         }
     }
@@ -457,10 +453,10 @@ impl SerCtx {
                         };
                         let var =
                             self.lookup_var(var_name).ok_or_else(|| {
-                                Box::new(Error::UnknownVar {
+                                Error::UnknownVar {
                                     span,
                                     var_name: var_name.clone(),
-                                })
+                                }
                             })?;
                         Some((*param_name, json!([var.name, var.id])))
                     }
@@ -471,10 +467,10 @@ impl SerCtx {
                         };
                         let list =
                             self.lookup_list(list_name).ok_or_else(|| {
-                                Box::new(Error::UnknownList {
+                                Error::UnknownList {
                                     span,
                                     list_name: list_name.clone(),
-                                })
+                                }
                             })?;
                         Some((*param_name, json!([list.name, list.id])))
                     }

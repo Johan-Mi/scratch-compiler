@@ -283,10 +283,10 @@ impl SerCtx {
         span: Span,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
         let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
-            Box::new(Error::UnknownProc {
+            Error::UnknownProc {
                 span,
                 proc_name: proc_name.to_owned(),
-            })
+            }
         })?;
 
         if args.len() != proc.params.len() {

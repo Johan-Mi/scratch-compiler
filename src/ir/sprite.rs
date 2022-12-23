@@ -19,27 +19,24 @@ pub struct Sprite {
 
 impl Sprite {
     pub fn from_ast(ast: Ast) -> Result<(String, Self)> {
-        // TODO: Error handling
-        let (mut tail, span) = #[fancy_match]
+        let (mut tail, span) = (#[fancy_match]
         match ast {
             Ast::Node(box Ast::Sym("sprite", ..), tail, span) => {
-                (tail.into_iter(), span)
+                Ok((tail.into_iter(), span))
             }
-            _ => todo!("invalid sprite definition:\n{ast:#?}"),
-        };
+            _ => Err(Error::InvalidTopLevelItem { span: ast.span() }),
+        })?;
 
         let name = match tail.next() {
             Some(Ast::String(name, ..)) => Ok(name),
-            Some(Ast::Sym(_, sym_span)) => {
-                Err(Box::new(Error::SpriteMissingName {
-                    span,
-                    candidate_symbol: Some(sym_span),
-                }))
-            }
-            _ => Err(Box::new(Error::SpriteMissingName {
+            Some(Ast::Sym(_, sym_span)) => Err(Error::SpriteMissingName {
+                span,
+                candidate_symbol: Some(sym_span),
+            }),
+            _ => Err(Error::SpriteMissingName {
                 span,
                 candidate_symbol: None,
-            })),
+            }),
         }?;
 
         let mut costumes = HashMap::new();
@@ -51,6 +48,7 @@ impl Sprite {
             let span = decl.span();
             match decl {
                 Ast::Node(box Ast::Sym(sym, ..), tail, ..) => match &*sym {
+                    // TODO: Error handling
                     "variables" => variables.extend(all_symbols(tail).unwrap()),
                     "lists" => lists.extend(all_symbols(tail).unwrap()),
                     "costumes" => parse_costume_decl(&mut costumes, tail),
