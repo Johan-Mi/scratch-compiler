@@ -82,12 +82,11 @@ impl<E> TreeWalk<Result<Rewrite<Self>, E>> for Ast {
     }
 }
 
-pub fn all_symbols(asts: Vec<Ast>) -> Vec<String> {
+pub fn all_symbols(asts: Vec<Ast>) -> Result<Vec<String>, Ast> {
     asts.into_iter()
         .map(|ast| match ast {
-            Ast::Sym(sym, ..) => sym,
-            // TODO: Error handling
-            _ => todo!(),
+            Ast::Sym(sym, ..) => Ok(sym),
+            _ => Err(ast),
         })
         .collect()
 }

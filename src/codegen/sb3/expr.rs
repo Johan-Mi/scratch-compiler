@@ -197,20 +197,20 @@ impl SerCtx {
                 func!(operator_letter_of(STRING: String, LETTER: Number))
             }
             "mod" => func!(operator_mod(NUM1: Number, NUM2: Number)),
-            "abs" => self.mathop("abs", parent, args),
-            "floor" => self.mathop("floor", parent, args),
-            "ceil" => self.mathop("ceiling", parent, args),
-            "sqrt" => self.mathop("sqrt", parent, args),
-            "ln" => self.mathop("ln", parent, args),
-            "log" => self.mathop("log", parent, args),
-            "e^" => self.mathop("e ^", parent, args),
-            "ten^" => self.mathop("10 ^", parent, args),
-            "sin" => self.mathop("sin", parent, args),
-            "cos" => self.mathop("cos", parent, args),
-            "tan" => self.mathop("tan", parent, args),
-            "asin" => self.mathop("asin", parent, args),
-            "acos" => self.mathop("acos", parent, args),
-            "atan" => self.mathop("atan", parent, args),
+            "abs" => self.mathop("abs", parent, args, span),
+            "floor" => self.mathop("floor", parent, args, span),
+            "ceil" => self.mathop("ceiling", parent, args, span),
+            "sqrt" => self.mathop("sqrt", parent, args, span),
+            "ln" => self.mathop("ln", parent, args, span),
+            "log" => self.mathop("log", parent, args, span),
+            "e^" => self.mathop("e ^", parent, args, span),
+            "ten^" => self.mathop("10 ^", parent, args, span),
+            "sin" => self.mathop("sin", parent, args, span),
+            "cos" => self.mathop("cos", parent, args, span),
+            "tan" => self.mathop("tan", parent, args, span),
+            "asin" => self.mathop("asin", parent, args, span),
+            "acos" => self.mathop("acos", parent, args, span),
+            "atan" => self.mathop("atan", parent, args, span),
             "pressing-key" => func!(sensing_keypressed(KEY_OPTION: String)),
             "to-num" => match args {
                 [arg] => self.emit_non_shadow(
@@ -255,15 +255,19 @@ impl SerCtx {
 
     fn mathop(
         &self,
-        op_name: &str,
+        op_name: &'static str,
         parent: Uid,
         args: &[Expr],
+        span: Span,
     ) -> Result<Reporter> {
-        let num = match args {
-            [num] => |parent| {
-                Ok(self.serialize_expr(num, parent)?.with_empty_shadow())
-            },
-            _ => todo!(),
+        let num = |parent| match args {
+            [num] => Ok(self.serialize_expr(num, parent)?.with_empty_shadow()),
+            _ => Err(Box::new(Error::FunctionWrongArgCount {
+                span,
+                func_name: op_name,
+                expected: 1,
+                got: args.len(),
+            })),
         };
         self.emit_non_shadow(
             "operator_mathop",

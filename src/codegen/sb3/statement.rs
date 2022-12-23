@@ -173,6 +173,15 @@ impl SerCtx {
             }
         }
 
+        let wrong_arg_count = |expected| {
+            Err(Box::new(Error::BuiltinProcWrongArgCount {
+                span,
+                proc_name: proc_name.to_owned(),
+                expected,
+                got: args.len(),
+            }))
+        };
+
         match proc_name {
             "erase-all" => proc!(pen_clear()),
             "stamp" => proc!(pen_stamp()),
@@ -213,7 +222,7 @@ impl SerCtx {
                         &[],
                     )
                 }
-                _ => todo!(),
+                _ => wrong_arg_count(1),
             },
             ":=" => proc!(data_setvariableto(VARIABLE: Var, VALUE: String)),
             "+=" => proc!(data_changevariableby(VARIABLE: Var, VALUE: String)),
@@ -233,7 +242,7 @@ impl SerCtx {
                     &[],
                     &[("STOP_OPTION", &|_| Ok(json!(["all", null])))],
                 ),
-                _ => todo!(),
+                _ => wrong_arg_count(0),
             },
             "stop-this-script" => match args {
                 [] => self.emit_stacking(
@@ -243,7 +252,7 @@ impl SerCtx {
                     &[],
                     &[("STOP_OPTION", &|_| Ok(json!(["this script", null])))],
                 ),
-                _ => todo!(),
+                _ => wrong_arg_count(0),
             },
             "stop-other-scripts" => match args {
                 [] => self.emit_stacking(
@@ -255,7 +264,7 @@ impl SerCtx {
                         Ok(json!(["other scripts in this sprite", null]))
                     })],
                 ),
-                _ => todo!(),
+                _ => wrong_arg_count(0),
             },
             "clone-myself" => todo!(),
             "reset-timer" => proc!(sensing_resettimer()),
