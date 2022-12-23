@@ -238,10 +238,9 @@ impl SerCtx {
                     .iter()
                     .map(|(param, _)| match param {
                         Expr::Sym(sym, ..) => sym.clone(),
-                        _ => todo!(
-                            "invalid parameter to custom procedure definition:\
-                            \n{param:#?}"
-                        ),
+                        // This check is already performed when setting
+                        // `self.proc_args`
+                        _ => unreachable!(),
                     })
                     .collect::<Vec<_>>();
 
