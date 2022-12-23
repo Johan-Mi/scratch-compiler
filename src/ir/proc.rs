@@ -2,6 +2,7 @@ use crate::{
     ast::{all_symbols, Ast},
     diagnostic::Result,
     ir::{expr::Expr, statement::Statement},
+    span::Span,
     uid::Uid,
 };
 use fancy_match::fancy_match;
@@ -10,7 +11,7 @@ use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct Procedure {
-    pub params: Vec<Expr>,
+    pub params: Vec<(Expr, Span)>,
     pub body: Statement,
     pub variables: HashSet<String>,
     pub lists: HashSet<String>,
@@ -55,13 +56,16 @@ impl Procedure {
     }
 }
 
-fn parse_signature(ast: Ast) -> Result<(String, Vec<Expr>)> {
+fn parse_signature(ast: Ast) -> Result<(String, Vec<(Expr, Span)>)> {
     // TODO: Error handling
     match ast {
         Ast::Node(box Ast::Sym(name, ..), params, ..) => {
             let params = params
                 .into_iter()
-                .map(Expr::from_ast)
+                .map(|param| {
+                    let span = param.span();
+                    Ok((Expr::from_ast(param)?, span))
+                })
                 .collect::<Result<_>>()?;
             Ok((name, params))
         }

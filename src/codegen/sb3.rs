@@ -211,7 +211,7 @@ impl SerCtx {
                 );
             }
             "when-received" => {
-                let [Expr::Lit(Value::String(broadcast_name))] =
+                let [(Expr::Lit(Value::String(broadcast_name)), _)] =
                     &proc.params[..]
                 else {
                     todo!();
@@ -236,7 +236,7 @@ impl SerCtx {
                 self.proc_args = proc
                     .params
                     .iter()
-                    .map(|param| match param {
+                    .map(|(param, _)| match param {
                         Expr::Sym(sym, ..) => sym.clone(),
                         _ => todo!(
                             "invalid parameter to custom procedure definition:\
@@ -263,7 +263,7 @@ impl SerCtx {
                 let argumentdefaults =
                     serde_json::to_string(&[""].repeat(proc.params.len()))
                         .unwrap();
-                let reporters = proc.params.iter().map(|param| {
+                let reporters = proc.params.iter().map(|(param, _)| {
                     Result::Ok(
                         self.serialize_expr(param, this)?.without_shadow(),
                     )

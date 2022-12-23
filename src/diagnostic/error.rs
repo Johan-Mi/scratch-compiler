@@ -58,6 +58,9 @@ pub enum Error {
     InvalidMacroSignature {
         span: Span,
     },
+    InvalidParameterForCustomProcDef {
+        span: Span,
+    },
     MacroDefinitionMissingBody {
         span: Span,
     },
@@ -197,6 +200,10 @@ impl Error {
             InvalidMacroSignature { span } => {
                 vec![with_span("invalid macro signature", *span)]
             }
+            InvalidParameterForCustomProcDef { span } => vec![just_message(
+                "invalid parameter for custom procedure definition",
+            )
+            .with_labels(vec![primary(*span).with_message("expected symbol")])],
             MacroDefinitionMissingBody { span } => {
                 vec![with_span("macro definition is missing a body", *span)]
             }
