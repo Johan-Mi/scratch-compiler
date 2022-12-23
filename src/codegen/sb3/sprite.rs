@@ -84,13 +84,11 @@ impl SerCtx {
                             Expr::Sym(sym, ..) => {
                                 Ok((sym.clone(), self.new_uid()))
                             }
-                            _ => Err(Box::new(
-                                Error::InvalidParameterForCustomProcDef {
-                                    span: *span,
-                                },
-                            )),
+                            _ => Err(Error::InvalidParameterForCustomProcDef {
+                                span: *span,
+                            }),
                         })
-                        .collect::<Result<_>>()?;
+                        .collect::<std::result::Result<_, _>>()?;
                     Ok(Some((name.into(), CustomProcedure { params })))
                 }
             })

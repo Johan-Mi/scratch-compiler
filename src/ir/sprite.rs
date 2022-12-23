@@ -29,16 +29,14 @@ impl Sprite {
 
         let name = match tail.next() {
             Some(Ast::String(name, ..)) => Ok(name),
-            Some(Ast::Sym(_, sym_span)) => {
-                Err(Box::new(Error::SpriteMissingName {
-                    span,
-                    candidate_symbol: Some(sym_span),
-                }))
-            }
-            _ => Err(Box::new(Error::SpriteMissingName {
+            Some(Ast::Sym(_, sym_span)) => Err(Error::SpriteMissingName {
+                span,
+                candidate_symbol: Some(sym_span),
+            }),
+            _ => Err(Error::SpriteMissingName {
                 span,
                 candidate_symbol: None,
-            })),
+            }),
         }?;
 
         let mut costumes = HashMap::new();

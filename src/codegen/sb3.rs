@@ -33,9 +33,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     // TODO: Error handling
     let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
     zip.start_file("project.json", FileOptions::default())
-        .map_err(|err| {
-            Box::new(Error::CouldNotCreateProjectJson { inner: err })
-        })?;
+        .map_err(|err| Error::CouldNotCreateProjectJson { inner: err })?;
 
     let uid_gen = crate::uid::Generator::default();
 
@@ -111,9 +109,9 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
 
     let buf = zip
         .finish()
-        .map_err(|err| Box::new(Error::CouldNotFinishZip { inner: err }))?;
+        .map_err(|err| Error::CouldNotFinishZip { inner: err })?;
     fs::write(path, buf.into_inner())
-        .map_err(|err| Box::new(Error::CouldNotCreateSb3File { inner: err }))?;
+        .map_err(|err| Error::CouldNotCreateSb3File { inner: err })?;
 
     Ok(())
 }
@@ -339,12 +337,11 @@ impl SerCtx {
         span: Span,
     ) -> impl Fn(Uid) -> Result<Json> + 's {
         move |_| {
-            let var = self.lookup_var(var_name).ok_or_else(|| {
-                Box::new(Error::UnknownVar {
+            let var =
+                self.lookup_var(var_name).ok_or_else(|| Error::UnknownVar {
                     span,
                     var_name: var_name.into(),
-                })
-            })?;
+                })?;
             Ok(json!([var.name, var.id]))
         }
     }
@@ -456,10 +453,10 @@ impl SerCtx {
                         };
                         let var =
                             self.lookup_var(var_name).ok_or_else(|| {
-                                Box::new(Error::UnknownVar {
+                                Error::UnknownVar {
                                     span,
                                     var_name: var_name.clone(),
-                                })
+                                }
                             })?;
                         Some((*param_name, json!([var.name, var.id])))
                     }
@@ -470,10 +467,10 @@ impl SerCtx {
                         };
                         let list =
                             self.lookup_list(list_name).ok_or_else(|| {
-                                Box::new(Error::UnknownList {
+                                Error::UnknownList {
                                     span,
                                     list_name: list_name.clone(),
-                                })
+                                }
                             })?;
                         Some((*param_name, json!([list.name, list.id])))
                     }
