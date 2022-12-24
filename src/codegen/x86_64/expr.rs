@@ -402,7 +402,25 @@ impl AsmProgram {
                 }
                 _ => wrong_arg_count(2),
             },
-            "mod" => todo!(),
+            "mod" => match args {
+                [lhs, rhs] => {
+                    self.generate_double_expr(rhs)?;
+                    self.text.push_str(
+                        "    sub rsp, 8
+    movq [rsp], xmm0
+",
+                    );
+                    self.generate_double_expr(lhs)?;
+                    self.text.push_str(
+                        "    movq xmm1, [rsp]
+    call fmod
+    add rsp, 8
+",
+                    );
+                    Ok(Typ::Double)
+                }
+                _ => wrong_arg_count(2),
+            },
             "abs" => mathop(
                 "    mov rax, (1 << 63) - 1
     movq xmm1, rax
@@ -412,16 +430,16 @@ impl AsmProgram {
             "floor" => mathop("    roundsd xmm0, xmm0, 1\n"),
             "ceil" => mathop("    roundsd xmm0, xmm0, 2\n"),
             "sqrt" => mathop("    sqrtsd xmm0, xmm0\n"),
-            "ln" => todo!(),
-            "log" => todo!(),
-            "e^" => todo!(),
-            "ten^" => todo!(),
-            "sin" => todo!(),
-            "cos" => todo!(),
-            "tan" => todo!(),
-            "asin" => todo!(),
-            "acos" => todo!(),
-            "atan" => todo!(),
+            "ln" => mathop("    call log wrt ..plt\n"),
+            "log" => mathop("    call log10 wrt ..plt\n"),
+            "e^" => mathop("    call exp wrt ..plt\n"),
+            "ten^" => mathop("    call exp10 wrt ..plt\n"),
+            "sin" => mathop("    call sin wrt ..plt\n"),
+            "cos" => mathop("    call cos wrt ..plt\n"),
+            "tan" => mathop("    call tan wrt ..plt\n"),
+            "asin" => mathop("    call asin wrt ..plt\n"),
+            "acos" => mathop("    call acos wrt ..plt\n"),
+            "atan" => mathop("    call atan wrt ..plt\n"),
             "pressing-key" => todo!(),
             "to-num" => match args {
                 [operand] => {

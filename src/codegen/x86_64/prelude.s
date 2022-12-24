@@ -3,6 +3,7 @@ default rel
 global main
 
 extern malloc, free, memcpy, realloc, asprintf
+extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan
 
 %macro staticstr 2+
     [section .rodata]
