@@ -162,11 +162,8 @@ impl MacroContext<'_> {
 
     fn use_builtin_macros(ast: Ast) -> Result<Rewrite<Ast>> {
         Ok((|| {
-            let (sym, args, span) = match &ast {
-                Ast::Node(box Ast::Sym(sym, ..), args, span) => {
-                    (sym, args, *span)
-                }
-                _ => return None,
+            let Ast::Node(box Ast::Sym(ref sym, ..), ref args, span) = ast else {
+                return None;
             };
             match &**sym {
                 "str-concat!" => args

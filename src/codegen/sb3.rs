@@ -447,9 +447,8 @@ impl SerCtx {
             .map(|(param, arg)| {
                 Ok(match param {
                     Param::Var(param_name) => {
-                        let (var_name, span) = match arg {
-                            Expr::Sym(sym, span) => (sym, *span),
-                            _ => todo!(),
+                        let Expr::Sym(ref var_name, span) = *arg else {
+                            todo!();
                         };
                         let var =
                             self.lookup_var(var_name).ok_or_else(|| {
@@ -461,9 +460,8 @@ impl SerCtx {
                         Some((*param_name, json!([var.name, var.id])))
                     }
                     Param::List(param_name) => {
-                        let (list_name, span) = match arg {
-                            Expr::Sym(sym, span) => (sym, *span),
-                            _ => todo!(),
+                        let Expr::Sym(ref list_name, span) = *arg else {
+                            todo!();
                         };
                         let list =
                             self.lookup_list(list_name).ok_or_else(|| {
