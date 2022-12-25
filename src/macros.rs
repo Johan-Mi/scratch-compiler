@@ -36,9 +36,9 @@ impl Macro {
             .ok_or(Error::MacroDefinitionMissingSignature { span })?;
         match signature {
             Ast::Sym(macro_name, ..) => {
-                let body = args.next().ok_or({
-                    Error::MacroDefinitionMissingBody { span }
-                })?;
+                let body = args
+                    .next()
+                    .ok_or(Error::MacroDefinitionMissingBody { span })?;
                 assert!(args.next().is_none());
                 Ok((macro_name, Self::Symbol(body)))
             }
@@ -47,9 +47,9 @@ impl Macro {
                     .into_iter()
                     .map(Parameter::from_ast)
                     .collect::<Result<_>>()?;
-                let body = args.next().ok_or({
-                    Error::MacroDefinitionMissingBody { span }
-                })?;
+                let body = args
+                    .next()
+                    .ok_or(Error::MacroDefinitionMissingBody { span })?;
                 assert!(args.next().is_none());
                 Ok((macro_name, Self::Function(FunctionMacro { params, body })))
             }
@@ -162,11 +162,8 @@ impl MacroContext<'_> {
 
     fn use_builtin_macros(ast: Ast) -> Result<Rewrite<Ast>> {
         Ok((|| {
-            let (sym, args, span) = match &ast {
-                Ast::Node(box Ast::Sym(sym, ..), args, span) => {
-                    (sym, args, *span)
-                }
-                _ => return None,
+            let Ast::Node(box Ast::Sym(ref sym, ..), ref args, span) = ast else {
+                return None;
             };
             match &**sym {
                 "str-concat!" => args

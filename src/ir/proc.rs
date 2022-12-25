@@ -58,19 +58,17 @@ impl Procedure {
 
 fn parse_signature(ast: Ast) -> Result<(String, Vec<(Expr, Span)>)> {
     // TODO: Error handling
-    match ast {
-        Ast::Node(box Ast::Sym(name, ..), params, ..) => {
-            let params = params
-                .into_iter()
-                .map(|param| {
-                    let span = param.span();
-                    Ok((Expr::from_ast(param)?, span))
-                })
-                .collect::<Result<_>>()?;
-            Ok((name, params))
-        }
-        _ => todo!(),
-    }
+    let Ast::Node(box Ast::Sym(name, ..), params, ..) = ast else {
+        todo!();
+    };
+    let params = params
+        .into_iter()
+        .map(|param| {
+            let span = param.span();
+            Ok((Expr::from_ast(param)?, span))
+        })
+        .collect::<Result<_>>()?;
+    Ok((name, params))
 }
 
 pub struct CustomProcedure {
