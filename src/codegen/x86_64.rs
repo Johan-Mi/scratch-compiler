@@ -223,28 +223,8 @@ impl AsmProgram {
                         )
                         .unwrap();
                     }
-                    if proc.params.len() < 8 {
-                        writeln!(
-                            self.text,
-                            "    add rsp, {}
-    jmp [rsp-{}]",
-                            proc.params.len() * 16 + 8,
-                            proc.params.len() * 16
-                        )
+                    writeln!(self.text, "    ret {}", proc.params.len() * 16)
                         .unwrap();
-                    } else {
-                        // Slow path to prevent the return address from falling
-                        // outside of the red zone when there are lots of
-                        // parameters.
-                        writeln!(
-                            self.text,
-                            "    mov rax, [rsp]
-    add rsp, {}
-    jmp rax",
-                            proc.params.len() * 16 + 8,
-                        )
-                        .unwrap();
-                    }
                 } else {
                     self.text.push_str("    ret\n");
                 }
