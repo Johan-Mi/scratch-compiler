@@ -43,7 +43,7 @@ struct AsmProgram {
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
     custom_procs: HashMap<String, CustomProcedure>,
-    proc_stop_label: Option<Uid>,
+    proc_stop_label: Option<LocalLabel<Uid>>,
 }
 
 impl TryFrom<&Program> for AsmProgram {
@@ -196,15 +196,14 @@ impl AsmProgram {
     mov rbp, rsp
 ",
                 );
-                let stop_label = if proc.params.is_empty() {
+                self.proc_stop_label = if proc.params.is_empty() {
                     None
                 } else {
-                    Some(self.new_uid())
+                    Some(LocalLabel(self.new_uid()))
                 };
-                self.proc_stop_label = stop_label;
                 self.generate_statement(&proc.body)?;
-                if let Some(stop_label) = stop_label {
-                    self.emit(LocalLabel(stop_label));
+                if let Some(stop_label) = self.proc_stop_label {
+                    self.emit(stop_label);
                 }
                 self.text.push_str("    pop rbp\n");
 
@@ -428,7 +427,7 @@ impl AsmProgram {
                 [] => {
                     self.text.push_str("    mov rsp, rbp\n");
                     if let Some(stop_label) = self.proc_stop_label {
-                        writeln!(self.text, "    jmp .{stop_label}").unwrap();
+                        writeln!(self.text, "    jmp {stop_label}").unwrap();
                     } else {
                         self.text.push_str(
                             "    pop rbp
