@@ -13,10 +13,6 @@ extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan
 %endmacro
 
 section .text
-drop_pop_any:
-    pop rax
-    pop rdi
-    mov [rsp], rax
 drop_any:
     cmp rdi, 2
     jbe .dont_free
@@ -28,13 +24,10 @@ drop_any:
 drop_pop_cow:
     pop rax
     pop rdi
-    add rsp, 8
+    mov [rsp], rax
     test rdi, 1
-    jnz .dont_free
-    push rax
-    jmp free wrt ..plt
-.dont_free:
-    jmp rax
+    jz free wrt ..plt
+    ret
 
 any_to_cow:
     cmp rdi, 1
@@ -179,7 +172,7 @@ any_to_bool:
     cmp rdi, 2
     jb .done
     je .is_number
-    push word 0
+    push qword 0
     cmp rsi, 1
     je .might_be_str_0
     cmp rsi, 5
@@ -196,7 +189,7 @@ any_to_bool:
     cmp byte [rdi], '0'
     setne [rsp]
     call drop_any
-    pop ax
+    pop rax
     ret
 .might_be_str_false:
     mov edx, [rdi]
@@ -209,7 +202,7 @@ any_to_bool:
     setne al
     or [rsp], al
     call drop_any
-    pop ax
+    pop rax
     ret
 .is_number:
     xor eax, eax
@@ -265,6 +258,7 @@ clone_any:
     jbe .done
     test rdi, 1
     jnz .done
+    sub rsp, 8
     push rsi
     push rdi
     mov rdi, rsi
@@ -274,6 +268,7 @@ clone_any:
     mov rdx, [rsp]
     call memcpy wrt ..plt
     pop rdx
+    add rsp, 8
     ret
 .done:
     mov rax, rdi
@@ -347,6 +342,7 @@ list_ensure_extra_capacity:
     ret
 
 list_append:
+    sub rsp, 8
     push rdx
     push rsi
     call list_ensure_extra_capacity
@@ -356,6 +352,7 @@ list_append:
     pop qword [rsi+rdi]
     pop qword [rsi+rdi+8]
     inc qword [rax+8]
+    add rsp, 8
     ret
 
 list_get:

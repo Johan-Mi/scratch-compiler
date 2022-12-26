@@ -44,6 +44,7 @@ struct AsmProgram {
     static_strs: Vec<(Uid, String)>,
     custom_procs: HashMap<String, CustomProcedure>,
     proc_stop_label: Option<LocalLabel<Uid>>,
+    stack_aligned: bool,
 }
 
 impl TryFrom<&Program> for AsmProgram {
@@ -178,6 +179,7 @@ impl AsmProgram {
     mov rbp, rsp
 ",
                 );
+                self.stack_aligned = true;
                 self.generate_statement(&proc.body)?;
                 self.text.push_str(
                     "    pop rbp
@@ -196,6 +198,7 @@ impl AsmProgram {
     mov rbp, rsp
 ",
                 );
+                self.stack_aligned = true;
                 self.proc_stop_label = if proc.params.is_empty() {
                     None
                 } else {
@@ -208,14 +211,40 @@ impl AsmProgram {
                 self.text.push_str("    pop rbp\n");
 
                 // Drop parameters
-                if let Some(drop_calls_needed) =
-                    proc.params.len().checked_sub(1)
-                {
-                    for _ in 0..drop_calls_needed {
-                        self.text.push_str("    call drop_pop_any\n");
+                if !proc.params.is_empty() {
+                    for i in 0..proc.params.len() {
+                        writeln!(
+                            self.text,
+                            "    mov rdi, [rsp+{}]
+    mov rsi, [rsp+{}]
+    call drop_any",
+                            i * 16 + 8,
+                            i * 16 + 16
+                        )
+                        .unwrap();
                     }
-                    // Use a tail call for the final parameter
-                    self.text.push_str("    jmp drop_pop_any\n");
+                    if proc.params.len() < 8 {
+                        writeln!(
+                            self.text,
+                            "    add rsp, {}
+    jmp [rsp-{}]",
+                            proc.params.len() * 16 + 8,
+                            proc.params.len() * 16
+                        )
+                        .unwrap();
+                    } else {
+                        // Slow path to prevent the return address from falling
+                        // outside of the red zone when there are lots of
+                        // parameters.
+                        writeln!(
+                            self.text,
+                            "    mov rax, [rsp]
+    add rsp, {}
+    jmp rax",
+                            proc.params.len() * 16 + 8,
+                        )
+                        .unwrap();
+                    }
                 } else {
                     self.text.push_str("    ret\n");
                 }
@@ -260,10 +289,16 @@ impl AsmProgram {
                 let loop_label = LocalLabel(self.new_uid());
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
-                self.text.push_str(
+                self.text.push_str(if self.stack_aligned {
                     "    call double_to_usize
-    push rax\n",
-                );
+    push rax\n"
+                } else {
+                    "    sub rsp, 8
+    call double_to_usize
+    mov [rsp], rax
+"
+                });
+                self.stack_aligned ^= true;
                 self.emit(loop_label);
                 writeln!(
                     self.text,
@@ -275,6 +310,7 @@ impl AsmProgram {
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
                 self.text.push_str("    add rsp, 8\n");
+                self.stack_aligned ^= true;
                 Ok(())
             }
             Statement::Forever(body) => {
@@ -315,6 +351,11 @@ impl AsmProgram {
                 let loop_label = LocalLabel(self.new_uid());
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
+                let stack_was_aligned = self.stack_aligned;
+                if !stack_was_aligned {
+                    self.text.push_str("    sub rsp, 8\n");
+                }
+                self.stack_aligned = true;
                 self.text.push_str(
                     "    call double_to_usize
     push rax
@@ -329,18 +370,23 @@ impl AsmProgram {
     jae {after_loop}
     inc rdi
     push rdi
-    push qword [{var_id}]
-    mov qword [{var_id}], 2
     call usize_to_double
+    mov rdi, [{var_id}]
+    mov rsi, [{var_id}+8]
+    mov qword [{var_id}], 2
     movq [{var_id}+8], xmm0
-    pop rdi
     call drop_any"
                 )
                 .unwrap();
                 self.generate_statement(body)?;
                 writeln!(self.text, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
-                self.text.push_str("    add rsp, 8\n");
+                self.text.push_str(if stack_was_aligned {
+                    "    add rsp, 8\n"
+                } else {
+                    "    add rsp, 16\n"
+                });
+                self.stack_aligned = stack_was_aligned;
                 Ok(())
             }
         }
@@ -386,9 +432,9 @@ impl AsmProgram {
     mov rax, 1
     mov rdi, 1
     syscall
-    call drop_pop_cow
 ",
                         );
+                        self.aligning_call("drop_pop_cow");
                     }
                 }
                 _ => return wrong_arg_count(1),
@@ -402,10 +448,10 @@ impl AsmProgram {
                         "    mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]
     mov [{var_id}], rax
-    mov [{var_id}+8], rdx
-    call drop_any"
+    mov [{var_id}+8], rdx"
                     )
                     .unwrap();
+                    self.aligning_call("drop_any");
                 }
                 _ => return wrong_arg_count(2),
             },
@@ -416,10 +462,10 @@ impl AsmProgram {
                     writeln!(
                         self.text,
                         "    lea rdi, [{list_id}]
-    mov rsi, rax
-    call list_append"
+    mov rsi, rax"
                     )
                     .unwrap();
+                    self.aligning_call("list_append");
                 }
                 _ => return wrong_arg_count(2),
             },
@@ -494,6 +540,12 @@ impl AsmProgram {
             }));
         }
 
+        let stack_was_aligned = self.stack_aligned;
+        if !stack_was_aligned {
+            self.text.push_str("    sub rsp, 8\n");
+        }
+        self.stack_aligned = true;
+
         for arg in args {
             self.generate_any_expr(arg)?;
             self.text.push_str(
@@ -504,24 +556,51 @@ impl AsmProgram {
         }
 
         writeln!(self.text, "    call {proc_id}").unwrap();
+
+        if !stack_was_aligned {
+            self.text.push_str("    add rsp, 8\n");
+        }
+        self.stack_aligned = stack_was_aligned;
+
         Ok(())
+    }
+
+    fn aligning_call(&mut self, proc: impl fmt::Display) {
+        if self.stack_aligned {
+            writeln!(self.text, "    call {proc}").unwrap();
+        } else {
+            writeln!(
+                self.text,
+                "    sub rsp, 8
+    call {proc}
+    add rsp, 8"
+            )
+            .unwrap();
+        }
     }
 }
 
 impl fmt::Display for AsmProgram {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, concat!(include_str!("x86_64/prelude.s"), "\nmain:\n"))?;
+        writeln!(
+            f,
+            concat!(
+                include_str!("x86_64/prelude.s"),
+                "\nmain:\n    sub rsp, 8"
+            )
+        )?;
         for entry_point in &self.entry_points {
             writeln!(f, "    call {entry_point}")?;
         }
         writeln!(
             f,
-            r#"    xor eax, eax
+            "    add rsp, 8
+    xor eax, eax
     ret
 
 {}
 section .data
-align 8"#,
+align 8",
             self.text,
         )?;
         for var_id in &self.var_ids {
