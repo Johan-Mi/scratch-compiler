@@ -208,7 +208,6 @@ impl AsmProgram {
                 if let Some(stop_label) = self.proc_stop_label {
                     self.emit(stop_label);
                 }
-                self.text.push_str("    pop rbp\n");
 
                 // Drop parameters
                 if !proc.params.is_empty() {
@@ -223,10 +222,19 @@ impl AsmProgram {
                         )
                         .unwrap();
                     }
-                    writeln!(self.text, "    ret {}", proc.params.len() * 16)
-                        .unwrap();
+                    writeln!(
+                        self.text,
+                        "    pop rbp
+    ret {}",
+                        proc.params.len() * 16
+                    )
+                    .unwrap();
                 } else {
-                    self.text.push_str("    ret\n");
+                    self.text.push_str(
+                        "    pop rbp
+    ret
+",
+                    );
                 }
 
                 Ok(proc_id)
