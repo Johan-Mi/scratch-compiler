@@ -12,7 +12,7 @@ use nom::{
         all_consuming, map_opt, map_res, not, opt, peek, recognize, value,
     },
     error::ParseError,
-    multi::{count, many0, separated_list0},
+    multi::{count, many0},
     number::complete::double,
     sequence::{delimited, pair, preceded, separated_pair, terminated},
     IResult, Parser,
@@ -20,7 +20,7 @@ use nom::{
 use std::borrow::Cow;
 
 pub fn program(input: Input) -> IResult<Input, Vec<Ast>> {
-    all_consuming(delimited(ws, separated_list0(ws, expr), ws))(input)
+    all_consuming(preceded(ws, many0(terminated(expr, ws))))(input)
 }
 
 fn expr(input: Input) -> IResult<Input, Ast> {
