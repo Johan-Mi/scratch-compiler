@@ -24,7 +24,7 @@ impl AsmProgram {
                         self.generate_double_expr(initial)?;
                         self.text.push_str(
                             "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                         );
                         self.stack_aligned ^= true;
@@ -32,21 +32,21 @@ impl AsmProgram {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
                                 "    addsd xmm0, [rsp]
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                         }
                         for term in negatives {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
-                                "    movq xmm1, [rsp]
+                                "    movsd xmm1, [rsp]
     subsd xmm1, xmm0
-    movq [rsp], xmm1
+    movsd [rsp], xmm1
 ",
                             );
                         }
                         self.text.push_str(
-                            "    movq xmm0, [rsp]
+                            "    movsd xmm0, [rsp]
     add rsp, 8
 ",
                         );
@@ -56,7 +56,7 @@ impl AsmProgram {
                         self.generate_double_expr(initial)?;
                         self.text.push_str(
                             "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                         );
                         self.stack_aligned ^= true;
@@ -64,14 +64,14 @@ impl AsmProgram {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
                                 "    addsd xmm0, [rsp]
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                         }
                         self.text.push_str(
                             "    mov rax, (1 << 63)
     xor [rsp], rax
-    movq xmm0, [rsp]
+    movsd xmm0, [rsp]
     add rsp, 8
 ",
                         );
@@ -89,7 +89,7 @@ impl AsmProgram {
                         self.generate_double_expr(initial)?;
                         self.text.push_str(
                             "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                         );
                         self.stack_aligned ^= true;
@@ -97,21 +97,21 @@ impl AsmProgram {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
                                 "    mulsd xmm0, [rsp]
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                         }
                         for term in denominators {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
-                                "    movq xmm1, [rsp]
+                                "    movsd xmm1, [rsp]
     divsd xmm1, xmm0
-    movq [rsp], xmm1
+    movsd [rsp], xmm1
 ",
                             );
                         }
                         self.text.push_str(
-                            "    movq xmm0, [rsp]
+                            "    movsd xmm0, [rsp]
     add rsp, 8
 ",
                         );
@@ -121,7 +121,7 @@ impl AsmProgram {
                         self.generate_double_expr(initial)?;
                         self.text.push_str(
                             "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                         );
                         self.stack_aligned ^= true;
@@ -129,7 +129,7 @@ impl AsmProgram {
                             self.generate_double_expr(term)?;
                             self.text.push_str(
                                 "    mulsd xmm0, [rsp]
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                         }
@@ -298,13 +298,13 @@ impl AsmProgram {
                         Typ::Double => {
                             self.text.push_str(
                                 "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                             self.stack_aligned ^= true;
                             match self.generate_expr(rhs)? {
                                 Typ::Double => self.text.push_str(
-                                    "    movq xmm1, [rsp]
+                                    "    movsd xmm1, [rsp]
     xor eax, eax
     ucomisd xmm0, xmm1
     sete al
@@ -335,7 +335,7 @@ impl AsmProgram {
                         Typ::Double => {
                             self.text.push_str(
                                 "    sub rsp, 8
-    movq [rsp], xmm0
+    movsd [rsp], xmm0
 ",
                             );
                             self.stack_aligned ^= true;
@@ -348,7 +348,7 @@ impl AsmProgram {
                                     };
                                     writeln!(
                                         self.text,
-                                        "    movq xmm1, [rsp]
+                                        "    movsd xmm1, [rsp]
     xor eax, eax
     ucomisd xmm1, xmm0
     set{condition} al",
@@ -397,9 +397,9 @@ impl AsmProgram {
     call str_length
     mov rdi, rax
     call usize_to_double
-    movq [rsp+16], xmm0
+    movsd [rsp+16], xmm0
     call drop_pop_cow
-    movq xmm0, [rsp]
+    movsd xmm0, [rsp]
 ",
                     );
                     self.text.push_str(if stack_was_aligned {
@@ -458,10 +458,10 @@ impl AsmProgram {
                         "    sub rsp, 16\n"
                     });
                     self.stack_aligned = true;
-                    self.text.push_str("    movq [rsp], xmm0\n");
+                    self.text.push_str("    movsd [rsp], xmm0\n");
                     self.generate_double_expr(lhs)?;
                     self.text.push_str(
-                        "    movq xmm1, [rsp]
+                        "    movsd xmm1, [rsp]
     call fmod
 ",
                     );
