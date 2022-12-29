@@ -217,24 +217,33 @@ impl AsmProgram {
                 _ => wrong_arg_count(2),
             },
             "++" => match args {
-                [single] => self.generate_expr(single),
-                [lhs, rhs] => {
-                    self.generate_cow_expr(rhs)?;
-                    let stack_was_aligned = self.stack_aligned;
-                    if !stack_was_aligned {
-                        self.text.push_str("    sub rsp, 8\n");
-                    }
-                    self.stack_aligned = true;
+                [] => {
                     self.text.push_str(
-                        "    push rdx
+                        "    lea rax, [str_empty]
+    xor edx, edx
+",
+                    );
+                    Ok(Typ::StaticStr)
+                }
+                [single] => self.generate_expr(single),
+                [rest @ .., last] => {
+                    self.generate_cow_expr(last)?;
+                    for arg in rest.iter().rev() {
+                        let stack_was_aligned = self.stack_aligned;
+                        if !stack_was_aligned {
+                            self.text.push_str("    sub rsp, 8\n");
+                        }
+                        self.stack_aligned = true;
+                        self.text.push_str(
+                            "    push rdx
     sub rsp, 8
     push rdx
     push rax
 ",
-                    );
-                    self.generate_cow_expr(lhs)?;
-                    self.text.push_str(
-                        "    add [rsp+24], rdx
+                        );
+                        self.generate_cow_expr(arg)?;
+                        self.text.push_str(
+                            "    add [rsp+24], rdx
     push rdx
     push rax
     mov rdi, [rsp+40]
@@ -254,14 +263,14 @@ impl AsmProgram {
     pop rax
     pop rdx
 ",
-                    );
-                    if !stack_was_aligned {
-                        self.text.push_str("    add rsp, 8\n");
+                        );
+                        if !stack_was_aligned {
+                            self.text.push_str("    add rsp, 8\n");
+                        }
+                        self.stack_aligned = stack_was_aligned;
                     }
-                    self.stack_aligned = stack_was_aligned;
                     Ok(Typ::OwnedString)
                 }
-                _ => todo!(),
             },
             "and" | "or" => match args {
                 [] => Ok(self.generate_lit(&Value::Bool(func_name == "and"))),
