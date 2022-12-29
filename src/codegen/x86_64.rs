@@ -412,6 +412,12 @@ impl AsmProgram {
                         )
                         .unwrap();
                     } else {
+                        let stack_was_aligned = self.stack_aligned;
+                        if !stack_was_aligned {
+                            self.text.push_str("    sub rsp, 8\n");
+                        }
+                        self.stack_aligned = true;
+
                         self.generate_cow_expr(message)?;
                         self.text.push_str(
                             "    push rdx
@@ -420,9 +426,14 @@ impl AsmProgram {
     mov rax, 1
     mov rdi, 1
     syscall
+    call drop_pop_cow
 ",
                         );
-                        self.aligning_call("drop_pop_cow");
+
+                        if !stack_was_aligned {
+                            self.text.push_str("    add rsp, 8\n");
+                        }
+                        self.stack_aligned = stack_was_aligned;
                     }
                 }
                 _ => return wrong_arg_count(1),
