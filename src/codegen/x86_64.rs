@@ -362,7 +362,7 @@ impl AsmProgram {
     mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]
     mov qword [{var_id}], 2
-    movq [{var_id}+8], xmm0
+    movsd [{var_id}+8], xmm0
     call drop_any"
                 )
                 .unwrap();
