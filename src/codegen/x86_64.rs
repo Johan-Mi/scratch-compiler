@@ -537,8 +537,8 @@ impl AsmProgram {
         for arg in args {
             self.generate_any_expr(arg)?;
             self.text.push_str(
-                "    push rsi
-    push rdi
+                "    push rdx
+    push rax
 ",
             );
         }
