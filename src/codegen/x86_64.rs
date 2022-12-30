@@ -94,6 +94,16 @@ impl TryFrom<&Program> for AsmProgram {
     }
 }
 
+impl fmt::Write for AsmProgram {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.text.write_str(s)
+    }
+
+    fn write_char(&mut self, c: char) -> fmt::Result {
+        self.text.write_char(c)
+    }
+}
+
 impl AsmProgram {
     fn new_uid(&self) -> Uid {
         self.uid_generator.new_uid()
@@ -174,17 +184,15 @@ impl AsmProgram {
                 let proc_id = self.new_uid();
                 self.entry_points.push(proc_id);
                 self.emit(Label(proc_id));
-                self.text.push_str(
+                self.emit(
                     "    push rbp
-    mov rbp, rsp
-",
+    mov rbp, rsp",
                 );
                 self.stack_aligned = true;
                 self.generate_statement(&proc.body)?;
-                self.text.push_str(
+                self.emit(
                     "    pop rbp
-    ret
-",
+    ret",
                 );
                 Ok(proc_id)
             }
@@ -193,10 +201,9 @@ impl AsmProgram {
             _ => {
                 let proc_id = self.custom_procs.get(name).as_ref().unwrap().id;
                 self.emit(Label(proc_id));
-                self.text.push_str(
+                self.emit(
                     "    push rbp
-    mov rbp, rsp
-",
+    mov rbp, rsp",
                 );
                 self.stack_aligned = true;
                 self.proc_stop_label = if proc.params.is_empty() {
@@ -213,7 +220,7 @@ impl AsmProgram {
                 if !proc.params.is_empty() {
                     for i in 0..proc.params.len() {
                         writeln!(
-                            self.text,
+                            self,
                             "    mov rdi, [rsp+{}]
     mov rsi, [rsp+{}]
     call drop_any",
@@ -223,17 +230,16 @@ impl AsmProgram {
                         .unwrap();
                     }
                     writeln!(
-                        self.text,
+                        self,
                         "    pop rbp
     ret {}",
                         proc.params.len() * 16
                     )
                     .unwrap();
                 } else {
-                    self.text.push_str(
+                    self.emit(
                         "    pop rbp
-    ret
-",
+    ret",
                     );
                 }
 
@@ -261,13 +267,13 @@ impl AsmProgram {
                 let end_label = LocalLabel(self.new_uid());
                 self.generate_bool_expr(condition)?;
                 writeln!(
-                    self.text,
+                    self,
                     "    test rax, rax
     jz {else_label}"
                 )
                 .unwrap();
                 self.generate_statement(if_true)?;
-                writeln!(self.text, "    jmp {end_label}").unwrap();
+                writeln!(self, "    jmp {end_label}").unwrap();
                 self.emit(else_label);
                 self.generate_statement(if_false)?;
                 self.emit(end_label);
@@ -277,27 +283,26 @@ impl AsmProgram {
                 let loop_label = LocalLabel(self.new_uid());
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
-                self.text.push_str(if self.stack_aligned {
+                self.emit(if self.stack_aligned {
                     "    call double_to_usize
-    push rax\n"
+    push rax"
                 } else {
                     "    sub rsp, 8
     call double_to_usize
-    mov [rsp], rax
-"
+    mov [rsp], rax"
                 });
                 self.stack_aligned ^= true;
                 self.emit(loop_label);
                 writeln!(
-                    self.text,
+                    self,
                     "    sub qword [rsp], 1
     jc {after_loop}"
                 )
                 .unwrap();
                 self.generate_statement(body)?;
-                writeln!(self.text, "    jmp {loop_label}").unwrap();
+                writeln!(self, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
-                self.text.push_str("    add rsp, 8\n");
+                self.emit("    add rsp, 8");
                 self.stack_aligned ^= true;
                 Ok(())
             }
@@ -305,7 +310,7 @@ impl AsmProgram {
                 let loop_label = LocalLabel(self.new_uid());
                 self.emit(loop_label);
                 self.generate_statement(body)?;
-                writeln!(self.text, "    jmp {loop_label}").unwrap();
+                writeln!(self, "    jmp {loop_label}").unwrap();
                 Ok(())
             }
             Statement::Until { condition, body }
@@ -320,13 +325,13 @@ impl AsmProgram {
                 self.emit(loop_label);
                 self.generate_bool_expr(condition)?;
                 writeln!(
-                    self.text,
+                    self,
                     "    test rax, rax
     {end_condition} {after_loop}",
                 )
                 .unwrap();
                 self.generate_statement(body)?;
-                self.text.push_str("    jmp {loop_label}\n");
+                self.emit("    jmp {loop_label}");
                 self.emit(after_loop);
                 Ok(())
             }
@@ -341,18 +346,17 @@ impl AsmProgram {
                 self.generate_double_expr(times)?;
                 let stack_was_aligned = self.stack_aligned;
                 if !stack_was_aligned {
-                    self.text.push_str("    sub rsp, 8\n");
+                    self.emit("    sub rsp, 8");
                 }
                 self.stack_aligned = true;
-                self.text.push_str(
+                self.emit(
                     "    call double_to_usize
     push rax
-    push qword 0
-",
+    push qword 0",
                 );
                 self.emit(loop_label);
                 writeln!(
-                    self.text,
+                    self,
                     "    pop rdi
     cmp rdi, [rsp]
     jae {after_loop}
@@ -367,12 +371,12 @@ impl AsmProgram {
                 )
                 .unwrap();
                 self.generate_statement(body)?;
-                writeln!(self.text, "    jmp {loop_label}").unwrap();
+                writeln!(self, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
-                self.text.push_str(if stack_was_aligned {
-                    "    add rsp, 8\n"
+                self.emit(if stack_was_aligned {
+                    "    add rsp, 8"
                 } else {
-                    "    add rsp, 16\n"
+                    "    add rsp, 16"
                 });
                 self.stack_aligned = stack_was_aligned;
                 Ok(())
@@ -402,7 +406,7 @@ impl AsmProgram {
                         let message = message.to_cow_str();
                         let message_id = self.allocate_static_str(&message);
                         writeln!(
-                            self.text,
+                            self,
                             "    mov rax, 1
     mov rdi, 1
     lea rsi, [{message_id}]
@@ -414,24 +418,23 @@ impl AsmProgram {
                     } else {
                         let stack_was_aligned = self.stack_aligned;
                         if !stack_was_aligned {
-                            self.text.push_str("    sub rsp, 8\n");
+                            self.emit("    sub rsp, 8");
                         }
                         self.stack_aligned = true;
 
                         self.generate_cow_expr(message)?;
-                        self.text.push_str(
+                        self.emit(
                             "    push rdx
     push rax
     mov rsi, rax
     mov rax, 1
     mov rdi, 1
     syscall
-    call drop_pop_cow
-",
+    call drop_pop_cow",
                         );
 
                         if !stack_was_aligned {
-                            self.text.push_str("    add rsp, 8\n");
+                            self.emit("    add rsp, 8");
                         }
                         self.stack_aligned = stack_was_aligned;
                     }
@@ -443,7 +446,7 @@ impl AsmProgram {
                     let var_id = self.lookup_var(var_name).unwrap();
                     self.generate_any_expr(value)?;
                     writeln!(
-                        self.text,
+                        self,
                         "    mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]
     mov [{var_id}], rax
@@ -459,7 +462,7 @@ impl AsmProgram {
                     let list_id = self.lookup_list(list_name, *list_span)?;
                     self.generate_any_expr(value)?;
                     writeln!(
-                        self.text,
+                        self,
                         "    lea rdi, [{list_id}]
     mov rsi, rax"
                     )
@@ -470,14 +473,13 @@ impl AsmProgram {
             },
             "stop-this-script" => match args {
                 [] => {
-                    self.text.push_str("    mov rsp, rbp\n");
+                    self.emit("    mov rsp, rbp");
                     if let Some(stop_label) = self.proc_stop_label {
-                        writeln!(self.text, "    jmp {stop_label}").unwrap();
+                        writeln!(self, "    jmp {stop_label}").unwrap();
                     } else {
-                        self.text.push_str(
+                        self.emit(
                             "    pop rbp
-    ret
-",
+    ret",
                         );
                     }
                 }
@@ -541,23 +543,22 @@ impl AsmProgram {
 
         let stack_was_aligned = self.stack_aligned;
         if !stack_was_aligned {
-            self.text.push_str("    sub rsp, 8\n");
+            self.emit("    sub rsp, 8");
         }
         self.stack_aligned = true;
 
         for arg in args {
             self.generate_any_expr(arg)?;
-            self.text.push_str(
+            self.emit(
                 "    push rdx
-    push rax
-",
+    push rax",
             );
         }
 
-        writeln!(self.text, "    call {proc_id}").unwrap();
+        writeln!(self, "    call {proc_id}").unwrap();
 
         if !stack_was_aligned {
-            self.text.push_str("    add rsp, 8\n");
+            self.emit("    add rsp, 8");
         }
         self.stack_aligned = stack_was_aligned;
 
@@ -566,10 +567,10 @@ impl AsmProgram {
 
     fn aligning_call(&mut self, proc: impl fmt::Display) {
         if self.stack_aligned {
-            writeln!(self.text, "    call {proc}").unwrap();
+            writeln!(self, "    call {proc}").unwrap();
         } else {
             writeln!(
-                self.text,
+                self,
                 "    sub rsp, 8
     call {proc}
     add rsp, 8"
@@ -624,11 +625,18 @@ trait Emit {
     fn emit(self, program: &mut AsmProgram);
 }
 
+impl Emit for &str {
+    fn emit(self, program: &mut AsmProgram) {
+        program.text.push_str(self);
+        program.text.push('\n');
+    }
+}
+
 struct Label<T>(T);
 
 impl<T: fmt::Display> Emit for Label<T> {
     fn emit(self, program: &mut AsmProgram) {
-        writeln!(program.text, "{}:", self.0).unwrap();
+        writeln!(program, "{}:", self.0).unwrap();
     }
 }
 
@@ -643,7 +651,7 @@ impl<T: fmt::Display> fmt::Display for LocalLabel<T> {
 
 impl<T: fmt::Display> Emit for LocalLabel<T> {
     fn emit(self, program: &mut AsmProgram) {
-        writeln!(program.text, "{self}:").unwrap();
+        writeln!(program, "{self}:").unwrap();
     }
 }
 

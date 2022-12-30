@@ -22,58 +22,51 @@ impl AsmProgram {
                     }
                     ([initial, positives @ ..], negatives) => {
                         self.generate_double_expr(initial)?;
-                        self.text.push_str(
+                        self.emit(
                             "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                         );
                         self.stack_aligned ^= true;
                         for term in positives {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    addsd xmm0, [rsp]
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                         }
                         for term in negatives {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    movsd xmm1, [rsp]
     subsd xmm1, xmm0
-    movsd [rsp], xmm1
-",
+    movsd [rsp], xmm1",
                             );
                         }
-                        self.text.push_str(
+                        self.emit(
                             "    movsd xmm0, [rsp]
-    add rsp, 8
-",
+    add rsp, 8",
                         );
                         self.stack_aligned ^= true;
                     }
                     ([], [initial, negatives @ ..]) => {
                         self.generate_double_expr(initial)?;
-                        self.text.push_str(
+                        self.emit(
                             "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                         );
                         self.stack_aligned ^= true;
                         for term in negatives {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    addsd xmm0, [rsp]
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                         }
-                        self.text.push_str(
+                        self.emit(
                             "    mov rax, (1 << 63)
     xor [rsp], rax
     movsd xmm0, [rsp]
-    add rsp, 8
-",
+    add rsp, 8",
                         );
                         self.stack_aligned ^= true;
                     }
@@ -87,58 +80,51 @@ impl AsmProgram {
                     }
                     ([initial, numerators @ ..], denominators) => {
                         self.generate_double_expr(initial)?;
-                        self.text.push_str(
+                        self.emit(
                             "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                         );
                         self.stack_aligned ^= true;
                         for term in numerators {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    mulsd xmm0, [rsp]
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                         }
                         for term in denominators {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    movsd xmm1, [rsp]
     divsd xmm1, xmm0
-    movsd [rsp], xmm1
-",
+    movsd [rsp], xmm1",
                             );
                         }
-                        self.text.push_str(
+                        self.emit(
                             "    movsd xmm0, [rsp]
-    add rsp, 8
-",
+    add rsp, 8",
                         );
                         self.stack_aligned ^= true;
                     }
                     ([], [initial, denominators @ ..]) => {
                         self.generate_double_expr(initial)?;
-                        self.text.push_str(
+                        self.emit(
                             "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                         );
                         self.stack_aligned ^= true;
                         for term in denominators {
                             self.generate_double_expr(term)?;
-                            self.text.push_str(
+                            self.emit(
                                 "    mulsd xmm0, [rsp]
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                         }
-                        self.text.push_str(
+                        self.emit(
                             "    mov rax, __?float64?__(1.0)
     movq xmm0, rax
     divsd xmm0, [rsp]
-    add rsp, 8
-",
+    add rsp, 8",
                         );
                         self.stack_aligned ^= true;
                     }
@@ -151,7 +137,7 @@ impl AsmProgram {
     fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<Typ> {
         if let Some(var_id) = self.lookup_var(sym) {
             writeln!(
-                self.text,
+                self,
                 "    mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]"
             )
@@ -184,7 +170,7 @@ impl AsmProgram {
         let mut mathop = |code| match args {
             [operand] => {
                 self.generate_double_expr(operand)?;
-                self.text.push_str(code);
+                self.emit(code);
                 Ok(Typ::Double)
             }
             _ => wrong_arg_count(1),
@@ -193,7 +179,7 @@ impl AsmProgram {
         let libc_mathop = |this: &mut Self, func_name| match args {
             [operand] => {
                 this.generate_double_expr(operand)?;
-                writeln!(this.text, "    call {func_name} wrt ..plt").unwrap();
+                writeln!(this, "    call {func_name} wrt ..plt").unwrap();
                 Ok(Typ::Double)
             }
             _ => wrong_arg_count(1),
@@ -205,7 +191,7 @@ impl AsmProgram {
                     let list_id = self.lookup_list(list_name, *list_span)?;
                     self.generate_any_expr(index)?;
                     writeln!(
-                        self.text,
+                        self,
                         "    mov rdi, rax
     mov rsi, rdx
     lea rdx, [{list_id}]"
@@ -218,10 +204,9 @@ impl AsmProgram {
             },
             "++" => match args {
                 [] => {
-                    self.text.push_str(
+                    self.emit(
                         "    lea rax, [str_empty]
-    xor edx, edx
-",
+    xor edx, edx",
                     );
                     Ok(Typ::StaticStr)
                 }
@@ -231,18 +216,17 @@ impl AsmProgram {
                     for arg in rest.iter().rev() {
                         let stack_was_aligned = self.stack_aligned;
                         if !stack_was_aligned {
-                            self.text.push_str("    sub rsp, 8\n");
+                            self.emit("    sub rsp, 8");
                         }
                         self.stack_aligned = true;
-                        self.text.push_str(
+                        self.emit(
                             "    push rdx
     sub rsp, 8
     push rdx
-    push rax
-",
+    push rax",
                         );
                         self.generate_cow_expr(arg)?;
-                        self.text.push_str(
+                        self.emit(
                             "    add [rsp+24], rdx
     push rdx
     push rax
@@ -261,11 +245,10 @@ impl AsmProgram {
     call drop_pop_cow
     call drop_pop_cow
     pop rax
-    pop rdx
-",
+    pop rdx",
                         );
                         if !stack_was_aligned {
-                            self.text.push_str("    add rsp, 8\n");
+                            self.emit("    add rsp, 8");
                         }
                         self.stack_aligned = stack_was_aligned;
                     }
@@ -282,7 +265,7 @@ impl AsmProgram {
                     for arg in rest {
                         self.generate_bool_expr(arg)?;
                         writeln!(
-                            self.text,
+                            self,
                             "    test rax, rax
     {short_circuit_condition} {short_circuit}",
                         )
@@ -296,7 +279,7 @@ impl AsmProgram {
             "not" => match args {
                 [operand] => {
                     self.generate_bool_expr(operand)?;
-                    self.text.push_str("    xor rax, 1\n");
+                    self.emit("    xor rax, 1");
                     Ok(Typ::Bool)
                 }
                 _ => wrong_arg_count(1),
@@ -305,28 +288,26 @@ impl AsmProgram {
                 [lhs, rhs] => {
                     match self.generate_expr(lhs)? {
                         Typ::Double => {
-                            self.text.push_str(
+                            self.emit(
                                 "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                             self.stack_aligned ^= true;
                             match self.generate_expr(rhs)? {
-                                Typ::Double => self.text.push_str(
+                                Typ::Double => self.emit(
                                     "    movsd xmm1, [rsp]
     xor eax, eax
     ucomisd xmm0, xmm1
-    sete al
-",
+    sete al",
                                 ),
                                 Typ::Bool => {
-                                    self.text.push_str("    xor eax, eax\n");
+                                    self.emit("    xor eax, eax");
                                 }
                                 Typ::StaticStr => todo!(),
                                 Typ::OwnedString => todo!(),
                                 Typ::Any => todo!(),
                             }
-                            self.text.push_str("    add rsp, 8\n");
+                            self.emit("    add rsp, 8");
                             self.stack_aligned ^= true;
                         }
                         Typ::Bool => todo!(),
@@ -342,10 +323,9 @@ impl AsmProgram {
                 [lhs, rhs] => {
                     match self.generate_expr(lhs)? {
                         Typ::Double => {
-                            self.text.push_str(
+                            self.emit(
                                 "    sub rsp, 8
-    movsd [rsp], xmm0
-",
+    movsd [rsp], xmm0",
                             );
                             self.stack_aligned ^= true;
                             match self.generate_expr(rhs)? {
@@ -356,7 +336,7 @@ impl AsmProgram {
                                         'a'
                                     };
                                     writeln!(
-                                        self.text,
+                                        self,
                                         "    movsd xmm1, [rsp]
     xor eax, eax
     ucomisd xmm1, xmm0
@@ -369,7 +349,7 @@ impl AsmProgram {
                                 Typ::OwnedString => todo!(),
                                 Typ::Any => todo!(),
                             }
-                            self.text.push_str("    add rsp, 8\n");
+                            self.emit("    add rsp, 8");
                             self.stack_aligned ^= true;
                         }
                         Typ::Bool => todo!(),
@@ -384,7 +364,7 @@ impl AsmProgram {
             "length" => match args {
                 [Expr::Sym(list_name, list_span)] => {
                     let list_id = self.lookup_list(list_name, *list_span)?;
-                    writeln!(self.text, "    mov rdi, [{list_id}+8]").unwrap();
+                    writeln!(self, "    mov rdi, [{list_id}+8]").unwrap();
                     self.aligning_call("usize_to_double");
                     Ok(Typ::Double)
                 }
@@ -394,13 +374,13 @@ impl AsmProgram {
                 [s] => {
                     self.generate_cow_expr(s)?;
                     let stack_was_aligned = self.stack_aligned;
-                    self.text.push_str(if stack_was_aligned {
-                        "    sub rsp, 8\n"
+                    self.emit(if stack_was_aligned {
+                        "    sub rsp, 8"
                     } else {
-                        "    sub rsp, 16\n"
+                        "    sub rsp, 16"
                     });
                     self.stack_aligned = true;
-                    self.text.push_str(
+                    self.emit(
                         "    push rdx
     push rax
     call str_length
@@ -408,13 +388,12 @@ impl AsmProgram {
     call usize_to_double
     movsd [rsp+16], xmm0
     call drop_pop_cow
-    movsd xmm0, [rsp]
-",
+    movsd xmm0, [rsp]",
                     );
-                    self.text.push_str(if stack_was_aligned {
-                        "    add rsp, 8\n"
+                    self.emit(if stack_was_aligned {
+                        "    add rsp, 8"
                     } else {
-                        "    add rsp, 16\n"
+                        "    add rsp, 16"
                     });
                     self.stack_aligned = stack_was_aligned;
                     Ok(Typ::Double)
@@ -424,19 +403,18 @@ impl AsmProgram {
             "char-at" => match args {
                 [s, index] => {
                     self.generate_cow_expr(s)?;
-                    self.text.push_str(
+                    self.emit(
                         "    sub rsp, 16
     push rdx
-    push rax
-",
+    push rax",
                     );
                     self.generate_double_expr(index)?;
                     let stack_was_aligned = self.stack_aligned;
                     if !stack_was_aligned {
-                        self.text.push_str("    sub rsp, 8\n");
+                        self.emit("    sub rsp, 8");
                     }
                     self.stack_aligned = true;
-                    self.text.push_str(
+                    self.emit(
                         "    call double_to_usize
     mov rdx, rax
     mov rdi, [rsp]
@@ -446,11 +424,10 @@ impl AsmProgram {
     mov [rsp+24], rdx
     call drop_pop_cow
     pop rax
-    pop rdx
-",
+    pop rdx",
                     );
                     if !stack_was_aligned {
-                        self.text.push_str("    add rsp, 8\n");
+                        self.emit("    add rsp, 8");
                     }
                     self.stack_aligned = stack_was_aligned;
                     Ok(Typ::OwnedString)
@@ -461,23 +438,22 @@ impl AsmProgram {
                 [lhs, rhs] => {
                     self.generate_double_expr(rhs)?;
                     let stack_was_aligned = self.stack_aligned;
-                    self.text.push_str(if stack_was_aligned {
-                        "    sub rsp, 8\n"
+                    self.emit(if stack_was_aligned {
+                        "    sub rsp, 8"
                     } else {
-                        "    sub rsp, 16\n"
+                        "    sub rsp, 16"
                     });
                     self.stack_aligned = true;
-                    self.text.push_str("    movsd [rsp], xmm0\n");
+                    self.emit("    movsd [rsp], xmm0");
                     self.generate_double_expr(lhs)?;
-                    self.text.push_str(
+                    self.emit(
                         "    movsd xmm1, [rsp]
-    call fmod
-",
+    call fmod",
                     );
-                    self.text.push_str(if stack_was_aligned {
-                        "    add rsp, 8\n"
+                    self.emit(if stack_was_aligned {
+                        "    add rsp, 8"
                     } else {
-                        "    add rsp, 16\n"
+                        "    add rsp, 16"
                     });
                     self.stack_aligned = stack_was_aligned;
                     Ok(Typ::Double)
@@ -487,12 +463,11 @@ impl AsmProgram {
             "abs" => mathop(
                 "    mov rax, (1 << 63) - 1
     movq xmm1, rax
-    andpd xmm0, xmm1
-",
+    andpd xmm0, xmm1",
             ),
-            "floor" => mathop("    roundsd xmm0, xmm0, 1\n"),
-            "ceil" => mathop("    roundsd xmm0, xmm0, 2\n"),
-            "sqrt" => mathop("    sqrtsd xmm0, xmm0\n"),
+            "floor" => mathop("    roundsd xmm0, xmm0, 1"),
+            "ceil" => mathop("    roundsd xmm0, xmm0, 2"),
+            "sqrt" => mathop("    sqrtsd xmm0, xmm0"),
             "ln" => libc_mathop(self, "log"),
             "log" => libc_mathop(self, "log10"),
             "e^" => libc_mathop(self, "exp"),
@@ -545,10 +520,9 @@ impl AsmProgram {
                 self.aligning_call("owned_string_to_double");
             }
             Typ::Any => {
-                self.text.push_str(
+                self.emit(
                     "    mov rdi, rax
-    mov rsi, rdx
-",
+    mov rsi, rdx",
                 );
                 self.aligning_call("any_to_double")
             }
@@ -562,10 +536,9 @@ impl AsmProgram {
             Typ::Bool => self.aligning_call("bool_to_static_str"),
             Typ::StaticStr | Typ::OwnedString => {}
             Typ::Any => {
-                self.text.push_str(
+                self.emit(
                     "    mov rdi, rax
-    mov rsi, rdx
-",
+    mov rsi, rdx",
                 );
                 self.aligning_call("any_to_cow")
             }
@@ -575,10 +548,9 @@ impl AsmProgram {
 
     pub(super) fn generate_any_expr(&mut self, expr: &Expr) -> Result<()> {
         match self.generate_expr(expr)? {
-            Typ::Double => self.text.push_str(
+            Typ::Double => self.emit(
                 "    movq rdx, xmm0
-    mov rax, 2
-",
+    mov rax, 2",
             ),
             Typ::Bool | Typ::StaticStr | Typ::OwnedString | Typ::Any => {}
         }
@@ -590,7 +562,7 @@ impl AsmProgram {
             Value::Num(num) => {
                 let bits = num.to_bits();
                 writeln!(
-                    self.text,
+                    self,
                     "    mov rax, {bits}
     movq xmm0, rax"
                 )
@@ -600,7 +572,7 @@ impl AsmProgram {
             Value::String(s) => {
                 let string_id = self.allocate_static_str(s);
                 writeln!(
-                    self.text,
+                    self,
                     "    lea rax, [{string_id}]
     mov rdx, {}",
                     s.len(),
@@ -609,11 +581,11 @@ impl AsmProgram {
                 Typ::StaticStr
             }
             Value::Bool(false) => {
-                self.text.push_str("    xor eax, eax\n");
+                self.emit("    xor eax, eax");
                 Typ::Bool
             }
             Value::Bool(true) => {
-                self.text.push_str("    mov eax, 1\n");
+                self.emit("    mov eax, 1");
                 Typ::Bool
             }
         }
