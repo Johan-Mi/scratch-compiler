@@ -117,7 +117,7 @@ impl AsmProgram {
         self.custom_procs = sprite
             .procedures
             .iter()
-            .filter_map(|(name, proc)| match &**name {
+            .map(|(name, proc)| Ok(match &**name {
                 "when-flag-clicked" | "when-cloned" | "when-received" => None,
                 _ => {
                     assert_eq!(
@@ -132,21 +132,19 @@ impl AsmProgram {
                             params: proc[0]
                                 .params
                                 .iter()
-                                .map(|(param, _)| match param {
+                                .map(|(param, span)| match param {
                                     Expr::Sym(sym, ..) => {
-                                        (sym.clone(), self.new_uid())
+                                        Ok((sym.clone(), self.new_uid()))
                                     }
-                                    _ => todo!(
-                                        "invalid parameter to custom\
-                                    procedure definition:\n{param:#?}"
-                                    ),
+                                    _ => Err(Box::new(Error::InvalidParameterForCustomProcDef { span: *span })),
                                 })
-                                .collect(),
+                                .collect::<Result<_>>()?,
                         },
                     ))
                 }
-            })
-            .collect();
+            }))
+            .filter_map(Result::transpose)
+            .collect::<Result<_>>()?;
 
         for (name, procs) in &sprite.procedures {
             for proc in procs {
