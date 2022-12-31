@@ -30,9 +30,7 @@ impl AsmProgram<'_> {
         negatives: &[Expr],
     ) -> Result<Typ> {
         match (positives, negatives) {
-            ([], []) => {
-                self.generate_lit(&Value::Num(0.0));
-            }
+            ([], []) => self.emit("    xorpd xmm0, xmm0"),
             ([initial, positives @ ..], negatives) => {
                 self.generate_double_expr(initial)?;
                 self.emit(
