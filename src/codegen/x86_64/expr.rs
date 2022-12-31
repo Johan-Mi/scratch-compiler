@@ -378,8 +378,12 @@ impl AsmProgram<'_> {
             "length" => match args {
                 [Expr::Sym(list_name, list_span)] => {
                     let list_id = self.lookup_list(list_name, *list_span)?;
-                    writeln!(self, "    mov rdi, [{list_id}+8]").unwrap();
-                    self.aligning_call("usize_to_double");
+                    writeln!(
+                        self,
+                        "    mov rdi, [{list_id}+8]
+    call usize_to_double"
+                    )
+                    .unwrap();
                     Ok(Typ::Double)
                 }
                 _ => wrong_arg_count(1),
