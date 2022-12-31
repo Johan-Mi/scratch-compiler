@@ -16,122 +16,138 @@ impl AsmProgram<'_> {
                 self.generate_func_call(func_name, args, *span)
             }
             Expr::AddSub(positives, negatives) => {
-                match (&positives[..], &negatives[..]) {
-                    ([], []) => {
-                        self.generate_lit(&Value::Num(0.0));
-                    }
-                    ([initial, positives @ ..], negatives) => {
-                        self.generate_double_expr(initial)?;
-                        self.emit(
-                            "    sub rsp, 8
+                self.generate_add_sub(positives, negatives)
+            }
+            Expr::MulDiv(numerators, denominators) => {
+                self.generate_mul_div(numerators, denominators)
+            }
+        }
+    }
+
+    fn generate_add_sub(
+        &mut self,
+        positives: &[Expr],
+        negatives: &[Expr],
+    ) -> Result<Typ> {
+        match (positives, negatives) {
+            ([], []) => {
+                self.generate_lit(&Value::Num(0.0));
+            }
+            ([initial, positives @ ..], negatives) => {
+                self.generate_double_expr(initial)?;
+                self.emit(
+                    "    sub rsp, 8
     movsd [rsp], xmm0",
-                        );
-                        self.stack_aligned ^= true;
-                        for term in positives {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    addsd xmm0, [rsp]
+                );
+                self.stack_aligned ^= true;
+                for term in positives {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    addsd xmm0, [rsp]
     movsd [rsp], xmm0",
-                            );
-                        }
-                        for term in negatives {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    movsd xmm1, [rsp]
+                    );
+                }
+                for term in negatives {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    movsd xmm1, [rsp]
     subsd xmm1, xmm0
     movsd [rsp], xmm1",
-                            );
-                        }
-                        self.emit(
-                            "    movsd xmm0, [rsp]
+                    );
+                }
+                self.emit(
+                    "    movsd xmm0, [rsp]
     add rsp, 8",
-                        );
-                        self.stack_aligned ^= true;
-                    }
-                    ([], [initial, negatives @ ..]) => {
-                        self.generate_double_expr(initial)?;
-                        self.emit(
-                            "    sub rsp, 8
+                );
+                self.stack_aligned ^= true;
+            }
+            ([], [initial, negatives @ ..]) => {
+                self.generate_double_expr(initial)?;
+                self.emit(
+                    "    sub rsp, 8
     movsd [rsp], xmm0",
-                        );
-                        self.stack_aligned ^= true;
-                        for term in negatives {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    addsd xmm0, [rsp]
+                );
+                self.stack_aligned ^= true;
+                for term in negatives {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    addsd xmm0, [rsp]
     movsd [rsp], xmm0",
-                            );
-                        }
-                        self.emit(
-                            "    mov rax, (1 << 63)
+                    );
+                }
+                self.emit(
+                    "    mov rax, (1 << 63)
     xor [rsp], rax
     movsd xmm0, [rsp]
     add rsp, 8",
-                        );
-                        self.stack_aligned ^= true;
-                    }
-                }
-                Ok(Typ::Double)
+                );
+                self.stack_aligned ^= true;
             }
-            Expr::MulDiv(numerators, denominators) => {
-                match (&numerators[..], &denominators[..]) {
-                    ([], []) => {
-                        self.generate_lit(&Value::Num(1.0));
-                    }
-                    ([initial, numerators @ ..], denominators) => {
-                        self.generate_double_expr(initial)?;
-                        self.emit(
-                            "    sub rsp, 8
+        }
+        Ok(Typ::Double)
+    }
+
+    fn generate_mul_div(
+        &mut self,
+        numerators: &[Expr],
+        denominators: &[Expr],
+    ) -> Result<Typ> {
+        match (numerators, denominators) {
+            ([], []) => {
+                self.generate_lit(&Value::Num(1.0));
+            }
+            ([initial, numerators @ ..], denominators) => {
+                self.generate_double_expr(initial)?;
+                self.emit(
+                    "    sub rsp, 8
     movsd [rsp], xmm0",
-                        );
-                        self.stack_aligned ^= true;
-                        for term in numerators {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    mulsd xmm0, [rsp]
+                );
+                self.stack_aligned ^= true;
+                for term in numerators {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    mulsd xmm0, [rsp]
     movsd [rsp], xmm0",
-                            );
-                        }
-                        for term in denominators {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    movsd xmm1, [rsp]
+                    );
+                }
+                for term in denominators {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    movsd xmm1, [rsp]
     divsd xmm1, xmm0
     movsd [rsp], xmm1",
-                            );
-                        }
-                        self.emit(
-                            "    movsd xmm0, [rsp]
+                    );
+                }
+                self.emit(
+                    "    movsd xmm0, [rsp]
     add rsp, 8",
-                        );
-                        self.stack_aligned ^= true;
-                    }
-                    ([], [initial, denominators @ ..]) => {
-                        self.generate_double_expr(initial)?;
-                        self.emit(
-                            "    sub rsp, 8
+                );
+                self.stack_aligned ^= true;
+            }
+            ([], [initial, denominators @ ..]) => {
+                self.generate_double_expr(initial)?;
+                self.emit(
+                    "    sub rsp, 8
     movsd [rsp], xmm0",
-                        );
-                        self.stack_aligned ^= true;
-                        for term in denominators {
-                            self.generate_double_expr(term)?;
-                            self.emit(
-                                "    mulsd xmm0, [rsp]
+                );
+                self.stack_aligned ^= true;
+                for term in denominators {
+                    self.generate_double_expr(term)?;
+                    self.emit(
+                        "    mulsd xmm0, [rsp]
     movsd [rsp], xmm0",
-                            );
-                        }
-                        self.emit(
-                            "    mov rax, __?float64?__(1.0)
+                    );
+                }
+                self.emit(
+                    "    mov rax, __?float64?__(1.0)
     movq xmm0, rax
     divsd xmm0, [rsp]
     add rsp, 8",
-                        );
-                        self.stack_aligned ^= true;
-                    }
-                }
-                Ok(Typ::Double)
+                );
+                self.stack_aligned ^= true;
             }
         }
+        Ok(Typ::Double)
     }
 
     fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<Typ> {
