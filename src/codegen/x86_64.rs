@@ -285,14 +285,10 @@ impl<'a> AsmProgram<'a> {
                 let loop_label = LocalLabel(self.new_uid());
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
-                self.emit(if self.stack_aligned {
-                    "    call double_to_usize
-    push rax"
-                } else {
-                    "    sub rsp, 8
-    call double_to_usize
-    mov [rsp], rax"
-                });
+                self.emit(
+                    "call double_to_usize
+push rax",
+                );
                 self.stack_aligned ^= true;
                 self.emit(loop_label);
                 writeln!(
