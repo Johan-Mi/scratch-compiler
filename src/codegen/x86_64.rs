@@ -219,7 +219,12 @@ impl<'a> AsmProgram<'a> {
                 }
 
                 // Drop parameters
-                if !proc.params.is_empty() {
+                if proc.params.is_empty() {
+                    self.emit(
+                        "    pop rbp
+    ret",
+                    );
+                } else {
                     for i in 0..proc.params.len() {
                         writeln!(
                             self,
@@ -238,11 +243,6 @@ impl<'a> AsmProgram<'a> {
                         proc.params.len() * 16
                     )
                     .unwrap();
-                } else {
-                    self.emit(
-                        "    pop rbp
-    ret",
-                    );
                 }
 
                 Ok(proc_id)

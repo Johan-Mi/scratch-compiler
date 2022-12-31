@@ -524,7 +524,7 @@ impl AsmProgram<'_> {
                     "    mov rdi, rax
     mov rsi, rdx",
                 );
-                self.aligning_call("any_to_double")
+                self.aligning_call("any_to_double");
             }
         }
         Ok(())
@@ -540,7 +540,7 @@ impl AsmProgram<'_> {
                     "    mov rdi, rax
     mov rsi, rdx",
                 );
-                self.aligning_call("any_to_cow")
+                self.aligning_call("any_to_cow");
             }
         }
         Ok(())
