@@ -29,42 +29,42 @@ pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
 }
 
 #[derive(Default)]
-struct AsmProgram {
+struct AsmProgram<'a> {
     uid_generator: crate::uid::Generator,
     entry_points: Vec<Uid>,
     text: String,
-    local_vars: HashMap<String, Uid>,
-    local_lists: HashMap<String, Uid>,
-    sprite_vars: HashMap<String, Uid>,
-    sprite_lists: HashMap<String, Uid>,
-    global_vars: HashMap<String, Uid>,
-    global_lists: HashMap<String, Uid>,
+    local_vars: HashMap<&'a str, Uid>,
+    local_lists: HashMap<&'a str, Uid>,
+    sprite_vars: HashMap<&'a str, Uid>,
+    sprite_lists: HashMap<&'a str, Uid>,
+    global_vars: HashMap<&'a str, Uid>,
+    global_lists: HashMap<&'a str, Uid>,
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
-    custom_procs: HashMap<String, CustomProcedure>,
+    custom_procs: HashMap<&'a str, CustomProcedure>,
     proc_stop_label: Option<LocalLabel<Uid>>,
     stack_aligned: bool,
 }
 
-impl TryFrom<&Program> for AsmProgram {
+impl<'a> TryFrom<&'a Program> for AsmProgram<'a> {
     type Error = Box<Error>;
 
-    fn try_from(program: &Program) -> Result<Self> {
+    fn try_from(program: &'a Program) -> Result<Self> {
         let mut this = Self::default();
 
         this.global_vars = program
             .stage
             .variables
             .iter()
-            .cloned()
+            .map(String::as_str)
             .zip(iter::repeat_with(|| this.new_uid()))
             .collect();
         this.global_lists = program
             .stage
             .lists
             .iter()
-            .cloned()
+            .map(String::as_str)
             .zip(iter::repeat_with(|| this.new_uid()))
             .collect();
         this.var_ids.extend(this.global_vars.values());
@@ -75,13 +75,13 @@ impl TryFrom<&Program> for AsmProgram {
             this.sprite_vars = sprite
                 .variables
                 .iter()
-                .cloned()
+                .map(String::as_str)
                 .zip(iter::repeat_with(|| this.new_uid()))
                 .collect();
             this.sprite_lists = sprite
                 .lists
                 .iter()
-                .cloned()
+                .map(String::as_str)
                 .zip(iter::repeat_with(|| this.new_uid()))
                 .collect();
             this.var_ids.extend(this.sprite_vars.values());
@@ -94,7 +94,7 @@ impl TryFrom<&Program> for AsmProgram {
     }
 }
 
-impl fmt::Write for AsmProgram {
+impl fmt::Write for AsmProgram<'_> {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         self.text.write_str(s)
     }
@@ -104,7 +104,7 @@ impl fmt::Write for AsmProgram {
     }
 }
 
-impl AsmProgram {
+impl<'a> AsmProgram<'a> {
     fn new_uid(&self) -> Uid {
         self.uid_generator.new_uid()
     }
@@ -113,7 +113,7 @@ impl AsmProgram {
         t.emit(self);
     }
 
-    fn generate_sprite(&mut self, sprite: &Sprite) -> Result<()> {
+    fn generate_sprite(&mut self, sprite: &'a Sprite) -> Result<()> {
         self.custom_procs = sprite
             .procedures
             .iter()
@@ -126,7 +126,7 @@ impl AsmProgram {
                         "duplicate definition of custom procdeure `{name}`"
                     );
                     Some((
-                        name.into(),
+                        &**name,
                         CustomProcedure {
                             id: self.new_uid(),
                             params: proc[0]
@@ -155,14 +155,18 @@ impl AsmProgram {
         Ok(())
     }
 
-    fn generate_proc(&mut self, name: &str, proc: &Procedure) -> Result<Uid> {
+    fn generate_proc(
+        &mut self,
+        name: &str,
+        proc: &'a Procedure,
+    ) -> Result<Uid> {
         self.local_vars = proc
             .variables
             .iter()
             .map(|name| {
                 let uid = self.new_uid();
                 self.var_ids.push(uid);
-                (name.clone(), uid)
+                (&**name, uid)
             })
             .collect();
         self.local_lists = proc
@@ -171,7 +175,7 @@ impl AsmProgram {
             .map(|name| {
                 let uid = self.new_uid();
                 self.list_ids.push(uid);
-                (name.clone(), uid)
+                (&**name, uid)
             })
             .collect();
 
@@ -578,7 +582,7 @@ impl AsmProgram {
     }
 }
 
-impl fmt::Display for AsmProgram {
+impl fmt::Display for AsmProgram<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(
             f,

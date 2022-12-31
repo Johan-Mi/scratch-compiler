@@ -7,7 +7,7 @@ use crate::{
 use sb3_stuff::Value;
 use std::fmt::Write as _;
 
-impl AsmProgram {
+impl AsmProgram<'_> {
     pub(super) fn generate_expr(&mut self, expr: &Expr) -> Result<Typ> {
         match expr {
             Expr::Lit(lit) => Ok(self.generate_lit(lit)),
