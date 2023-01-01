@@ -272,21 +272,16 @@ clone_any:
     mov rdx, rsi
     ret
 
-%assign EXPONENT_LENGTH 11
-%assign MANTISSA_LENGTH 52
-%assign EXPONENT_MASK ((1 << EXPONENT_LENGTH) - 1) << MANTISSA_LENGTH
-%assign SIGN_MASK 1 << 63
-
 double_to_cow:
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
     jp .is_nan
     je .is_zero
     movq rdi, xmm0
-    mov rax, EXPONENT_MASK
+    mov rax, __?float64?__(__?Infinity?__)
     cmp rdi, rax
     je .is_infinity
-    mov rax, EXPONENT_MASK | SIGN_MASK
+    mov rax, __?float64?__(-__?Infinity?__)
     cmp rdi, rax
     je .is_minus_infinity
     sub rsp, 8
