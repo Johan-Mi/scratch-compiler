@@ -16,7 +16,7 @@ section .text
 drop_any:
     cmp rdi, 2
     jbe .dont_free
-    test edi, 1
+    test dil, 1
     jz free wrt ..plt
 .dont_free:
     ret
@@ -25,7 +25,7 @@ drop_pop_cow:
     pop rax
     pop rdi
     mov [rsp], rax
-    test rdi, 1
+    test dil, 1
     jz free wrt ..plt
     ret
 
@@ -253,7 +253,7 @@ align 8
 clone_any:
     cmp rdi, 2
     jbe .done
-    test rdi, 1
+    test dil, 1
     jnz .done
     sub rsp, 8
     push rsi
