@@ -120,16 +120,14 @@ impl<'a> AsmProgram<'a> {
             .map(|(name, proc)| Ok(match &**name {
                 "when-flag-clicked" | "when-cloned" | "when-received" => None,
                 _ => {
-                    assert_eq!(
-                        1,
-                        proc.len(),
-                        "duplicate definition of custom procdeure `{name}`"
-                    );
+                    let [proc] = &proc[..] else {
+                        todo!("duplicate definition of custom procdeure `{name}`");
+                    };
                     Some((
                         &**name,
                         CustomProcedure {
                             id: self.new_uid(),
-                            params: proc[0]
+                            params: proc
                                 .params
                                 .iter()
                                 .map(|(param, span)| match param {
