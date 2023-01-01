@@ -178,16 +178,18 @@ any_to_bool:
     cmp rsi, 1
     je .might_be_str_0
     seta [rsp]
-    call drop_any
+.drop_parameter:
+    test dil, 1
+    jnz .dont_free
+    call free wrt ..plt
+.dont_free:
     pop rax
 .done:
     ret
 .might_be_str_0:
     cmp byte [rdi], '0'
     setne [rsp]
-    call drop_any
-    pop rax
-    ret
+    jmp .drop_parameter
 .might_be_str_false:
     mov edx, [rdi]
     and edx, ~0x20202020
@@ -198,9 +200,7 @@ any_to_bool:
     cmp dl, 'E'
     setne al
     or [rsp], al
-    call drop_any
-    pop rax
-    ret
+    jmp .drop_parameter
 .is_number:
     xor eax, eax
     movq xmm0, rsi
