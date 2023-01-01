@@ -149,7 +149,20 @@ impl AsmProgram<'_> {
     }
 
     fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<Typ> {
-        if let Some(var_id) = self.lookup_var(sym) {
+        if let Some(param_index) =
+            self.proc_params.iter().position(|&param| param == sym)
+        {
+            writeln!(
+                self,
+                "    mov rdi, [rbp+{}]
+    mov rsi, [rbp+{}]",
+                (self.proc_params.len() - param_index) * 16,
+                (self.proc_params.len() - param_index) * 16 + 8,
+            )
+            .unwrap();
+            self.aligning_call("clone_any");
+            Ok(Typ::Any)
+        } else if let Some(var_id) = self.lookup_var(sym) {
             writeln!(
                 self,
                 "    mov rdi, [{var_id}]

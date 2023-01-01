@@ -10,7 +10,6 @@ use crate::{
     span::Span,
     uid::Uid,
 };
-use smol_str::SmolStr;
 use std::{
     collections::HashMap,
     fmt::{self, Write as _},
@@ -42,8 +41,9 @@ struct AsmProgram<'a> {
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
     static_strs: Vec<(Uid, String)>,
-    custom_procs: HashMap<&'a str, CustomProcedure>,
+    custom_procs: HashMap<&'a str, CustomProcedure<'a>>,
     proc_stop_label: Option<LocalLabel<Uid>>,
+    proc_params: Vec<&'a str>,
     stack_aligned: bool,
 }
 
@@ -132,7 +132,7 @@ impl<'a> AsmProgram<'a> {
                                 .iter()
                                 .map(|(param, span)| match param {
                                     Expr::Sym(sym, ..) => {
-                                        Ok((sym.clone(), self.new_uid()))
+                                        Ok(&**sym)
                                     }
                                     _ => Err(Box::new(Error::InvalidParameterForCustomProcDef { span: *span })),
                                 })
@@ -172,6 +172,7 @@ impl<'a> AsmProgram<'a> {
             .zip(iter::repeat_with(|| self.new_uid()))
             .collect();
         self.list_ids.extend(self.local_lists.values());
+        self.proc_params = Vec::new();
 
         match name {
             "when-flag-clicked" => {
@@ -195,7 +196,11 @@ impl<'a> AsmProgram<'a> {
             "when-cloned" => todo!(),
             "when-received" => todo!(),
             _ => {
-                let proc_id = self.custom_procs.get(name).as_ref().unwrap().id;
+                let CustomProcedure {
+                    id: proc_id,
+                    ref params,
+                } = *self.custom_procs.get(name).unwrap();
+                self.proc_params = params.clone();
                 self.emit(Label(proc_id));
                 self.emit(
                     "    push rbp
@@ -655,7 +660,7 @@ impl<T: fmt::Display> Emit for LocalLabel<T> {
     }
 }
 
-struct CustomProcedure {
+struct CustomProcedure<'a> {
     id: Uid,
-    pub params: Vec<(SmolStr, Uid)>,
+    pub params: Vec<&'a str>,
 }
