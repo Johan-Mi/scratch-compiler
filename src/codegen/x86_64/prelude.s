@@ -173,12 +173,11 @@ any_to_bool:
     jb .done
     je .is_number
     push qword 0
-    cmp rsi, 1
-    je .might_be_str_0
     cmp rsi, 5
     je .might_be_str_false
-    test rsi, rsi
-    setnz [rsp]
+    cmp rsi, 1
+    je .might_be_str_0
+    seta [rsp]
     call drop_any
     pop rax
 .done:
