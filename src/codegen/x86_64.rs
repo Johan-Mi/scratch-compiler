@@ -163,21 +163,17 @@ impl<'a> AsmProgram<'a> {
         self.local_vars = proc
             .variables
             .iter()
-            .map(|name| {
-                let uid = self.new_uid();
-                self.var_ids.push(uid);
-                (&**name, uid)
-            })
+            .map(String::as_str)
+            .zip(iter::repeat_with(|| self.new_uid()))
             .collect();
+        self.var_ids.extend(self.local_vars.values());
         self.local_lists = proc
             .lists
             .iter()
-            .map(|name| {
-                let uid = self.new_uid();
-                self.list_ids.push(uid);
-                (&**name, uid)
-            })
+            .map(String::as_str)
+            .zip(iter::repeat_with(|| self.new_uid()))
             .collect();
+        self.list_ids.extend(self.local_lists.values());
 
         match name {
             "when-flag-clicked" => {
