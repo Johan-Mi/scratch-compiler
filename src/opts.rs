@@ -15,7 +15,7 @@ pub struct Opts {
     #[options(no_short)]
     pub lint: bool,
 
-    /// Type of code to compile to (only `sb3` is supported for now)
+    /// Type of code to compile to: sb3 (default) or x86_64
     pub target: Target,
 
     /// Dump the initial AST to a file
@@ -39,6 +39,7 @@ pub struct Opts {
 pub enum Target {
     #[default]
     SB3,
+    X86_64,
 }
 
 impl FromStr for Target {
@@ -47,6 +48,7 @@ impl FromStr for Target {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "sb3" => Ok(Self::SB3),
+            "x86_64" => Ok(Self::X86_64),
             _ => Err(InvalidTarget(s.to_owned())),
         }
     }
