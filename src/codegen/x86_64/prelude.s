@@ -179,8 +179,7 @@ any_to_bool:
     je .might_be_str_false
     xor eax, eax
     test rsi, rsi
-    setnz al
-    push rax
+    setnz [rsp]
     call drop_any
     pop rax
 .done:
