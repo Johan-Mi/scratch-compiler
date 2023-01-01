@@ -382,3 +382,21 @@ list_get:
     lea rax, [str_empty]
     xor rdx, rdx
     ret
+
+list_delete_all:
+    push rbx
+    mov rbx, rdi
+.loop:
+    sub qword [rbx+8], 1
+    jc .done
+    mov rax, [rbx+8]
+    shl rax, 4
+    mov rsi, [rbx]
+    mov rdi, [rsi+rax]
+    mov rsi, [rsi+rax+8]
+    call drop_any
+    jmp .loop
+.done:
+    inc qword [rbx+8]
+    pop rbx
+    ret

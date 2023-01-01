@@ -463,6 +463,14 @@ push rax",
                 }
                 _ => return wrong_arg_count(2),
             },
+            "delete-all" => match args {
+                [Expr::Sym(list_name, list_span)] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
+                    writeln!(self, "    lea rdi, [{list_id}]").unwrap();
+                    self.aligning_call("list_delete_all");
+                }
+                _ => return wrong_arg_count(1),
+            },
             "stop-this-script" => match args {
                 [] => {
                     self.emit("    mov rsp, rbp");
