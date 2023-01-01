@@ -177,7 +177,6 @@ any_to_bool:
     je .might_be_str_0
     cmp rsi, 5
     je .might_be_str_false
-    xor eax, eax
     test rsi, rsi
     setnz [rsp]
     call drop_any
