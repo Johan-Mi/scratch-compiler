@@ -26,22 +26,6 @@ impl Ast {
     }
 }
 
-impl TreeWalk<Self> for Ast {
-    fn each_branch(self, mut f: impl FnMut(Self) -> Self) -> Self {
-        match self {
-            Self::Num(..) | Self::String(..) | Self::Sym(..) => self,
-            Self::Node(mut head, tail, span) => {
-                *head = f(*head);
-                Self::Node(head, tail.into_iter().map(f).collect(), span)
-            }
-            Self::Unquote(mut unquoted, span) => {
-                *unquoted = f(*unquoted);
-                Self::Unquote(unquoted, span)
-            }
-        }
-    }
-}
-
 impl<E> TreeWalk<Result<Self, E>> for Ast {
     fn each_branch(
         self,
