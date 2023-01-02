@@ -1,5 +1,5 @@
 use crate::span::Span;
-use trexp::{Clean, Rewrite, TreeWalk};
+use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub enum Ast {
@@ -24,45 +24,24 @@ impl Ast {
             | Self::Unquote(_, span) => span,
         }
     }
-}
 
-impl<E> TreeWalk<Result<Self, E>> for Ast {
-    fn each_branch(
-        self,
-        mut f: impl FnMut(Self) -> Result<Self, E>,
-    ) -> Result<Self, E> {
+    pub fn traverse_postorder_mut<B>(
+        &mut self,
+        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
+    ) -> ControlFlow<B> {
         match self {
-            Self::Num(..) | Self::String(..) | Self::Sym(..) => Ok(self),
-            Self::Node(mut head, tail, span) => {
-                *head = f(*head)?;
-                let tail = tail.into_iter().map(f).collect::<Result<_, _>>()?;
-                Ok(Self::Node(head, tail, span))
+            Self::Num(_, _) => {}
+            Self::String(_, _) => {}
+            Self::Sym(_, _) => {}
+            Self::Node(head, tail, _) => {
+                head.traverse_postorder_mut(f)?;
+                for branch in tail {
+                    branch.traverse_postorder_mut(f)?;
+                }
             }
-            Self::Unquote(mut unquoted, span) => {
-                *unquoted = f(*unquoted)?;
-                Ok(Self::Unquote(unquoted, span))
-            }
+            Self::Unquote(unquoted, _) => unquoted.traverse_postorder_mut(f)?,
         }
-    }
-}
-
-impl<E> TreeWalk<Result<Rewrite<Self>, E>> for Ast {
-    fn each_branch(
-        self,
-        mut f: impl FnMut(Self) -> Result<Rewrite<Self>, E>,
-    ) -> Result<Rewrite<Self>, E> {
-        match self {
-            Self::Num(..) | Self::String(..) | Self::Sym(..) => Ok(Clean(self)),
-            Self::Node(head, tail, span) => f(*head)?.try_bind(|head| {
-                Ok(tail
-                    .into_iter()
-                    .map(f)
-                    .collect::<Result<Rewrite<_>, _>>()?
-                    .map(|tail| Self::Node(Box::new(head), tail, span)))
-            }),
-            Self::Unquote(unquoted, span) => Ok(f(*unquoted)?
-                .map(|unquoted| Self::Unquote(Box::new(unquoted), span))),
-        }
+        f(self)
     }
 }
 

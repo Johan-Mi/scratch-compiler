@@ -7,8 +7,11 @@ use crate::{
     Opts,
 };
 use fancy_match::fancy_match;
-use std::{collections::HashMap, fs};
-use trexp::{Clean, Dirty, Rewrite, TreeWalk};
+use std::{
+    collections::HashMap,
+    fs, mem,
+    ops::ControlFlow::{Break, Continue},
+};
 
 pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
@@ -80,30 +83,35 @@ impl MacroContext<'_> {
         Ok(())
     }
 
-    fn transform_shallow(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        [
-            |_this: &Self, ast| Self::use_builtin_macros(ast),
-            Self::use_user_defined_macros,
-            Self::use_inline_include,
-            Self::use_inline_macros,
-        ]
-        .iter()
-        .try_fold(Clean(ast), |ast, f| ast.try_bind(|ast| f(self, ast)))
+    fn transform_shallow(&self, ast: &mut Ast) -> Result<bool> {
+        Ok(Self::use_builtin_macros(ast)?
+            | self.use_user_defined_macros(ast)?
+            | self.use_inline_include(ast)?
+            | self.use_inline_macros(ast)?)
     }
 
-    fn transform_deep(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        Rewrite::try_repeat(ast, |ast| {
-            ast.bottom_up(|branch| self.transform_shallow(branch))
-        })
+    fn transform_deep(&self, ast: &mut Ast) -> Result<bool> {
+        let mut dirty = false;
+        while let Break(res) =
+            ast.traverse_postorder_mut(&mut |branch| match self
+                .transform_shallow(branch)
+            {
+                Ok(false) => Continue(()),
+                Ok(true) => Break(Ok(())),
+                Err(err) => Break(Err(err)),
+            })
+        {
+            res?;
+            dirty = true;
+        }
+        Ok(dirty)
     }
 
-    fn transform_top_level(&mut self, ast: Ast) -> Result<()> {
+    fn transform_top_level(&mut self, mut ast: Ast) -> Result<()> {
         // HACK: Prevents early expansion of macro body, while still allowing
         // macros to define other macros.
-        let ast = if ast.is_the_function_call("macro") {
-            ast
-        } else {
-            self.transform_deep(ast)?.into_inner()
+        if !ast.is_the_function_call("macro") {
+            self.transform_deep(&mut ast)?;
         };
 
         #[fancy_match]
@@ -124,114 +132,122 @@ impl MacroContext<'_> {
         }
     }
 
-    fn use_user_defined_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        Ok(match &ast {
-            Ast::Sym(sym, ..) => self.symbols.get(sym).cloned(),
-            Ast::Node(box Ast::Sym(sym, ..), args, span) => self
-                .functions
-                .get(sym)
-                .map(|func_macro| {
-                    let params = &func_macro.params;
-                    let num_args = args.len();
-                    let num_params = params.len();
-                    if num_args != num_params {
-                        return Err(Box::new(
-                            Error::FunctionMacroWrongArgCount {
-                                span: *span,
-                                macro_name: sym.clone(),
-                                expected: num_params,
-                                got: num_args,
-                            },
-                        ));
-                    }
-                    let mut bindings = HashMap::new();
-                    for (param, arg) in params.iter().zip(args) {
-                        param.pattern_match(
-                            sym,
-                            &self.transform_deep(arg.clone())?.into_inner(),
-                            &mut bindings,
-                        )?;
-                    }
-                    interpolate(func_macro.body.clone(), &bindings)
-                })
-                .transpose()?,
-            _ => None,
-        }
-        .map_or(Clean(ast), Dirty))
+    fn use_user_defined_macros(&self, ast: &mut Ast) -> Result<bool> {
+        Ok(match ast {
+            Ast::Sym(sym, ..) => {
+                let Some(symbol_macro) = self.symbols.get(sym) else {
+                    return Ok(false);
+                };
+                *ast = symbol_macro.clone();
+                true
+            }
+            Ast::Node(box Ast::Sym(sym, ..), args, span) => {
+                let Some(func_macro) = self.functions.get(sym) else {
+                    return Ok(false);
+                };
+                let params = &func_macro.params;
+                let num_args = args.len();
+                let num_params = params.len();
+                if num_args != num_params {
+                    return Err(Box::new(Error::FunctionMacroWrongArgCount {
+                        span: *span,
+                        macro_name: sym.clone(),
+                        expected: num_params,
+                        got: num_args,
+                    }));
+                }
+                let mut bindings = HashMap::new();
+                for (param, arg) in params.iter().zip(args) {
+                    self.transform_deep(arg)?;
+                    param.pattern_match(sym, arg, &mut bindings)?;
+                }
+                *ast = interpolate(func_macro.body.clone(), &bindings)?;
+                true
+            }
+            _ => false,
+        })
     }
 
-    fn use_builtin_macros(ast: Ast) -> Result<Rewrite<Ast>> {
-        Ok((|| {
-            let Ast::Node(box Ast::Sym(ref sym, ..), ref args, span) = ast else {
-                return None;
-            };
-            match &**sym {
-                "str-concat!" => args
+    fn use_builtin_macros(ast: &mut Ast) -> Result<bool> {
+        let Ast::Node(box Ast::Sym(sym, ..), args, span) = ast else {
+            return Ok(false);
+        };
+        Ok(match &**sym {
+            "str-concat!" => {
+                let Some(s) = args
                     .iter()
                     .map(|arg| match arg {
                         Ast::String(s, ..) => Some(&**s),
                         _ => None,
                     })
-                    .collect::<Option<_>>()
-                    .map(|s| Ast::String(s, span)),
-                "sym-concat!" => {
-                    if args.is_empty() {
-                        return Some(Err(Box::new(
-                            Error::SymConcatEmptySymbol { span },
-                        )));
-                    }
-                    args.iter()
-                        .map(|arg| match arg {
-                            Ast::Sym(sym, ..) => Some(&**sym),
-                            _ => None,
-                        })
-                        .collect::<Option<_>>()
-                        .map(|sym| Ast::Sym(sym, span))
-                }
-                "include-str" => match &args[..] {
-                    [Ast::String(path, ..)] => Some(Ast::String(
-                        fs::read_to_string(path).unwrap(),
-                        span,
-                    )),
-                    _ => None,
-                },
-                _ => None,
+                    .collect()
+                else {
+                    return Ok(false);
+                };
+                *ast = Ast::String(s, *span);
+                true
             }
-            .map(Ok)
-        })()
-        .transpose()?
-        .map_or(Clean(ast), Dirty))
+            "sym-concat!" => {
+                if args.is_empty() {
+                    return Err(Box::new(Error::SymConcatEmptySymbol {
+                        span: *span,
+                    }));
+                }
+                let Some(sym) = args
+                    .iter()
+                    .map(|arg| match arg {
+                        Ast::Sym(sym, ..) => Some(&**sym),
+                        _ => None,
+                    })
+                    .collect()
+                else {
+                    return Ok(false);
+                };
+                *ast = Ast::Sym(sym, *span);
+                true
+            }
+            "include-str" => match &args[..] {
+                [Ast::String(path, ..)] => {
+                    *ast =
+                        Ast::String(fs::read_to_string(path).unwrap(), *span);
+                    true
+                }
+                _ => false,
+            },
+            _ => false,
+        })
     }
 
-    fn use_inline_include(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        let Ast::Node(head, tail, span) = ast else {
-            return Ok(Clean(ast));
+    fn use_inline_include(&self, ast: &mut Ast) -> Result<bool> {
+        let Ast::Node(_, tail, _) = ast else {
+            return Ok(false);
         };
 
         if !tail.iter().any(|item| item.is_the_function_call("include")) {
-            return Ok(Clean(Ast::Node(head, tail, span)));
+            return Ok(false);
         }
 
-        let tail = tail
+        *tail = mem::take(tail)
             .into_iter()
             .map(|item| {
                 #[fancy_match]
                 match &item {
                     Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                        self.include(args, *span).map(Dirty)
+                        self.include(args, *span)
                     }
-                    _ => Ok(Clean(vec![item])),
+                    _ => Ok(vec![item]),
                 }
             })
-            .collect::<Result<Rewrite<Vec<Vec<Ast>>>>>()?;
+            .collect::<Result<Vec<Vec<Ast>>>>()?
+            .into_iter()
+            .flatten()
+            .collect();
 
-        Ok(tail.map(|tail| {
-            Ast::Node(head, tail.into_iter().flatten().collect(), span)
-        }))
+        Ok(true)
     }
 
-    fn use_inline_macros(&self, ast: Ast) -> Result<Rewrite<Ast>> {
-        #[fancy_match]
+    fn use_inline_macros(&self, ast: &mut Ast) -> Result<bool> {
+        let (macro_definition, def_span, args, span) = #[fancy_match]
         match ast {
             Ast::Node(
                 box Ast::Node(
@@ -241,33 +257,35 @@ impl MacroContext<'_> {
                 ),
                 args,
                 span,
-            ) => {
-                let (macro_name, Macro::Function(func_macro)) =
-                    Macro::parse(macro_definition, def_span)? else {
-                        return Err(Box::new(Error::SymbolMacroInInlinePosition { span }));
-                    };
-                let num_args = args.len();
-                let num_params = func_macro.params.len();
-                if num_args != num_params {
-                    return Err(Box::new(Error::FunctionMacroWrongArgCount {
-                        span,
-                        macro_name,
-                        expected: num_params,
-                        got: num_args,
-                    }));
-                }
-                let mut bindings = HashMap::new();
-                for (param, arg) in func_macro.params.iter().zip(args) {
-                    param.pattern_match(
-                        &macro_name,
-                        &self.transform_deep(arg.clone())?.into_inner(),
-                        &mut bindings,
-                    )?;
-                }
-                interpolate(func_macro.body.clone(), &bindings).map(Dirty)
-            }
-            _ => Ok(Clean(ast)),
+            ) => (macro_definition, def_span, args, span),
+            _ => return Ok(false),
+        };
+        let (macro_name, Macro::Function(func_macro)) =
+            Macro::parse(mem::take(macro_definition), *def_span)?
+        else {
+            return Err(Box::new(
+                Error::SymbolMacroInInlinePosition { span: *span }
+            ));
+        };
+
+        let num_args = args.len();
+        let num_params = func_macro.params.len();
+        if num_args != num_params {
+            return Err(Box::new(Error::FunctionMacroWrongArgCount {
+                span: *span,
+                macro_name,
+                expected: num_params,
+                got: num_args,
+            }));
         }
+
+        let mut bindings = HashMap::new();
+        for (param, arg) in func_macro.params.iter().zip(args) {
+            self.transform_deep(arg)?;
+            param.pattern_match(&macro_name, arg, &mut bindings)?;
+        }
+        *ast = interpolate(func_macro.body.clone(), &bindings)?;
+        Ok(true)
     }
 
     fn include(&self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
@@ -290,19 +308,24 @@ impl MacroContext<'_> {
 }
 
 fn interpolate(body: Ast, bindings: &HashMap<String, Ast>) -> Result<Ast> {
-    match body {
-        Ast::Unquote(box Ast::Sym(sym, span), ..) => bindings
-            .get(&*sym)
-            .ok_or_else(|| {
-                Box::new(Error::UnknownMetavariable {
-                    span,
-                    var_name: sym,
-                })
-            })
-            .cloned(),
-        Ast::Unquote(unquoted, ..) => Ok(*unquoted),
-        _ => body.each_branch(|tree| interpolate(tree, bindings)),
-    }
+    Ok(match body {
+        Ast::Unquote(box Ast::Sym(var_name, span), ..) => bindings
+            .get(&var_name)
+            .ok_or(Error::UnknownMetavariable { span, var_name })?
+            .clone(),
+        Ast::Unquote(unquoted, ..) => *unquoted,
+        Ast::Num(..) | Ast::String(..) | Ast::Sym(..) => body,
+        Ast::Node(mut head, tail, span) => {
+            *head = interpolate(*head, bindings)?;
+            Ast::Node(
+                head,
+                tail.into_iter()
+                    .map(|branch| interpolate(branch, bindings))
+                    .collect::<Result<_>>()?,
+                span,
+            )
+        }
+    })
 }
 
 struct FunctionMacro {

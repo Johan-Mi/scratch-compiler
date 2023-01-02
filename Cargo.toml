@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 fancy-match = { git = "https://github.com/Johan-Mi/fancy-match" }
-trexp = { git = "https://github.com/Johan-Mi/trexp" }
 sb3-stuff = { git = "https://github.com/Johan-Mi/sb3-stuff" }
 md5 = "0.7.0"
 nom = "7.1"
