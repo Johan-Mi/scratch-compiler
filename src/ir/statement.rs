@@ -2,8 +2,7 @@ use crate::{
     ast::Ast, diagnostic::Result, ir::expr::Expr,
     optimize::statement::optimize_stmt, span::Span,
 };
-use std::mem;
-use trexp::{Clean, Rewrite, TreeWalk};
+use std::ops::ControlFlow;
 
 #[derive(Debug)]
 pub enum Statement {
@@ -36,6 +35,12 @@ pub enum Statement {
         times: Expr,
         body: Box<Statement>,
     },
+}
+
+impl Default for Statement {
+    fn default() -> Self {
+        Self::Do(Vec::new())
+    }
 }
 
 impl Statement {
@@ -165,63 +170,42 @@ impl Statement {
     }
 
     pub fn optimize(&mut self) {
-        let placeholder = Self::Do(Vec::new());
-        let this = mem::replace(self, placeholder);
-        *self = optimize_stmt(this).into_inner();
+        optimize_stmt(self);
     }
-}
 
-impl TreeWalk<Rewrite<Self>> for Statement {
-    fn each_branch(
-        self,
-        mut f: impl FnMut(Self) -> Rewrite<Self>,
-    ) -> Rewrite<Self> {
+    pub fn traverse_postorder_mut<B>(
+        &mut self,
+        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
+    ) -> ControlFlow<B> {
         match self {
-            Self::ProcCall { .. } => Clean(self),
-            Self::Do(body) => body
-                .into_iter()
-                .map(f)
-                .collect::<Rewrite<_>>()
-                .map(Self::Do),
+            Self::ProcCall {
+                proc_name: _,
+                proc_span: _,
+                args: _,
+            } => {}
+            Self::Do(stmts) => {
+                for stmt in stmts {
+                    stmt.traverse_postorder_mut(f)?;
+                }
+            }
             Self::IfElse {
-                condition,
+                condition: _,
                 if_true,
                 if_false,
-            } => f(*if_true).bind(|if_true| {
-                f(*if_false).map(|if_false| Self::IfElse {
-                    condition,
-                    if_true: Box::new(if_true),
-                    if_false: Box::new(if_false),
-                })
-            }),
-            Self::Repeat { times, body } => f(*body).map(|body| Self::Repeat {
-                times,
-                body: Box::new(body),
-            }),
-            Self::Forever(body) => {
-                f(*body).map(|body| Self::Forever(Box::new(body)))
+            } => {
+                if_true.traverse_postorder_mut(f)?;
+                if_false.traverse_postorder_mut(f)?;
             }
-            Self::Until { condition, body } => {
-                f(*body).map(|body| Self::Until {
-                    condition,
-                    body: Box::new(body),
-                })
-            }
-            Self::While { condition, body } => {
-                f(*body).map(|body| Self::While {
-                    condition,
-                    body: Box::new(body),
-                })
-            }
-            Self::For {
-                counter,
-                times,
+            Self::Repeat { times: _, body }
+            | Self::Forever(body)
+            | Self::Until { condition: _, body }
+            | Self::While { condition: _, body }
+            | Self::For {
+                counter: _,
+                times: _,
                 body,
-            } => f(*body).map(|body| Self::For {
-                counter,
-                times,
-                body: Box::new(body),
-            }),
+            } => body.traverse_postorder_mut(f)?,
         }
+        f(self)
     }
 }

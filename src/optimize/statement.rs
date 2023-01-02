@@ -5,111 +5,108 @@ use crate::{
     },
     optimize::expr::optimize_expr,
 };
-use trexp::{Bind, Clean, Dirty, Rewrite, TreeWalk};
+use std::{
+    mem,
+    ops::ControlFlow::{Break, Continue},
+};
 
-pub fn optimize_stmt(stmt: Statement) -> Rewrite<Statement> {
-    Rewrite::repeat(stmt, |s| {
-        s.bottom_up(|s| {
-            STMT_OPTIMIZATIONS.iter().fold(Clean(s), Bind::bind_mut)
+pub fn optimize_stmt(stmt: &mut Statement) -> bool {
+    let mut dirty = false;
+    while stmt
+        .traverse_postorder_mut(&mut |s| {
+            if STMT_OPTIMIZATIONS.iter().any(|f| f(s)) {
+                Break(())
+            } else {
+                Continue(())
+            }
         })
-    })
+        .is_break()
+    {
+        dirty = true;
+    }
+    dirty
 }
 
-const STMT_OPTIMIZATIONS: &[fn(Statement) -> Rewrite<Statement>] =
+const STMT_OPTIMIZATIONS: &[fn(&mut Statement) -> bool] =
     &[optimize_stmt_exprs, flatten_do, const_conditions];
 
 /// Optimizes all expressions contained in a statement.
-fn optimize_stmt_exprs(stmt: Statement) -> Rewrite<Statement> {
+fn optimize_stmt_exprs(stmt: &mut Statement) -> bool {
     match stmt {
-        Do(_) | Forever(_) => Clean(stmt),
-        ProcCall {
-            proc_name,
-            proc_span,
-            args,
-        } => args
-            .into_iter()
-            .map(optimize_expr)
-            .collect::<Rewrite<_>>()
-            .map(|args| ProcCall {
-                proc_name,
-                proc_span,
-                args,
-            }),
+        Do(_) | Forever(_) => false,
+        ProcCall { args, .. } => args.iter_mut().any(optimize_expr),
         IfElse {
-            condition,
-            if_true,
-            if_false,
-        } => optimize_expr(condition).map(|condition| IfElse {
-            condition,
-            if_true,
-            if_false,
-        }),
-        Repeat { times, body } => {
-            optimize_expr(times).map(|times| Repeat { times, body })
+            condition: expr, ..
         }
-        Until { condition, body } => {
-            optimize_expr(condition).map(|condition| Until { condition, body })
+        | Repeat { times: expr, .. }
+        | Until {
+            condition: expr, ..
         }
-        While { condition, body } => {
-            optimize_expr(condition).map(|condition| While { condition, body })
+        | While {
+            condition: expr, ..
         }
-        For {
-            counter,
-            times,
-            body,
-        } => optimize_expr(times).map(|times| For {
-            counter,
-            times,
-            body,
-        }),
+        | For { times: expr, .. } => optimize_expr(expr),
     }
 }
 
 /// Flattens nested `do` blocks.
-fn flatten_do(stmt: Statement) -> Rewrite<Statement> {
+fn flatten_do(stmt: &mut Statement) -> bool {
     match stmt {
-        Do(mut stmts) if stmts.len() == 1 => Dirty(stmts.pop().unwrap()),
+        Do(ref mut stmts) if stmts.len() == 1 => {
+            *stmt = stmts.pop().unwrap();
+            true
+        }
         Do(stmts) if stmts.iter().any(|stmt| matches!(stmt, Do(_))) => {
-            Dirty(Do(stmts
+            *stmts = mem::take(stmts)
                 .into_iter()
                 .flat_map(|stmt| match stmt {
                     Do(nested) => nested,
                     _ => vec![stmt],
                 })
-                .collect()))
+                .collect();
+            true
         }
-        _ => Clean(stmt),
+        _ => false,
     }
 }
 
 /// Removes constant conditions from if statements and loops.
-fn const_conditions(stmt: Statement) -> Rewrite<Statement> {
+fn const_conditions(stmt: &mut Statement) -> bool {
     match stmt {
         IfElse {
             condition: Lit(condition),
             if_true,
             if_false,
-        } => Dirty(if condition.to_bool() {
-            *if_true
-        } else {
-            *if_false
-        }),
+        } => {
+            *stmt = if condition.to_bool() {
+                mem::take(if_true)
+            } else {
+                mem::take(if_false)
+            };
+            true
+        }
         Until {
             condition: Lit(condition),
             body,
-        } => Dirty(if condition.to_bool() {
-            Do(Vec::new())
-        } else {
-            Forever(body)
-        }),
+        } => {
+            *stmt = if condition.to_bool() {
+                Do(Vec::new())
+            } else {
+                Forever(mem::take(body))
+            };
+            true
+        }
         While {
             condition: Lit(condition),
             body,
-        } => Dirty(if condition.to_bool() {
-            Forever(body)
-        } else {
-            Do(Vec::new())
-        }),
-        _ => Clean(stmt),
+        } => {
+            *stmt = if condition.to_bool() {
+                Forever(mem::take(body))
+            } else {
+                Do(Vec::new())
+            };
+            true
+        }
+        _ => false,
     }
 }

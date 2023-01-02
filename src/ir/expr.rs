@@ -5,7 +5,7 @@ use crate::{
 };
 use sb3_stuff::Value;
 use smol_str::SmolStr;
-use trexp::{Clean, Rewrite, TreeWalk};
+use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -14,6 +14,12 @@ pub enum Expr {
     FuncCall(&'static str, Span, Vec<Expr>),
     AddSub(Vec<Expr>, Vec<Expr>),
     MulDiv(Vec<Expr>, Vec<Expr>),
+}
+
+impl Default for Expr {
+    fn default() -> Self {
+        Self::Lit(Value::Num(0.0))
+    }
 }
 
 impl Expr {
@@ -94,41 +100,25 @@ impl Expr {
     pub const fn is_lit(&self) -> bool {
         matches!(self, Self::Lit(..))
     }
-}
 
-impl TreeWalk<Rewrite<Self>> for Expr {
-    fn each_branch(
-        self,
-        mut f: impl FnMut(Self) -> Rewrite<Self>,
-    ) -> Rewrite<Self> {
+    pub fn traverse_postorder_mut<B>(
+        &mut self,
+        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
+    ) -> ControlFlow<B> {
         match self {
-            Self::Lit(_) | Self::Sym(..) => Clean(self),
-            Self::FuncCall(func_name, func_span, args) => {
-                args.into_iter().map(f).collect::<Rewrite<_>>().map(
-                    |new_args| Self::FuncCall(func_name, func_span, new_args),
-                )
+            Self::Lit(_) | Self::Sym(_, _) => {}
+            Self::FuncCall(_, _, args) => {
+                for expr in args {
+                    expr.traverse_postorder_mut(f)?;
+                }
             }
-            Self::AddSub(positives, negatives) => positives
-                .into_iter()
-                .map(&mut f)
-                .collect::<Rewrite<_>>()
-                .bind(|positives| {
-                    negatives
-                        .into_iter()
-                        .map(f)
-                        .collect::<Rewrite<_>>()
-                        .map(|negatives| Self::AddSub(positives, negatives))
-                }),
-            Self::MulDiv(numerators, denominators) => numerators
-                .into_iter()
-                .map(&mut f)
-                .collect::<Rewrite<_>>()
-                .bind(|numerators| {
-                    denominators.into_iter().map(f).collect::<Rewrite<_>>().map(
-                        |denominators| Self::MulDiv(numerators, denominators),
-                    )
-                }),
+            Self::AddSub(a, b) | Self::MulDiv(a, b) => {
+                for expr in a.iter_mut().chain(b) {
+                    expr.traverse_postorder_mut(f)?;
+                }
+            }
         }
+        f(self)
     }
 }
 
