@@ -356,6 +356,12 @@ list_get:
     and eax, ~0x202020
     cmp eax, "LAST"
     jne .numeric_index
+    test dil, 1
+    jnz .dont_free
+    push rdx
+    call free wrt ..plt
+    pop rdx
+.dont_free:
     cmp qword [rdx+8], 0
     jz .out_of_bounds
     mov rax, [rdx+8]
