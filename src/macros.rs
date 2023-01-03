@@ -158,7 +158,6 @@ impl MacroContext<'_> {
                 }
                 let mut bindings = HashMap::new();
                 for (param, arg) in params.iter().zip(args) {
-                    self.transform_deep(arg)?;
                     param.pattern_match(sym, arg, &mut bindings)?;
                 }
                 *ast = interpolate(func_macro.body.clone(), &bindings)?;
@@ -281,7 +280,6 @@ impl MacroContext<'_> {
 
         let mut bindings = HashMap::new();
         for (param, arg) in func_macro.params.iter().zip(args) {
-            self.transform_deep(arg)?;
             param.pattern_match(&macro_name, arg, &mut bindings)?;
         }
         *ast = interpolate(func_macro.body.clone(), &bindings)?;
