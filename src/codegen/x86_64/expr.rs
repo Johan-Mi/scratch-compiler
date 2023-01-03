@@ -240,12 +240,12 @@ impl AsmProgram<'_> {
                 [single] => self.generate_expr(single),
                 [rest @ .., last] => {
                     self.generate_cow_expr(last)?;
+                    let stack_was_aligned = self.stack_aligned;
+                    if !stack_was_aligned {
+                        self.emit("    sub rsp, 8");
+                    }
+                    self.stack_aligned = true;
                     for arg in rest.iter().rev() {
-                        let stack_was_aligned = self.stack_aligned;
-                        if !stack_was_aligned {
-                            self.emit("    sub rsp, 8");
-                        }
-                        self.stack_aligned = true;
                         self.emit(
                             "    push rdx
     sub rsp, 8
@@ -274,11 +274,11 @@ impl AsmProgram<'_> {
     pop rax
     pop rdx",
                         );
-                        if !stack_was_aligned {
-                            self.emit("    add rsp, 8");
-                        }
-                        self.stack_aligned = stack_was_aligned;
                     }
+                    if !stack_was_aligned {
+                        self.emit("    add rsp, 8");
+                    }
+                    self.stack_aligned = stack_was_aligned;
                     Ok(Typ::OwnedString)
                 }
             },
