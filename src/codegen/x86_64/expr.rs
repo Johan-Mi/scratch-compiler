@@ -5,7 +5,7 @@ use crate::{
     span::Span,
 };
 use sb3_stuff::Value;
-use std::fmt::Write as _;
+use std::{cmp::Ordering, fmt::Write as _};
 
 impl AsmProgram<'_> {
     pub(super) fn generate_expr(&mut self, expr: &Expr) -> Result<Typ> {
@@ -311,80 +311,15 @@ impl AsmProgram<'_> {
                 }
                 _ => wrong_arg_count(1),
             },
-            "=" => match args {
+            "<" | "=" | ">" => match args {
                 [lhs, rhs] => {
-                    match self.generate_expr(lhs)? {
-                        Typ::Double => {
-                            self.emit(
-                                "    sub rsp, 8
-    movsd [rsp], xmm0",
-                            );
-                            self.stack_aligned ^= true;
-                            match self.generate_expr(rhs)? {
-                                Typ::Double => self.emit(
-                                    "    movsd xmm1, [rsp]
-    xor eax, eax
-    ucomisd xmm0, xmm1
-    sete al",
-                                ),
-                                Typ::Bool => {
-                                    self.emit("    xor eax, eax");
-                                }
-                                Typ::StaticStr => todo!(),
-                                Typ::OwnedString => todo!(),
-                                Typ::Any => todo!(),
-                            }
-                            self.emit("    add rsp, 8");
-                            self.stack_aligned ^= true;
-                        }
-                        Typ::Bool => todo!(),
-                        Typ::StaticStr => todo!(),
-                        Typ::OwnedString => todo!(),
-                        Typ::Any => todo!(),
+                    let ordering = match func_name {
+                        "<" => Ordering::Less,
+                        "=" => Ordering::Equal,
+                        ">" => Ordering::Greater,
+                        _ => unreachable!(),
                     };
-                    Ok(Typ::Bool)
-                }
-                _ => wrong_arg_count(2),
-            },
-            "<" | ">" => match args {
-                [lhs, rhs] => {
-                    match self.generate_expr(lhs)? {
-                        Typ::Double => {
-                            self.emit(
-                                "    sub rsp, 8
-    movsd [rsp], xmm0",
-                            );
-                            self.stack_aligned ^= true;
-                            match self.generate_expr(rhs)? {
-                                Typ::Double => {
-                                    let condition = if func_name == "<" {
-                                        'b'
-                                    } else {
-                                        'a'
-                                    };
-                                    writeln!(
-                                        self,
-                                        "    movsd xmm1, [rsp]
-    xor eax, eax
-    ucomisd xmm1, xmm0
-    set{condition} al",
-                                    )
-                                    .unwrap();
-                                }
-                                Typ::Bool => todo!(),
-                                Typ::StaticStr => todo!(),
-                                Typ::OwnedString => todo!(),
-                                Typ::Any => todo!(),
-                            }
-                            self.emit("    add rsp, 8");
-                            self.stack_aligned ^= true;
-                        }
-                        Typ::Bool => todo!(),
-                        Typ::StaticStr => todo!(),
-                        Typ::OwnedString => todo!(),
-                        Typ::Any => todo!(),
-                    };
-                    Ok(Typ::Bool)
+                    self.generate_comparison(ordering, lhs, rhs)
                 }
                 _ => wrong_arg_count(2),
             },
@@ -620,5 +555,57 @@ impl AsmProgram<'_> {
                 Typ::Bool
             }
         }
+    }
+
+    fn generate_comparison(
+        &mut self,
+        ordering: Ordering,
+        lhs: &Expr,
+        rhs: &Expr,
+    ) -> Result<Typ> {
+        match self.generate_expr(lhs)? {
+            Typ::Double => {
+                self.emit(
+                    "    sub rsp, 8
+    movsd [rsp], xmm0",
+                );
+                self.stack_aligned ^= true;
+                match self.generate_expr(rhs)? {
+                    Typ::Double => {
+                        let condition = match ordering {
+                            Ordering::Less => 'b',
+                            Ordering::Equal => 'e',
+                            Ordering::Greater => 'a',
+                        };
+                        writeln!(
+                            self,
+                            "    movsd xmm1, [rsp]
+    xor eax, eax
+    ucomisd xmm1, xmm0
+    set{condition} al",
+                        )
+                        .unwrap();
+                    }
+                    Typ::Bool => {
+                        if ordering.is_eq() {
+                            self.emit("    xor eax, eax");
+                        } else {
+                            todo!();
+                        }
+                    }
+                    Typ::StaticStr => todo!(),
+                    Typ::OwnedString => todo!(),
+                    Typ::Any => todo!(),
+                }
+                self.emit("    add rsp, 8");
+                self.stack_aligned ^= true;
+            }
+            Typ::Bool => todo!(),
+            Typ::StaticStr => todo!(),
+            Typ::OwnedString => todo!(),
+            Typ::Any => todo!(),
+        }
+
+        Ok(Typ::Bool)
     }
 }
