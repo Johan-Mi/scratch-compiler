@@ -7,8 +7,7 @@ use crate::{
 };
 use std::mem;
 
-pub fn optimize_stmt(stmt: &mut Statement) -> bool {
-    let mut dirty = false;
+pub fn optimize_stmt(stmt: &mut Statement) {
     while {
         let mut this_step_dirty = false;
         stmt.traverse_postorder_mut(&mut |s| {
@@ -17,10 +16,7 @@ pub fn optimize_stmt(stmt: &mut Statement) -> bool {
             }
         });
         this_step_dirty
-    } {
-        dirty = true;
-    }
-    dirty
+    } {}
 }
 
 const STMT_OPTIMIZATIONS: &[fn(&mut Statement) -> bool] =
