@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, realloc, asprintf
+extern malloc, free, memcpy, memmove, realloc, asprintf
 extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan
 
 %macro staticstr 2+
@@ -387,6 +387,61 @@ list_get:
 .out_of_bounds:
     lea rax, [str_empty]
     xor rdx, rdx
+    ret
+
+list_delete:
+    cmp rdi, 2
+    jbe .numeric_index
+    cmp rsi, 4
+    jne .numeric_index
+    mov eax, [rdi]
+    and eax, ~0x202020
+    cmp eax, "LAST"
+    jne .numeric_index
+    test dil, 1
+    jnz .dont_free
+    push rdx
+    call free wrt ..plt
+    pop rdx
+.dont_free:
+    sub qword [rdx+8], 1
+    jc .done
+    mov rax, [rdx+8]
+    shl rax, 4
+    mov rsi, [rdx]
+    mov rdi, [rsi+rax]
+    mov rsi, [rsi+rax+8]
+    jmp drop_any
+.numeric_index:
+    push rdx
+    call any_to_double
+    call double_to_usize
+    pop rdx
+    sub rax, 1
+    jc .done
+    cmp rax, [rdx+8]
+    jae .done
+    mov rax, [rdx+8]
+    shl rax, 4
+    mov rsi, [rdx]
+    mov rdi, [rsi+rax]
+    mov rsi, [rsi+rax+8]
+    push rdx
+    push rax
+    sub rsp, 8
+    call drop_any
+    add rsp, 8
+    pop rax
+    pop rdx
+    dec qword [rdx+8]
+    shl rax, 4
+    add rax, [rdx]
+    mov rdi, rax
+    lea rsi, [rdi+16]
+    mov rdx, [rdx+8]
+    sub rdx, rax
+    jmp memmove wrt ..plt
+.done:
     ret
 
 list_delete_all:

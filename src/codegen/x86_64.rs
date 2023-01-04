@@ -468,6 +468,21 @@ push rax",
                 }
                 _ => return wrong_arg_count(2),
             },
+            "delete" => match args {
+                [Expr::Sym(list_name, list_span), value] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
+                    self.generate_any_expr(value)?;
+                    writeln!(
+                        self,
+                        "    lea rdx, [{list_id}]
+    mov rdi, rax
+    mov rsi, rdx"
+                    )
+                    .unwrap();
+                    self.aligning_call("list_delete");
+                }
+                _ => return wrong_arg_count(2),
+            },
             "delete-all" => match args {
                 [Expr::Sym(list_name, list_span)] => {
                     let list_id = self.lookup_list(list_name, *list_span)?;
