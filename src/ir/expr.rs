@@ -5,7 +5,6 @@ use crate::{
 };
 use sb3_stuff::Value;
 use smol_str::SmolStr;
-use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -101,24 +100,21 @@ impl Expr {
         matches!(self, Self::Lit(..))
     }
 
-    pub fn traverse_postorder_mut<B>(
-        &mut self,
-        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
-    ) -> ControlFlow<B> {
+    pub fn traverse_postorder_mut(&mut self, f: &mut impl FnMut(&mut Self)) {
         match self {
             Self::Lit(_) | Self::Sym(_, _) => {}
             Self::FuncCall(_, _, args) => {
                 for expr in args {
-                    expr.traverse_postorder_mut(f)?;
+                    expr.traverse_postorder_mut(f);
                 }
             }
             Self::AddSub(a, b) | Self::MulDiv(a, b) => {
                 for expr in a.iter_mut().chain(b) {
-                    expr.traverse_postorder_mut(f)?;
+                    expr.traverse_postorder_mut(f);
                 }
             }
         }
-        f(self)
+        f(self);
     }
 }
 

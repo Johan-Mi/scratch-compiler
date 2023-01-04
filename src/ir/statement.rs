@@ -2,7 +2,6 @@ use crate::{
     ast::Ast, diagnostic::Result, ir::expr::Expr,
     optimize::statement::optimize_stmt, span::Span,
 };
-use std::ops::ControlFlow;
 
 #[derive(Debug)]
 pub enum Statement {
@@ -161,10 +160,7 @@ impl Statement {
         optimize_stmt(self);
     }
 
-    pub fn traverse_postorder_mut<B>(
-        &mut self,
-        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
-    ) -> ControlFlow<B> {
+    pub fn traverse_postorder_mut(&mut self, f: &mut impl FnMut(&mut Self)) {
         match self {
             Self::ProcCall {
                 proc_name: _,
@@ -173,7 +169,7 @@ impl Statement {
             } => {}
             Self::Do(stmts) => {
                 for stmt in stmts {
-                    stmt.traverse_postorder_mut(f)?;
+                    stmt.traverse_postorder_mut(f);
                 }
             }
             Self::IfElse {
@@ -181,8 +177,8 @@ impl Statement {
                 if_true,
                 if_false,
             } => {
-                if_true.traverse_postorder_mut(f)?;
-                if_false.traverse_postorder_mut(f)?;
+                if_true.traverse_postorder_mut(f);
+                if_false.traverse_postorder_mut(f);
             }
             Self::Repeat { times: _, body }
             | Self::Forever(body)
@@ -192,8 +188,8 @@ impl Statement {
                 counter: _,
                 times: _,
                 body,
-            } => body.traverse_postorder_mut(f)?,
+            } => body.traverse_postorder_mut(f),
         }
-        f(self)
+        f(self);
     }
 }

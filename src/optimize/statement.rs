@@ -5,23 +5,19 @@ use crate::{
     },
     optimize::expr::optimize_expr,
 };
-use std::{
-    mem,
-    ops::ControlFlow::{Break, Continue},
-};
+use std::mem;
 
 pub fn optimize_stmt(stmt: &mut Statement) -> bool {
     let mut dirty = false;
-    while stmt
-        .traverse_postorder_mut(&mut |s| {
-            if STMT_OPTIMIZATIONS.iter().any(|f| f(s)) {
-                Break(())
-            } else {
-                Continue(())
+    while {
+        let mut this_step_dirty = false;
+        stmt.traverse_postorder_mut(&mut |s| {
+            for f in STMT_OPTIMIZATIONS {
+                this_step_dirty |= f(s);
             }
-        })
-        .is_break()
-    {
+        });
+        this_step_dirty
+    } {
         dirty = true;
     }
     dirty

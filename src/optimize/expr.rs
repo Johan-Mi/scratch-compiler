@@ -1,16 +1,18 @@
 use crate::ir::expr::Expr::{self, *};
 use sb3_stuff::Value;
-use std::{mem, ops::ControlFlow::{Break, Continue}};
+use std::mem;
 
 pub fn optimize_expr(expr: &mut Expr) -> bool {
     let mut dirty = false;
-    while expr.traverse_postorder_mut(&mut |e| {
-        if EXPR_OPTIMIZATIONS.iter().any(|f| f(e)) {
-            Break(())
-        } else {
-            Continue(())
-        }
-    }).is_break() {
+    while {
+        let mut this_step_dirty = false;
+        expr.traverse_postorder_mut(&mut |e| {
+            for f in EXPR_OPTIMIZATIONS {
+                this_step_dirty |= f(e);
+            }
+        });
+        this_step_dirty
+    } {
         dirty = true;
     }
     dirty
