@@ -1,5 +1,4 @@
 use crate::span::Span;
-use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub enum Ast {
@@ -25,10 +24,10 @@ impl Ast {
         }
     }
 
-    pub fn traverse_postorder_mut<B>(
+    pub fn traverse_postorder_mut<E>(
         &mut self,
-        f: &mut impl FnMut(&mut Self) -> ControlFlow<B>,
-    ) -> ControlFlow<B> {
+        f: &mut impl FnMut(&mut Self) -> Result<(), E>,
+    ) -> Result<(), E> {
         match self {
             Self::Num(_, _) => {}
             Self::String(_, _) => {}

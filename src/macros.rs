@@ -7,11 +7,7 @@ use crate::{
     Opts,
 };
 use fancy_match::fancy_match;
-use std::{
-    collections::HashMap,
-    fs, mem,
-    ops::ControlFlow::{Break, Continue},
-};
+use std::{collections::HashMap, fs, mem};
 
 pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
@@ -92,16 +88,14 @@ impl MacroContext<'_> {
 
     fn transform_deep(&self, ast: &mut Ast) -> Result<bool> {
         let mut dirty = false;
-        while let Break(res) =
-            ast.traverse_postorder_mut(&mut |branch| match self
-                .transform_shallow(branch)
-            {
-                Ok(false) => Continue(()),
-                Ok(true) => Break(Ok(())),
-                Err(err) => Break(Err(err)),
-            })
-        {
-            res?;
+        while {
+            let mut this_step_dirty = false;
+            ast.traverse_postorder_mut(&mut |branch| {
+                this_step_dirty |= self.transform_shallow(branch)?;
+                Ok::<(), Box<Error>>(())
+            })?;
+            this_step_dirty
+        } {
             dirty = true;
         }
         Ok(dirty)
