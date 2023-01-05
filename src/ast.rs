@@ -29,9 +29,7 @@ impl Ast {
         f: &mut impl FnMut(&mut Self) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
-            Self::Num(_, _) => {}
-            Self::String(_, _) => {}
-            Self::Sym(_, _) => {}
+            Self::Num(..) | Self::String(..) | Self::Sym(..) => {}
             Self::Node(head, tail, _) => {
                 head.traverse_postorder_mut(f)?;
                 for branch in tail {
