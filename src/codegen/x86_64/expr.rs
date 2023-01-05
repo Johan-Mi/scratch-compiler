@@ -5,10 +5,10 @@ use crate::{
     span::Span,
 };
 use sb3_stuff::Value;
-use std::{cmp::Ordering, fmt::Write as _};
+use std::{borrow::Cow, cmp::Ordering, fmt::Write as _};
 
-impl AsmProgram<'_> {
-    pub(super) fn generate_expr(&mut self, expr: &Expr) -> Result<Typ> {
+impl<'a> AsmProgram<'a> {
+    pub(super) fn generate_expr(&mut self, expr: &'a Expr) -> Result<Typ> {
         match expr {
             Expr::Lit(lit) => Ok(self.generate_lit(lit)),
             Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span),
@@ -26,8 +26,8 @@ impl AsmProgram<'_> {
 
     fn generate_add_sub(
         &mut self,
-        positives: &[Expr],
-        negatives: &[Expr],
+        positives: &'a [Expr],
+        negatives: &'a [Expr],
     ) -> Result<Typ> {
         match (positives, negatives) {
             ([], []) => self.emit("    xorpd xmm0, xmm0"),
@@ -87,8 +87,8 @@ impl AsmProgram<'_> {
 
     fn generate_mul_div(
         &mut self,
-        numerators: &[Expr],
-        denominators: &[Expr],
+        numerators: &'a [Expr],
+        denominators: &'a [Expr],
     ) -> Result<Typ> {
         match (numerators, denominators) {
             ([], []) => {
@@ -182,7 +182,7 @@ impl AsmProgram<'_> {
     fn generate_func_call(
         &mut self,
         func_name: &'static str,
-        args: &[Expr],
+        args: &'a [Expr],
         span: Span,
     ) -> Result<Typ> {
         let wrong_arg_count = |expected| {
@@ -283,7 +283,11 @@ impl AsmProgram<'_> {
                 }
             },
             "and" | "or" => match args {
-                [] => Ok(self.generate_lit(&Value::Bool(func_name == "and"))),
+                [] => Ok(self.generate_lit(if func_name == "and" {
+                    &Value::Bool(true)
+                } else {
+                    &Value::Bool(false)
+                })),
                 [single] => self.generate_expr(single),
                 [rest @ .., last] => {
                     let short_circuit = LocalLabel(self.new_uid());
@@ -460,7 +464,7 @@ impl AsmProgram<'_> {
         }
     }
 
-    pub(super) fn generate_bool_expr(&mut self, expr: &Expr) -> Result<()> {
+    pub(super) fn generate_bool_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => self.aligning_call("double_to_bool"),
             Typ::Bool => {}
@@ -475,7 +479,10 @@ impl AsmProgram<'_> {
         Ok(())
     }
 
-    pub(super) fn generate_double_expr(&mut self, expr: &Expr) -> Result<()> {
+    pub(super) fn generate_double_expr(
+        &mut self,
+        expr: &'a Expr,
+    ) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => {}
             Typ::Bool => self.aligning_call("bool_to_double"),
@@ -496,7 +503,7 @@ impl AsmProgram<'_> {
         Ok(())
     }
 
-    pub(super) fn generate_cow_expr(&mut self, expr: &Expr) -> Result<()> {
+    pub(super) fn generate_cow_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => self.aligning_call("double_to_cow"),
             Typ::Bool => self.aligning_call("bool_to_static_str"),
@@ -512,7 +519,7 @@ impl AsmProgram<'_> {
         Ok(())
     }
 
-    pub(super) fn generate_any_expr(&mut self, expr: &Expr) -> Result<()> {
+    pub(super) fn generate_any_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => self.emit(
                 "    movq rdx, xmm0
@@ -523,7 +530,7 @@ impl AsmProgram<'_> {
         Ok(())
     }
 
-    fn generate_lit(&mut self, lit: &Value) -> Typ {
+    fn generate_lit(&mut self, lit: &'a Value) -> Typ {
         match lit {
             Value::Num(num) => {
                 let bits = num.to_bits();
@@ -536,7 +543,7 @@ impl AsmProgram<'_> {
                 Typ::Double
             }
             Value::String(s) => {
-                let string_id = self.allocate_static_str(s);
+                let string_id = self.allocate_static_str(Cow::Borrowed(s));
                 writeln!(
                     self,
                     "    lea rax, [{string_id}]
@@ -560,8 +567,8 @@ impl AsmProgram<'_> {
     fn generate_comparison(
         &mut self,
         ordering: Ordering,
-        lhs: &Expr,
-        rhs: &Expr,
+        lhs: &'a Expr,
+        rhs: &'a Expr,
     ) -> Result<Typ> {
         match self.generate_expr(lhs)? {
             Typ::Double => {

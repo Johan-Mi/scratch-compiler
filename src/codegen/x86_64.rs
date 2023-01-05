@@ -11,6 +11,7 @@ use crate::{
     uid::Uid,
 };
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::{self, Write as _},
     fs::File,
@@ -40,7 +41,7 @@ struct AsmProgram<'a> {
     global_lists: HashMap<&'a str, Uid>,
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
-    static_strs: Vec<(Uid, String)>,
+    static_strs: Vec<(Uid, Cow<'a, str>)>,
     custom_procs: HashMap<&'a str, CustomProcedure<'a>>,
     proc_stop_label: Option<LocalLabel<Uid>>,
     proc_params: Vec<&'a str>,
@@ -249,7 +250,7 @@ impl<'a> AsmProgram<'a> {
         }
     }
 
-    fn generate_statement(&mut self, stmt: &Statement) -> Result<()> {
+    fn generate_statement(&mut self, stmt: &'a Statement) -> Result<()> {
         match stmt {
             Statement::ProcCall {
                 proc_name,
@@ -384,7 +385,7 @@ push rax",
     fn generate_proc_call(
         &mut self,
         proc_name: &str,
-        args: &[Expr],
+        args: &'a [Expr],
         span: Span,
     ) -> Result<()> {
         let wrong_arg_count = |expected| {
@@ -401,15 +402,15 @@ push rax",
                 [message] => {
                     if let Expr::Lit(message) = message {
                         let message = message.to_cow_str();
-                        let message_id = self.allocate_static_str(&message);
+                        let message_len = message.len();
+                        let message_id = self.allocate_static_str(message);
                         writeln!(
                             self,
                             "    mov rax, 1
     mov rdi, 1
     lea rsi, [{message_id}]
-    mov rdx, {}
-    syscall",
-                            message.len(),
+    mov rdx, {message_len}
+    syscall"
                         )
                         .unwrap();
                     } else {
@@ -510,9 +511,9 @@ push rax",
         Ok(())
     }
 
-    fn allocate_static_str(&mut self, s: &str) -> Uid {
+    fn allocate_static_str(&mut self, s: Cow<'a, str>) -> Uid {
         let uid = self.new_uid();
-        self.static_strs.push((uid, s.to_owned()));
+        self.static_strs.push((uid, s));
         uid
     }
 
@@ -541,7 +542,7 @@ push rax",
     fn generate_custom_proc_call(
         &mut self,
         proc_name: &str,
-        args: &[Expr],
+        args: &'a [Expr],
         span: Span,
     ) -> Result<()> {
         let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
