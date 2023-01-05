@@ -151,8 +151,8 @@ impl MacroContext<'_> {
                     }));
                 }
                 let mut bindings = HashMap::new();
-                for (param, arg) in params.iter().zip(args) {
-                    self.transform_deep(arg)?;
+                for (param, mut arg) in params.iter().zip(mem::take(args)) {
+                    self.transform_deep(&mut arg)?;
                     param.pattern_match(sym, arg, &mut bindings)?;
                 }
                 *ast = interpolate(func_macro.body.clone(), &bindings)?;
@@ -274,8 +274,8 @@ impl MacroContext<'_> {
         }
 
         let mut bindings = HashMap::new();
-        for (param, arg) in func_macro.params.iter().zip(args) {
-            self.transform_deep(arg)?;
+        for (param, mut arg) in func_macro.params.iter().zip(mem::take(args)) {
+            self.transform_deep(&mut arg)?;
             param.pattern_match(&macro_name, arg, &mut bindings)?;
         }
         *ast = interpolate(func_macro.body.clone(), &bindings)?;
@@ -355,17 +355,17 @@ impl Parameter {
     fn pattern_match(
         &self,
         macro_name: &str,
-        ast: &Ast,
+        ast: Ast,
         bindings: &mut HashMap<String, Ast>,
     ) -> Result<()> {
         match self {
             Self::Var(var) => {
-                assert!(bindings.insert(var.clone(), ast.clone()).is_none());
+                assert!(bindings.insert(var.clone(), ast).is_none());
                 Ok(())
             }
             Self::Constructor(name, subparams, span) => match ast {
                 Ast::Node(box Ast::Sym(sym, _), subtrees, _)
-                    if sym == name && subparams.len() == subtrees.len() =>
+                    if sym == *name && subparams.len() == subtrees.len() =>
                 {
                     for (p, t) in subparams.iter().zip(subtrees) {
                         p.pattern_match(macro_name, t, bindings)?;
