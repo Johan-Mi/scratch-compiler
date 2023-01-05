@@ -2,14 +2,14 @@ use crate::{codegen::sb3::Mangled, uid::Uid};
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
 
-pub(super) enum Reporter {
+pub(super) enum Reporter<'a> {
     Literal(Value),
-    Variable(Mangled),
-    List(Mangled),
+    Variable(Mangled<'a>),
+    List(Mangled<'a>),
     Block(Uid),
 }
 
-impl Reporter {
+impl Reporter<'_> {
     pub fn with_empty_shadow(&self) -> Json {
         let json = self.inner_json();
         if self.is_shadow() {

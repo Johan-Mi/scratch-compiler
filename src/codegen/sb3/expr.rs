@@ -7,7 +7,7 @@ use crate::{
 use sb3_stuff::Value;
 use serde_json::json;
 
-impl SerCtx {
+impl SerCtx<'_> {
     pub(super) fn serialize_expr(
         &self,
         expr: &Expr,
@@ -21,7 +21,7 @@ impl SerCtx {
                 "timer" => self.simple_symbol("sensing_timer", parent),
                 "answer" => self.simple_symbol("sensing_answer", parent),
                 _ => {
-                    if self.proc_args.contains(sym) {
+                    if self.proc_args.contains(&&**sym) {
                         self.emit_non_shadow(
                             "argument_reporter_string_number",
                             parent,

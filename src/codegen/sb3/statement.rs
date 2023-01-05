@@ -7,7 +7,7 @@ use crate::{
 };
 use serde_json::{json, Value as Json};
 
-impl SerCtx {
+impl SerCtx<'_> {
     pub(super) fn serialize_stmt(
         &self,
         stmt: &Statement,

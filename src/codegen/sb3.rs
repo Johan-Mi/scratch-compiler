@@ -18,8 +18,8 @@ use crate::{
 use reporter::Reporter;
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};
-use smol_str::SmolStr;
 use std::{
+    borrow::Cow,
     cell::RefCell,
     collections::HashMap,
     fs::{self, File},
@@ -43,9 +43,9 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
         .iter()
         .map(|var| {
             (
-                var.into(),
+                &**var,
                 Mangled {
-                    name: var.clone(),
+                    name: Cow::Borrowed(var),
                     id: uid_gen.new_uid(),
                 },
             )
@@ -57,9 +57,9 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
         .iter()
         .map(|list| {
             (
-                list.into(),
+                &**list,
                 Mangled {
-                    name: list.clone(),
+                    name: Cow::Borrowed(list),
                     id: uid_gen.new_uid(),
                 },
             )
@@ -116,27 +116,27 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     Ok(())
 }
 
-struct SerCtx {
+struct SerCtx<'a> {
     uid_gen: crate::uid::Generator,
     blocks: RefCell<HashMap<Uid, Json>>,
-    custom_procs: HashMap<SmolStr, CustomProcedure>,
-    proc_args: Vec<SmolStr>,
-    local_vars: HashMap<SmolStr, Mangled>,
-    local_lists: HashMap<SmolStr, Mangled>,
-    sprite_vars: HashMap<SmolStr, Mangled>,
-    sprite_lists: HashMap<SmolStr, Mangled>,
-    global_vars: HashMap<SmolStr, Mangled>,
-    global_lists: HashMap<SmolStr, Mangled>,
+    custom_procs: HashMap<&'a str, CustomProcedure>,
+    proc_args: Vec<&'a str>,
+    local_vars: HashMap<&'a str, Mangled<'a>>,
+    local_lists: HashMap<&'a str, Mangled<'a>>,
+    sprite_vars: HashMap<&'a str, Mangled<'a>>,
+    sprite_lists: HashMap<&'a str, Mangled<'a>>,
+    global_vars: HashMap<&'a str, Mangled<'a>>,
+    global_lists: HashMap<&'a str, Mangled<'a>>,
 }
 
-impl SerCtx {
+impl<'a> SerCtx<'a> {
     fn new_uid(&self) -> Uid {
         self.uid_gen.new_uid()
     }
 
     pub fn serialize_procs(
         &mut self,
-        procs: &HashMap<String, Vec<Procedure>>,
+        procs: &'a HashMap<String, Vec<Procedure>>,
     ) -> Result<HashMap<Uid, Json>> {
         for (name, procs) in procs {
             for proc in procs {
@@ -146,16 +146,20 @@ impl SerCtx {
         Ok(self.blocks.take())
     }
 
-    fn serialize_proc(&mut self, name: &str, proc: &Procedure) -> Result<()> {
+    fn serialize_proc(
+        &mut self,
+        name: &str,
+        proc: &'a Procedure,
+    ) -> Result<()> {
         self.local_vars = proc
             .variables
             .iter()
             .map(|name| {
                 let id = self.new_uid();
                 (
-                    name.into(),
+                    &**name,
                     Mangled {
-                        name: format!("local {id} {name}"),
+                        name: Cow::Owned(format!("local {id} {name}")),
                         id,
                     },
                 )
@@ -167,9 +171,9 @@ impl SerCtx {
             .map(|name| {
                 let id = self.new_uid();
                 (
-                    name.into(),
+                    &**name,
                     Mangled {
-                        name: format!("local {id} {name}"),
+                        name: Cow::Owned(format!("local {id} {name}")),
                         id,
                     },
                 )
@@ -235,7 +239,7 @@ impl SerCtx {
                     .params
                     .iter()
                     .map(|(param, _)| match param {
-                        Expr::Sym(sym, ..) => sym.clone(),
+                        Expr::Sym(sym, ..) => &**sym,
                         // This check is already performed when setting
                         // `self.proc_args`
                         _ => unreachable!(),
@@ -508,7 +512,7 @@ struct Call<'name, 'a> {
 }
 
 #[derive(Clone)]
-struct Mangled {
-    name: String,
+struct Mangled<'a> {
+    name: Cow<'a, str>,
     id: Uid,
 }

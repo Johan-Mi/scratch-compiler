@@ -5,22 +5,22 @@ use crate::{
     ir::{expr::Expr, proc::CustomProcedure, sprite::Sprite},
 };
 use serde_json::{json, Value as Json};
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
-impl SerCtx {
+impl<'a> SerCtx<'a> {
     pub fn serialize_sprite(
         &mut self,
         name: &str,
-        sprite: &Sprite,
+        sprite: &'a Sprite,
     ) -> Result<Json> {
         let variables = sprite
             .variables
             .iter()
             .map(|var| {
                 (
-                    var.into(),
+                    &**var,
                     Mangled {
-                        name: var.clone(),
+                        name: Cow::Borrowed(var),
                         id: self.new_uid(),
                     },
                 )
@@ -31,9 +31,9 @@ impl SerCtx {
             .iter()
             .map(|lst| {
                 (
-                    lst.into(),
+                    &**lst,
                     Mangled {
-                        name: lst.clone(),
+                        name: Cow::Borrowed(lst),
                         id: self.new_uid(),
                     },
                 )
@@ -89,7 +89,7 @@ impl SerCtx {
                             }),
                         })
                         .collect::<std::result::Result<_, _>>()?;
-                    Ok(Some((name.into(), CustomProcedure { params })))
+                    Ok(Some((&**name, CustomProcedure { params })))
                 }
             })
             .filter_map(Result::transpose)
