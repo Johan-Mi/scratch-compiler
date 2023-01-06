@@ -301,10 +301,10 @@ impl MacroContext<'_> {
     }
 }
 
-fn interpolate(body: Ast, bindings: &HashMap<String, Ast>) -> Result<Ast> {
+fn interpolate(body: Ast, bindings: &HashMap<&str, Ast>) -> Result<Ast> {
     Ok(match body {
         Ast::Unquote(box Ast::Sym(var_name, span), ..) => bindings
-            .get(&var_name)
+            .get(&*var_name)
             .ok_or(Error::UnknownMetavariable { span, var_name })?
             .clone(),
         Ast::Unquote(unquoted, ..) => *unquoted,
@@ -352,15 +352,15 @@ impl Parameter {
         }
     }
 
-    fn pattern_match(
-        &self,
+    fn pattern_match<'a>(
+        &'a self,
         macro_name: &str,
         ast: Ast,
-        bindings: &mut HashMap<String, Ast>,
+        bindings: &mut HashMap<&'a str, Ast>,
     ) -> Result<()> {
         match self {
             Self::Var(var) => {
-                assert!(bindings.insert(var.clone(), ast).is_none());
+                assert!(bindings.insert(var, ast).is_none());
                 Ok(())
             }
             Self::Constructor(name, subparams, span) => match ast {
