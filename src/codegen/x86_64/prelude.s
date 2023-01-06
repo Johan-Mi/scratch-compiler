@@ -461,3 +461,50 @@ list_delete_all:
     inc qword [rbx+8]
     pop rbx
     ret
+
+list_replace:
+    cmp rdi, 2
+    jbe .numeric_index
+    cmp rsi, 4
+    jne .numeric_index
+    mov eax, [rdi]
+    and eax, ~0x202020
+    cmp eax, "LAST"
+    jne .numeric_index
+    test dil, 1
+    jnz .dont_free_index
+    push r8
+    push rcx
+    push rdx
+    call free wrt ..plt
+    pop rdx
+    pop rcx
+    pop r8
+.dont_free_index:
+    mov rax, [r8+8]
+    jmp .do_it
+.numeric_index:
+    push r8
+    push rcx
+    push rdx
+    call any_to_double
+    call double_to_usize
+    pop rdx
+    pop rcx
+    pop r8
+    cmp rax, [r8+8]
+    ja .out_of_bounds
+.do_it:
+    sub rax, 1
+    jc .out_of_bounds
+    shl rax, 4
+    add rax, [r8]
+    mov rdi, [rax]
+    mov rsi, [rax+8]
+    mov [rax], rdx
+    mov [rax+8], rcx
+    jmp drop_any
+.out_of_bounds
+    mov rdi, rdx
+    mov rsi, rcx
+    jmp drop_any

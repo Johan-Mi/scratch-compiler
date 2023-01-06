@@ -492,6 +492,26 @@ push rax",
                 }
                 _ => return wrong_arg_count(1),
             },
+            "replace" => match args {
+                [Expr::Sym(list_name, list_span), index, value] => {
+                    let list_id = self.lookup_list(list_name, *list_span)?;
+                    self.generate_any_expr(value)?;
+                    self.emit(
+                        "    push rsi
+    push rdi",
+                    );
+                    self.generate_any_expr(index)?;
+                    writeln!(
+                        self,
+                        "    lea r8, [{list_id}]
+    pop rdx
+    pop rcx"
+                    )
+                    .unwrap();
+                    self.aligning_call("list_replace");
+                }
+                _ => return wrong_arg_count(3),
+            },
             "stop-this-script" => match args {
                 [] => {
                     self.emit("    mov rsp, rbp");
