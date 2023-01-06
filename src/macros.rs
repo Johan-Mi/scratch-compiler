@@ -278,7 +278,7 @@ impl MacroContext<'_> {
             self.transform_deep(&mut arg)?;
             param.pattern_match(&macro_name, arg, &mut bindings)?;
         }
-        *ast = interpolate(func_macro.body.clone(), &bindings)?;
+        *ast = interpolate(func_macro.body, &bindings)?;
         Ok(true)
     }
 
