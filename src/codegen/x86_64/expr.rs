@@ -566,10 +566,15 @@ impl<'a> AsmProgram<'a> {
 
     fn generate_comparison(
         &mut self,
-        ordering: Ordering,
-        lhs: &'a Expr,
-        rhs: &'a Expr,
+        mut ordering: Ordering,
+        mut lhs: &'a Expr,
+        mut rhs: &'a Expr,
     ) -> Result<Typ> {
+        if ordering.is_gt() {
+            ordering = Ordering::Less;
+            std::mem::swap(&mut lhs, &mut rhs);
+        }
+
         match self.generate_expr(lhs)? {
             Typ::Double => {
                 self.emit(
@@ -579,11 +584,8 @@ impl<'a> AsmProgram<'a> {
                 self.stack_aligned ^= true;
                 match self.generate_expr(rhs)? {
                     Typ::Double => {
-                        let condition = match ordering {
-                            Ordering::Less => 'b',
-                            Ordering::Equal => 'e',
-                            Ordering::Greater => 'a',
-                        };
+                        let condition =
+                            if ordering.is_lt() { 'b' } else { 'e' };
                         writeln!(
                             self,
                             "    movsd xmm1, [rsp]
