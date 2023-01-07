@@ -504,7 +504,7 @@ list_replace:
     mov [rax], rdx
     mov [rax+8], rcx
     jmp drop_any
-.out_of_bounds
+.out_of_bounds:
     mov rdi, rdx
     mov rsi, rcx
     jmp drop_any
