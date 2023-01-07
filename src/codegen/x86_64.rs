@@ -334,11 +334,17 @@ push rax",
                 Ok(())
             }
             Statement::For {
-                counter,
+                counter: (counter_name, counter_span),
                 times,
                 body,
             } => {
-                let var_id = self.lookup_var(&counter.0).unwrap();
+                let var_id =
+                    self.lookup_var(counter_name).ok_or_else(|| {
+                        Box::new(Error::UnknownVar {
+                            span: *counter_span,
+                            var_name: counter_name.into(),
+                        })
+                    })?;
                 let loop_label = LocalLabel(self.new_uid());
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
@@ -440,8 +446,14 @@ push rax",
                 _ => return wrong_arg_count(1),
             },
             ":=" => match args {
-                [Expr::Sym(var_name, _), value] => {
-                    let var_id = self.lookup_var(var_name).unwrap();
+                [Expr::Sym(var_name, var_span), value] => {
+                    let var_id =
+                        self.lookup_var(var_name).ok_or_else(|| {
+                            Box::new(Error::UnknownVar {
+                                span: *var_span,
+                                var_name: var_name.clone(),
+                            })
+                        })?;
                     self.generate_any_expr(value)?;
                     writeln!(
                         self,
