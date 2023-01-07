@@ -585,12 +585,11 @@ impl<'a> AsmProgram<'a> {
                 match self.generate_expr(rhs)? {
                     Typ::Double => {
                         let condition =
-                            if ordering.is_lt() { 'b' } else { 'e' };
+                            if ordering.is_lt() { 'a' } else { 'e' };
                         writeln!(
                             self,
-                            "    movsd xmm1, [rsp]
-    xor eax, eax
-    ucomisd xmm1, xmm0
+                            "    xor eax, eax
+    ucomisd xmm0, [rsp]
     set{condition} al",
                         )
                         .unwrap();
