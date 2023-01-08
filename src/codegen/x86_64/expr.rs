@@ -608,7 +608,25 @@ impl<'a> AsmProgram<'a> {
                 self.emit("    add rsp, 8");
                 self.stack_aligned ^= true;
             }
-            Typ::Bool => todo!(),
+            Typ::Bool => {
+                self.emit("    push rax");
+                self.stack_aligned ^= true;
+                match self.generate_expr(rhs)? {
+                    Typ::Double => todo!(),
+                    Typ::Bool => self.emit(if ordering.is_eq() {
+                        "    cmp al, [rsp]
+    sete al"
+                    } else {
+                        "    cmp al, [rsp]
+    seta al"
+                    }),
+                    Typ::StaticStr => todo!(),
+                    Typ::OwnedString => todo!(),
+                    Typ::Any => todo!(),
+                }
+                self.stack_aligned ^= true;
+                self.emit("    add rsp, 8");
+            }
             Typ::StaticStr => todo!(),
             Typ::OwnedString => todo!(),
             Typ::Any => todo!(),
