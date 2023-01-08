@@ -624,7 +624,18 @@ impl<'a> AsmProgram<'a> {
                     }),
                     Typ::StaticStr => todo!(),
                     Typ::OwnedString => todo!(),
-                    Typ::Any => todo!(),
+                    Typ::Any => {
+                        self.emit(
+                            "    movsd xmm0, [rsp]
+    mov rdi, rax
+    mov rsi, rdx",
+                        );
+                        self.aligning_call(if ordering.is_eq() {
+                            "any_eq_double"
+                        } else {
+                            "any_lt_double"
+                        });
+                    }
                 }
                 self.emit("    add rsp, 8");
                 self.stack_aligned ^= true;
@@ -648,9 +659,67 @@ impl<'a> AsmProgram<'a> {
                 self.stack_aligned ^= true;
                 self.emit("    add rsp, 8");
             }
-            Typ::StaticStr => todo!(),
+            Typ::StaticStr => {
+                self.emit(
+                    "    push rdx
+    push rax",
+                );
+                match self.generate_expr(rhs)? {
+                    Typ::Double => todo!(),
+                    Typ::Bool => todo!(),
+                    Typ::StaticStr => todo!(),
+                    Typ::OwnedString => todo!(),
+                    Typ::Any => {
+                        self.emit(
+                            "    mov rcx, rdx
+    mov rdx, rax
+    pop rdi
+    pop rsi",
+                        );
+                        self.aligning_call(if ordering.is_eq() {
+                            "any_eq_str"
+                        } else {
+                            "any_lt_str"
+                        });
+                    }
+                }
+            }
             Typ::OwnedString => todo!(),
-            Typ::Any => todo!(),
+            Typ::Any => {
+                self.emit(
+                    "    push rdx
+    push rax",
+                );
+                match self.generate_expr(rhs)? {
+                    Typ::Double => {
+                        self.emit(
+                            "pop rdi
+    pop rsi",
+                        );
+                        self.aligning_call(if ordering.is_eq() {
+                            "any_eq_double"
+                        } else {
+                            "any_lt_double"
+                        });
+                    }
+                    Typ::Bool => todo!(),
+                    Typ::StaticStr => todo!(),
+                    Typ::OwnedString => todo!(),
+                    Typ::Any => {
+                        self.emit(
+                            "    mov rcx, rdx
+    mov rdx, rax
+    pop rdi
+    pop rsi",
+                        );
+                        self.aligning_call(if ordering.is_eq() {
+                            "any_eq_any"
+                        } else {
+                            "any_lt_any"
+                        });
+                    }
+                }
+            }
         }
 
         Ok(Typ::Bool)

@@ -509,6 +509,42 @@ list_replace:
     mov rsi, rcx
     jmp drop_any
 
+any_eq_str:
+    ; TODO
+    mov eax, 60
+    mov edi, 96
+    syscall
+
+any_lt_str:
+    ; TODO
+    mov eax, 60
+    mov edi, 95
+    syscall
+
+any_eq_double:
+    ; TODO
+    mov eax, 60
+    mov edi, 94
+    syscall
+
+any_lt_double:
+    ; TODO
+    mov eax, 60
+    mov edi, 93
+    syscall
+
+any_eq_any:
+    ; TODO
+    mov eax, 60
+    mov edi, 92
+    syscall
+
+any_lt_any:
+    ; TODO
+    mov eax, 60
+    mov edi, 91
+    syscall
+
 random_between:
     ; TODO
     mov eax, 60
