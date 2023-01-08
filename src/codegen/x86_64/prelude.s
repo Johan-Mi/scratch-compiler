@@ -550,3 +550,9 @@ random_between:
     mov eax, 60
     mov edi, 97
     syscall
+
+str_to_double:
+    ; TODO
+    mov eax, 60
+    mov edi, 90
+    syscall

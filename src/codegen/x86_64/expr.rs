@@ -508,7 +508,7 @@ impl<'a> AsmProgram<'a> {
             Typ::Double => {}
             Typ::Bool => self.aligning_call("bool_to_double"),
             Typ::StaticStr => {
-                self.aligning_call("static_str_to_double");
+                self.aligning_call("str_to_double");
             }
             Typ::OwnedString => {
                 self.aligning_call("owned_string_to_double");
