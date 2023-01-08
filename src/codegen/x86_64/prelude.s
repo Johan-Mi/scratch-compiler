@@ -508,3 +508,9 @@ list_replace:
     mov rdi, rdx
     mov rsi, rcx
     jmp drop_any
+
+random_between:
+    ; TODO
+    mov eax, 60
+    mov edi, 97
+    syscall

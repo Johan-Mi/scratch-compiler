@@ -456,7 +456,28 @@ impl<'a> AsmProgram<'a> {
                 }
                 _ => wrong_arg_count(1),
             },
-            "random" => todo!(),
+            "random" => match args {
+                [low, high] => {
+                    self.generate_double_expr(high)?;
+                    self.emit(
+                        "    sub rsp, 8
+    movsd [rsp], xmm0",
+                    );
+                    self.stack_aligned ^= true;
+                    self.generate_double_expr(low)?;
+                    self.emit("    movsd xmm1, [rsp]");
+                    self.emit(if self.stack_aligned {
+                        "    call random_between
+    add rsp, 8"
+                    } else {
+                        "    add rsp, 8
+    call random_between"
+                    });
+                    self.stack_aligned ^= true;
+                    Ok(Typ::Double)
+                }
+                _ => wrong_arg_count(2),
+            },
             _ => Err(Box::new(Error::UnknownFunction {
                 span,
                 func_name: func_name.to_owned(),
