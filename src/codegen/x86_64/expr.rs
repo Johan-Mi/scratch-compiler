@@ -594,13 +594,13 @@ impl<'a> AsmProgram<'a> {
                         )
                         .unwrap();
                     }
-                    Typ::Bool => {
-                        if ordering.is_eq() {
-                            self.emit("    xor eax, eax");
-                        } else {
-                            todo!();
-                        }
-                    }
+                    Typ::Bool => self.emit(if ordering.is_eq() {
+                        "    xor eax, eax"
+                    } else {
+                        "    mov edx, 1
+    cmp qword [rsp], __?float64?__(__?Infinity?__)
+    cmovne eax, edx"
+                    }),
                     Typ::StaticStr => todo!(),
                     Typ::OwnedString => todo!(),
                     Typ::Any => todo!(),
