@@ -46,6 +46,7 @@ struct AsmProgram<'a> {
     proc_stop_label: Option<LocalLabel<Uid>>,
     proc_params: Vec<&'a str>,
     stack_aligned: bool,
+    uses_drand48: bool,
 }
 
 impl<'a> TryFrom<&'a Program> for AsmProgram<'a> {
@@ -665,6 +666,14 @@ impl fmt::Display for AsmProgram<'_> {
                 "\nmain:\n    sub rsp, 8"
             )
         )?;
+        if self.uses_drand48 {
+            f.write_str(
+                "    xor edi, edi
+    call time wrt ..plt
+    call srand48 wrt ..plt
+",
+            )?;
+        }
         for entry_point in &self.entry_points {
             writeln!(f, "    call {entry_point}")?;
         }

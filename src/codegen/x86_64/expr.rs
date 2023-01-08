@@ -458,6 +458,7 @@ impl<'a> AsmProgram<'a> {
             },
             "random" => match args {
                 [low, high] => {
+                    self.uses_drand48 = true;
                     self.generate_double_expr(high)?;
                     self.emit(
                         "    sub rsp, 8

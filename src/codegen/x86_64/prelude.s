@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, memmove, realloc, asprintf
+extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time
 extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan
 
 %macro staticstr 2+
@@ -546,10 +546,16 @@ any_lt_any:
     syscall
 
 random_between:
-    ; TODO
-    mov eax, 60
-    mov edi, 97
-    syscall
+    ; TODO: perform rounding when both parameters are integers
+    sub rsp, 24
+    subsd xmm1, xmm0
+    movsd [rsp], xmm0
+    movsd [rsp+8], xmm1
+    call drand48 wrt ..plt
+    mulsd xmm0, [rsp+8]
+    addsd xmm0, [rsp]
+    add rsp, 24
+    ret
 
 str_to_double:
     ; TODO
