@@ -445,7 +445,7 @@ push rax",
                 }
                 _ => return wrong_arg_count(1),
             },
-            ":=" => match args {
+            ":=" | "+=" => match args {
                 [Expr::Sym(var_name, var_span), value] => {
                     let var_id =
                         self.lookup_var(var_name).ok_or_else(|| {
@@ -454,16 +454,39 @@ push rax",
                                 var_name: var_name.clone(),
                             })
                         })?;
-                    self.generate_any_expr(value)?;
-                    writeln!(
-                        self,
-                        "    mov rdi, [{var_id}]
+                    if proc_name == ":=" {
+                        self.generate_any_expr(value)?;
+                        writeln!(
+                            self,
+                            "    mov rdi, [{var_id}]
     mov rsi, [{var_id}+8]
     mov [{var_id}], rax
     mov [{var_id}+8], rdx"
-                    )
-                    .unwrap();
-                    self.aligning_call("drop_any");
+                        )
+                        .unwrap();
+                        self.aligning_call("drop_any");
+                    } else {
+                        self.generate_double_expr(value)?;
+                        writeln!(
+                            self,
+                            "    sub rsp, 8
+    movsd [rsp], xmm0
+    mov rdi, [{var_id}]
+    mov rsi, [{var_id}+8]"
+                        )
+                        .unwrap();
+                        self.stack_aligned ^= true;
+                        self.aligning_call("any_to_double");
+                        writeln!(
+                            self,
+                            "    addsd xmm0, [rsp]
+    mov qword [{var_id}], 2
+    movsd [{var_id}+8], xmm0
+    add rsp, 8"
+                        )
+                        .unwrap();
+                        self.stack_aligned ^= true;
+                    }
                 }
                 _ => return wrong_arg_count(2),
             },
