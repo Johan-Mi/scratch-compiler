@@ -556,6 +556,17 @@ any_eq_any:
     syscall
 
 any_lt_any:
+    cmp rdi, 2
+    jne .not_both_numbers
+    cmp rdx, 2
+    jne .not_both_numbers
+    xor eax, eax
+    movq xmm0, rsi
+    movq xmm1, rcx
+    ucomisd xmm0, xmm1
+    setb al
+    ret
+.not_both_numbers:
     ; TODO
     mov eax, 60
     mov edi, 91
