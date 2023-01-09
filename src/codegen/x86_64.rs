@@ -232,8 +232,8 @@ impl<'a> AsmProgram<'a> {
                             "    mov rdi, [rsp+{}]
     mov rsi, [rsp+{}]
     call drop_any",
-                            i * 16 + 8,
-                            i * 16 + 16
+                            i * 16 + 16,
+                            i * 16 + 24
                         )
                         .unwrap();
                     }
