@@ -80,7 +80,8 @@ impl MacroContext<'_> {
     }
 
     fn transform_shallow(&self, ast: &mut Ast) -> Result<bool> {
-        Ok(Self::use_builtin_macros(ast)?
+        Ok(Self::use_builtin_function_macros(ast)?
+            | self.use_builtin_symbol_macros(ast)
             | self.use_user_defined_macros(ast)?
             | self.use_inline_include(ast)?
             | self.use_inline_macros(ast)?)
@@ -162,7 +163,20 @@ impl MacroContext<'_> {
         })
     }
 
-    fn use_builtin_macros(ast: &mut Ast) -> Result<bool> {
+    fn use_builtin_symbol_macros(&self, ast: &mut Ast) -> bool {
+        let Ast::Sym(sym, span) = ast else {
+            return false;
+        };
+        match &**sym {
+            "COMPILER-OPTIONS.TARGET" => {
+                *ast = Ast::String(self.opts.target.to_str().to_owned(), *span);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn use_builtin_function_macros(ast: &mut Ast) -> Result<bool> {
         let Ast::Node(box Ast::Sym(sym, ..), args, span) = ast else {
             return Ok(false);
         };

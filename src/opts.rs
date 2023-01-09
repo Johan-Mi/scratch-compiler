@@ -42,6 +42,15 @@ pub enum Target {
     X86_64,
 }
 
+impl Target {
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::SB3 => "sb3",
+            Self::X86_64 => "x86_64",
+        }
+    }
+}
+
 impl FromStr for Target {
     type Err = InvalidTarget;
 
