@@ -528,10 +528,26 @@ any_eq_double:
     syscall
 
 any_lt_double:
+    xor eax, eax
+    cmp rdi, 2
+    ja .is_cow
+    jb .is_bool
+    movq xmm1, rsi
+    ucomisd xmm0, xmm1
+    setb al
+    ret
+.is_bool:
+    ucomisd xmm0, [.inf]
+    sete al
+    andn eax, edi, eax
+    ret
+.is_cow:
     ; TODO
     mov eax, 60
     mov edi, 93
     syscall
+align 8
+.inf: dq __?Infinity?__
 
 any_eq_any:
     ; TODO
