@@ -1,4 +1,7 @@
-use super::{typ::Typ, AsmProgram, LocalLabel};
+use super::{
+    typ::{StrKnowledge, Typ},
+    AsmProgram, LocalLabel,
+};
 use crate::{
     diagnostic::{Error, Result},
     ir::expr::Expr,
@@ -235,7 +238,7 @@ impl<'a> AsmProgram<'a> {
                         "    lea rax, [str_empty]
     xor edx, edx",
                     );
-                    Ok(Typ::StaticStr)
+                    Ok(Typ::StaticStr(StrKnowledge::Exact("")))
                 }
                 [single] => self.generate_expr(single),
                 [rest @ .., last] => {
@@ -490,7 +493,7 @@ impl<'a> AsmProgram<'a> {
         match self.generate_expr(expr)? {
             Typ::Double => self.aligning_call("double_to_bool"),
             Typ::Bool => {}
-            Typ::StaticStr => {
+            Typ::StaticStr(_) => {
                 self.aligning_call("static_str_to_bool");
             }
             Typ::OwnedString => {
@@ -508,7 +511,7 @@ impl<'a> AsmProgram<'a> {
         match self.generate_expr(expr)? {
             Typ::Double => {}
             Typ::Bool => self.aligning_call("bool_to_double"),
-            Typ::StaticStr => {
+            Typ::StaticStr(_) => {
                 self.aligning_call("str_to_double");
             }
             Typ::OwnedString => {
@@ -529,7 +532,7 @@ impl<'a> AsmProgram<'a> {
         match self.generate_expr(expr)? {
             Typ::Double => self.aligning_call("double_to_cow"),
             Typ::Bool => self.aligning_call("bool_to_static_str"),
-            Typ::StaticStr | Typ::OwnedString => {}
+            Typ::StaticStr(_) | Typ::OwnedString => {}
             Typ::Any => {
                 self.emit(
                     "    mov rdi, rax
@@ -547,12 +550,12 @@ impl<'a> AsmProgram<'a> {
                 "    movq rdx, xmm0
     mov rax, 2",
             ),
-            Typ::Bool | Typ::StaticStr | Typ::OwnedString | Typ::Any => {}
+            Typ::Bool | Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => {}
         }
         Ok(())
     }
 
-    fn generate_lit(&mut self, lit: &'a Value) -> Typ {
+    fn generate_lit(&mut self, lit: &'a Value) -> Typ<'a> {
         match lit {
             Value::Num(num) => {
                 let bits = num.to_bits();
@@ -573,7 +576,7 @@ impl<'a> AsmProgram<'a> {
                     s.len(),
                 )
                 .unwrap();
-                Typ::StaticStr
+                Typ::StaticStr(StrKnowledge::Exact(s))
             }
             Value::Bool(false) => {
                 self.emit("    xor eax, eax");
@@ -623,7 +626,7 @@ impl<'a> AsmProgram<'a> {
     cmp qword [rsp], __?float64?__(__?Infinity?__)
     cmovne eax, edx"
                     }),
-                    Typ::StaticStr => todo!(),
+                    Typ::StaticStr(_) => todo!(),
                     Typ::OwnedString => todo!(),
                     Typ::Any => {
                         self.emit(
@@ -653,14 +656,16 @@ impl<'a> AsmProgram<'a> {
                         "    cmp al, [rsp]
     seta al"
                     }),
-                    Typ::StaticStr => todo!(),
+                    Typ::StaticStr(_) => todo!(),
                     Typ::OwnedString => todo!(),
                     Typ::Any => todo!(),
                 }
                 self.stack_aligned ^= true;
                 self.emit("    add rsp, 8");
             }
-            Typ::StaticStr => {
+            Typ::StaticStr(lhs_knowledge) => {
+                let lhs_is_true =
+                    matches!(lhs_knowledge, StrKnowledge::Exact("true"));
                 self.emit(
                     "    push rdx
     push rax",
@@ -668,20 +673,29 @@ impl<'a> AsmProgram<'a> {
                 match self.generate_expr(rhs)? {
                     Typ::Double => todo!(),
                     Typ::Bool => todo!(),
-                    Typ::StaticStr => todo!(),
+                    Typ::StaticStr(_) => todo!(),
                     Typ::OwnedString => todo!(),
                     Typ::Any => {
-                        self.emit(
-                            "    mov rcx, rdx
+                        if ordering.is_eq() && lhs_is_true {
+                            self.emit(
+                                "    mov rdi, rax
+    mov rsi, rdx
+    add rsp, 16",
+                            );
+                            self.aligning_call("any_eq_true");
+                        } else {
+                            self.emit(
+                                "    mov rcx, rdx
     mov rdx, rax
     pop rdi
     pop rsi",
-                        );
-                        self.aligning_call(if ordering.is_eq() {
-                            "any_eq_str"
-                        } else {
-                            "any_lt_str"
-                        });
+                            );
+                            self.aligning_call(if ordering.is_eq() {
+                                "any_eq_str"
+                            } else {
+                                "any_lt_str"
+                            });
+                        }
                     }
                 }
             }
@@ -704,7 +718,7 @@ impl<'a> AsmProgram<'a> {
                         });
                     }
                     Typ::Bool => todo!(),
-                    Typ::StaticStr => todo!(),
+                    Typ::StaticStr(_) => todo!(),
                     Typ::OwnedString => todo!(),
                     Typ::Any => {
                         self.emit(

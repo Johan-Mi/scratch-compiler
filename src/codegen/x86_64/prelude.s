@@ -572,6 +572,26 @@ any_lt_any:
     mov edi, 91
     syscall
 
+any_eq_true:
+    xor eax, eax
+    cmp rdi, 2
+    cmovb eax, edi
+    jbe .done
+    cmp rsi, 4
+    jne .drop_parameter
+    mov edx, [rdi]
+    and edx, ~0x20202020
+    cmp edx, "TRUE"
+    sete al
+.drop_parameter:
+    test dil, 1
+    jnz .done
+    push rax
+    call free wrt ..plt
+    pop rax
+.done:
+    ret
+
 random_between:
     ; TODO: perform rounding when both parameters are integers
     sub rsp, 24
