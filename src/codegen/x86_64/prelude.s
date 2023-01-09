@@ -522,6 +522,14 @@ any_lt_str:
     syscall
 
 any_eq_double:
+    cmp rdi, 2
+    jne .not_number
+    xor eax, eax
+    movq xmm0, rsi
+    ucomisd xmm0, xmm1
+    sete al
+    ret
+.not_number:
     ; TODO
     mov eax, 60
     mov edi, 94
