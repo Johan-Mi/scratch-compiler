@@ -112,7 +112,7 @@ impl<'a> AsmProgram<'a> {
     }
 
     fn emit<T: Emit>(&mut self, t: T) {
-        t.emit(self);
+        t.emit_to(self);
     }
 
     fn generate_sprite(&mut self, sprite: &'a Sprite) -> Result<()> {
@@ -709,11 +709,11 @@ align 8",
 }
 
 trait Emit {
-    fn emit(self, program: &mut AsmProgram);
+    fn emit_to(self, program: &mut AsmProgram);
 }
 
 impl Emit for &str {
-    fn emit(self, program: &mut AsmProgram) {
+    fn emit_to(self, program: &mut AsmProgram) {
         program.text.push_str(self);
         program.text.push('\n');
     }
@@ -722,7 +722,7 @@ impl Emit for &str {
 struct Label<T>(T);
 
 impl<T: fmt::Display> Emit for Label<T> {
-    fn emit(self, program: &mut AsmProgram) {
+    fn emit_to(self, program: &mut AsmProgram) {
         writeln!(program, "{}:", self.0).unwrap();
     }
 }
@@ -737,7 +737,7 @@ impl<T: fmt::Display> fmt::Display for LocalLabel<T> {
 }
 
 impl<T: fmt::Display> Emit for LocalLabel<T> {
-    fn emit(self, program: &mut AsmProgram) {
+    fn emit_to(self, program: &mut AsmProgram) {
         writeln!(program, "{self}:").unwrap();
     }
 }
