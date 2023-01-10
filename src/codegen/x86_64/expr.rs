@@ -507,11 +507,22 @@ impl<'a> AsmProgram<'a> {
     ) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => {}
-            Typ::Bool => self.aligning_call("bool_to_double"),
+            Typ::Bool => {
+                self.emit("mov edi, eax");
+                self.aligning_call("bool_to_double")
+            }
             Typ::StaticStr(_) => {
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx",
+                );
                 self.aligning_call("str_to_double");
             }
             Typ::OwnedString => {
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx",
+                );
                 self.aligning_call("owned_string_to_double");
             }
             Typ::Any => {
