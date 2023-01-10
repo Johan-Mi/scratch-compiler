@@ -638,7 +638,20 @@ random_between:
     ret
 
 str_to_double:
+    xor eax, eax
+    cmp rsi, 8
+    je .might_be_infinity
+.regular:
     ; TODO
     mov eax, 60
     mov edi, 90
     syscall
+.might_be_infinity:
+    mov rdx, "Infinity"
+    cmp [rdi], rdx
+    jne .regular
+    movsd xmm0, [.inf]
+    mov eax, 1
+    ret
+align 8
+.inf: dq __?Infinity?__
