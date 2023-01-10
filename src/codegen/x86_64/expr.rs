@@ -491,12 +491,26 @@ impl<'a> AsmProgram<'a> {
             Typ::Double => self.aligning_call("double_to_bool"),
             Typ::Bool => {}
             Typ::StaticStr(_) => {
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx",
+                );
                 self.aligning_call("static_str_to_bool");
             }
             Typ::OwnedString => {
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx",
+                );
                 self.aligning_call("owned_string_to_bool");
             }
-            Typ::Any => self.aligning_call("any_to_bool"),
+            Typ::Any => {
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx",
+                );
+                self.aligning_call("any_to_bool")
+            }
         }
         Ok(())
     }
