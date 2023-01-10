@@ -671,6 +671,7 @@ impl fmt::Display for AsmProgram<'_> {
             f.write_str(
                 "    xor edi, edi
     call time wrt ..plt
+    mov rdi, rax
     call srand48 wrt ..plt
 ",
             )?;
