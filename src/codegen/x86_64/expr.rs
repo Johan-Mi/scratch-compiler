@@ -421,7 +421,7 @@ impl<'a> AsmProgram<'a> {
                     self.generate_double_expr(lhs)?;
                     self.emit(
                         "    movsd xmm1, [rsp]
-    call fmod",
+    call fmod wrt ..plt",
                     );
                     self.emit(if stack_was_aligned {
                         "    add rsp, 8"
