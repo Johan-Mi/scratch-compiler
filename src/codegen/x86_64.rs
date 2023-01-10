@@ -41,7 +41,7 @@ struct AsmProgram<'a> {
     global_lists: HashMap<&'a str, Uid>,
     var_ids: Vec<Uid>,
     list_ids: Vec<Uid>,
-    static_strs: Vec<(Uid, Cow<'a, str>)>,
+    static_strs: HashMap<Cow<'a, str>, Uid>,
     custom_procs: HashMap<&'a str, CustomProcedure<'a>>,
     proc_stop_label: Option<LocalLabel<Uid>>,
     proc_params: Vec<&'a str>,
@@ -568,9 +568,10 @@ push rax",
     }
 
     fn allocate_static_str(&mut self, s: Cow<'a, str>) -> Uid {
-        let uid = self.new_uid();
-        self.static_strs.push((uid, s));
-        uid
+        *self
+            .static_strs
+            .entry(s)
+            .or_insert_with(|| self.uid_generator.new_uid())
     }
 
     fn lookup_var(&self, name: &str) -> Option<Uid> {
@@ -691,7 +692,7 @@ align 8",
         for var_id in &self.var_ids {
             writeln!(f, "{var_id}: dq 2, 0")?;
         }
-        for (str_id, s) in &self.static_strs {
+        for (s, str_id) in &self.static_strs {
             write!(f, "staticstr {str_id}, db \"\"")?;
             for byte in s.bytes() {
                 write!(f, ",{byte}")?;
