@@ -445,12 +445,9 @@ impl<'a> AsmProgram<'a> {
             "log" => libc_mathop(self, "log10"),
             "e^" => libc_mathop(self, "exp"),
             "ten^" => libc_mathop(self, "exp10"),
-            "sin" => libc_mathop(self, "sin"),
-            "cos" => libc_mathop(self, "cos"),
-            "tan" => libc_mathop(self, "tan"),
-            "asin" => libc_mathop(self, "asin"),
-            "acos" => libc_mathop(self, "acos"),
-            "atan" => libc_mathop(self, "atan"),
+            "sin" | "cos" | "tan" | "asin" | "acos" | "atan" => {
+                libc_mathop(self, func_name)
+            }
             "pressing-key" => todo!(),
             "to-num" => match args {
                 [operand] => {
