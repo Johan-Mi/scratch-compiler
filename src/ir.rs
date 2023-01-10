@@ -32,9 +32,8 @@ impl Program {
             }
         }
 
-        let stage = sprites
-            .remove("Stage")
-            .ok_or_else(|| Error::ProgramMissingStage)?;
+        let stage =
+            sprites.remove("Stage").ok_or(Error::ProgramMissingStage)?;
 
         Ok(Self { stage, sprites })
     }
