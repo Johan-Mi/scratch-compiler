@@ -620,6 +620,17 @@ double_lt_str:
     syscall
 
 str_lt_double:
+    sub rsp, 8
+    movsd [rsp], xmm0
+    call str_to_double
+    add rsp, 8
+    test al, al
+    jz .not_convertible_to_number
+    xor eax, eax
+    ucomisd xmm0, [rsp]
+    setb al
+    ret
+.not_convertible_to_number:
     ; TODO
     mov eax, 60
     mov edi, 88
