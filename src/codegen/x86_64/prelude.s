@@ -525,7 +525,7 @@ any_eq_double:
     cmp rdi, 2
     jne .not_number
     xor eax, eax
-    movq xmm0, rsi
+    movq xmm1, rsi
     ucomisd xmm0, xmm1
     sete al
     ret
