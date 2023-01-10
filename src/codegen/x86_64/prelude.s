@@ -261,11 +261,11 @@ clone_any:
     mov rdi, rsi
     call malloc wrt ..plt
     mov rdi, rax
-    pop rsi
-    mov rdx, [rsp]
+    mov rsi, [rsp]
+    mov rdx, [rsp+8]
     call memcpy wrt ..plt
-    pop rdx
-    add rsp, 8
+    mov rdx, [rsp+8]
+    add rsp, 24
     ret
 .done:
     mov rax, rdi
