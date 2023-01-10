@@ -557,6 +557,29 @@ any_lt_double:
 align 8
 .inf: dq __?Infinity?__
 
+double_lt_any:
+    xor eax, eax
+    cmp rdi, 2
+    ja .is_cow
+    jb .is_bool
+    movq xmm1, rsi
+    ucomisd xmm0, xmm1
+    setb al
+    ret
+.is_bool:
+    mov edx, 1
+    mov eax, edi
+    ucomisd xmm0, [.inf]
+    cmovne eax, edx
+    ret
+.is_cow:
+    ; TODO
+    mov eax, 60
+    mov edi, 87
+    syscall
+align 8
+.inf: dq __?Infinity?__
+
 any_eq_any:
     ; TODO
     mov eax, 60

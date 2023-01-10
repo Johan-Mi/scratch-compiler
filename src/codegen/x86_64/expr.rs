@@ -637,7 +637,7 @@ impl<'a> AsmProgram<'a> {
                         self.aligning_call(if ordering.is_eq() {
                             "any_eq_double"
                         } else {
-                            "any_lt_double"
+                            "double_lt_any"
                         });
                     }
                 }
