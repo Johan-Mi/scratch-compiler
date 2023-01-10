@@ -287,8 +287,8 @@ impl<'a> AsmProgram<'a> {
                 let after_loop = LocalLabel(self.new_uid());
                 self.generate_double_expr(times)?;
                 self.emit(
-                    "call double_to_usize
-push rax",
+                    "    call double_to_usize
+    push rax",
                 );
                 self.stack_aligned ^= true;
                 self.emit(loop_label);
