@@ -300,7 +300,7 @@ impl<'a> AsmProgram<'a> {
                         self.generate_bool_expr(arg)?;
                         writeln!(
                             self,
-                            "    test rax, rax
+                            "    test al, al
     {short_circuit_condition} {short_circuit}",
                         )
                         .unwrap();
@@ -313,7 +313,7 @@ impl<'a> AsmProgram<'a> {
             "not" => match args {
                 [operand] => {
                     self.generate_bool_expr(operand)?;
-                    self.emit("    xor rax, 1");
+                    self.emit("    xor al, 1");
                     Ok(Typ::Bool)
                 }
                 _ => wrong_arg_count(1),
