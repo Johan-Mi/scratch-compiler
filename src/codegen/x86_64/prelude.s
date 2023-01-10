@@ -565,16 +565,29 @@ any_eq_any:
 
 any_lt_any:
     cmp rdi, 2
-    jne .not_both_numbers
+    ja .first_is_cow
+    jb .todo
     cmp rdx, 2
-    jne .not_both_numbers
+    ja .double_and_cow
+    jb .todo
     xor eax, eax
     movq xmm0, rsi
     movq xmm1, rcx
     ucomisd xmm0, xmm1
     setb al
     ret
-.not_both_numbers:
+.double_and_cow:
+    mov rdi, rdx
+    mov rsi, rcx
+    test dil, 1
+    jnz double_lt_str
+    jmp .todo
+.first_is_cow:
+    cmp rdx, 2
+    jne .todo
+    test dil, 1
+    jnz str_lt_double
+.todo:
     ; TODO
     mov eax, 60
     mov edi, 91
@@ -599,6 +612,18 @@ any_eq_true:
     pop rax
 .done:
     ret
+
+double_lt_str:
+    ; TODO
+    mov eax, 60
+    mov edi, 89
+    syscall
+
+str_lt_double:
+    ; TODO
+    mov eax, 60
+    mov edi, 88
+    syscall
 
 random_between:
     ; TODO: perform rounding when both parameters are integers
