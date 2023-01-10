@@ -542,7 +542,7 @@ any_lt_double:
     jb .is_bool
     movq xmm1, rsi
     ucomisd xmm0, xmm1
-    setb al
+    seta al
     ret
 .is_bool:
     ucomisd xmm0, [.inf]
