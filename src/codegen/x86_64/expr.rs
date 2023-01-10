@@ -209,7 +209,7 @@ impl<'a> AsmProgram<'a> {
         let libc_mathop = |this: &mut Self, func_name| match args {
             [operand] => {
                 this.generate_double_expr(operand)?;
-                writeln!(this, "    call {func_name} wrt ..plt").unwrap();
+                this.aligning_call(format_args!("{func_name} wrt ..plt"));
                 Ok(Typ::Double)
             }
             _ => wrong_arg_count(1),
