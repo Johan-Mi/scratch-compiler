@@ -600,6 +600,7 @@ any_lt_any:
     setb al
     ret
 .double_and_cow:
+    movq xmm0, rsi
     mov rdi, rdx
     mov rsi, rcx
     test dil, 1
@@ -608,6 +609,7 @@ any_lt_any:
 .first_is_cow:
     cmp rdx, 2
     jne .todo
+    movq xmm0, rcx
     test dil, 1
     jnz str_lt_double
 .todo:
@@ -637,6 +639,17 @@ any_eq_true:
     ret
 
 double_lt_str:
+    sub rsp, 8
+    movsd [rsp], xmm0
+    call str_to_double
+    add rsp, 8
+    test al, al
+    jz .not_convertible_to_number
+    xor eax, eax
+    ucomisd xmm0, [rsp-8]
+    seta al
+    ret
+.not_convertible_to_number:
     ; TODO
     mov eax, 60
     mov edi, 89
@@ -650,7 +663,7 @@ str_lt_double:
     test al, al
     jz .not_convertible_to_number
     xor eax, eax
-    ucomisd xmm0, [rsp]
+    ucomisd xmm0, [rsp-8]
     setb al
     ret
 .not_convertible_to_number:
