@@ -25,6 +25,7 @@ impl Expr {
     pub fn from_ast(ast: Ast) -> Result<Self> {
         Ok(match ast {
             Ast::Num(num, ..) => Self::Lit(Value::Num(num)),
+            Ast::Bool(b, ..) => Self::Lit(Value::Bool(b)),
             Ast::String(s, ..) => Self::Lit(Value::String(s.into())),
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
             Ast::Node(box Ast::Sym(func_name, span), args, ..) => {

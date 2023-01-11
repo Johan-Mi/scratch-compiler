@@ -322,7 +322,7 @@ fn interpolate(body: Ast, bindings: &HashMap<&str, Ast>) -> Result<Ast> {
             .ok_or(Error::UnknownMetavariable { span, var_name })?
             .clone(),
         Ast::Unquote(unquoted, ..) => *unquoted,
-        Ast::Num(..) | Ast::String(..) | Ast::Sym(..) => body,
+        Ast::Num(..) | Ast::Bool(..) | Ast::String(..) | Ast::Sym(..) => body,
         Ast::Node(mut head, tail, span) => {
             *head = interpolate(*head, bindings)?;
             Ast::Node(

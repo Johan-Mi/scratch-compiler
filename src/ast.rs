@@ -3,6 +3,7 @@ use crate::span::Span;
 #[derive(Debug, Clone)]
 pub enum Ast {
     Num(f64, Span),
+    Bool(bool, Span),
     String(String, Span),
     Sym(String, Span),
     Node(Box<Ast>, Vec<Ast>, Span),
@@ -17,6 +18,7 @@ impl Ast {
     pub const fn span(&self) -> Span {
         match *self {
             Self::Num(_, span)
+            | Self::Bool(_, span)
             | Self::String(_, span)
             | Self::Sym(_, span)
             | Self::Node(_, _, span)
@@ -29,7 +31,10 @@ impl Ast {
         f: &mut impl FnMut(&mut Self) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
-            Self::Num(..) | Self::String(..) | Self::Sym(..) => {}
+            Self::Num(..)
+            | Self::Bool(..)
+            | Self::String(..)
+            | Self::Sym(..) => {}
             Self::Node(head, tail, _) => {
                 head.traverse_postorder_mut(f)?;
                 for branch in tail {

@@ -4,7 +4,7 @@ use self::input::{spanned, Input};
 use crate::ast::Ast;
 use nom::{
     branch::alt,
-    bytes::complete::{is_a, is_not, take_while_m_n},
+    bytes::complete::{is_a, is_not, tag, take_while_m_n},
     character::complete::{
         char, digit1, hex_digit1, multispace1, oct_digit1, one_of, satisfy,
     },
@@ -24,7 +24,7 @@ pub fn program(input: Input) -> IResult<Input, Vec<Ast>> {
 }
 
 fn expr(input: Input) -> IResult<Input, Ast> {
-    alt((number, string, sym, node, unquote))(input)
+    alt((number, boolean, string, sym, node, unquote))(input)
 }
 
 fn number(input: Input) -> IResult<Input, Ast> {
@@ -61,6 +61,15 @@ fn sign(input: Input) -> IResult<Input, Option<&str>> {
 
 fn hex_digit(input: Input) -> IResult<Input, char> {
     satisfy(|c| c.is_ascii_hexdigit())(input)
+}
+
+fn boolean(input: Input) -> IResult<Input, Ast> {
+    terminated(
+        spanned(alt((value(true, tag("true")), value(false, tag("false"))))),
+        not(sym_non_first_char),
+    )
+    .map(|(span, b)| Ast::Bool(b, span))
+    .parse(input)
 }
 
 fn string(input: Input) -> IResult<Input, Ast> {
