@@ -618,6 +618,9 @@ any_lt_any:
     mov edi, 91
     syscall
 
+any_eq_bool:
+    test dl, dl
+    jz any_eq_false
 any_eq_true:
     xor eax, eax
     cmp rdi, 2
@@ -628,6 +631,31 @@ any_eq_true:
     mov edx, [rdi]
     and edx, ~0x20202020
     cmp edx, "TRUE"
+    sete al
+.drop_parameter:
+    test dil, 1
+    jnz .done
+    push rax
+    call free wrt ..plt
+    pop rax
+.done:
+    ret
+
+any_eq_false:
+    xor eax, eax
+    lea edx, [rdi+1]
+    cmp rdi, 2
+    cmovb eax, edx
+    jbe .done
+    cmp rsi, 5
+    jne .drop_parameter
+    mov edx, [rdi]
+    and edx, ~0x20202020
+    cmp edx, "FALS"
+    jne .drop_parameter
+    mov dl, [rdi]
+    and dl, ~0x20
+    cmp dl, "E"
     sete al
 .drop_parameter:
     test dil, 1

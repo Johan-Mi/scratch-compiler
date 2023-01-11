@@ -680,7 +680,18 @@ impl<'a> AsmProgram<'a> {
                     }),
                     Typ::StaticStr(_) => todo!(),
                     Typ::OwnedString => todo!(),
-                    Typ::Any => todo!(),
+                    Typ::Any => {
+                        self.emit(
+                            "    mov rdi, rax
+    mov rsi, rdx
+    mov rdx, [rsp]",
+                        );
+                        self.aligning_call(if ordering.is_eq() {
+                            "any_eq_bool"
+                        } else {
+                            "any_lt_bool"
+                        });
+                    }
                 }
                 self.stack_aligned ^= true;
                 self.emit("    add rsp, 8");
