@@ -10,9 +10,9 @@ use smol_str::SmolStr;
 pub enum Expr {
     Lit(Value),
     Sym(SmolStr, Span),
-    FuncCall(&'static str, Span, Vec<Expr>),
-    AddSub(Vec<Expr>, Vec<Expr>),
-    MulDiv(Vec<Expr>, Vec<Expr>),
+    FuncCall(&'static str, Span, Vec<Self>),
+    AddSub(Vec<Self>, Vec<Self>),
+    MulDiv(Vec<Self>, Vec<Self>),
 }
 
 impl Default for Expr {

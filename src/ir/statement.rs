@@ -10,29 +10,29 @@ pub enum Statement {
         proc_span: Span,
         args: Vec<Expr>,
     },
-    Do(Vec<Statement>),
+    Do(Vec<Self>),
     IfElse {
         condition: Expr,
-        if_true: Box<Statement>,
-        if_false: Box<Statement>,
+        if_true: Box<Self>,
+        if_false: Box<Self>,
     },
     Repeat {
         times: Expr,
-        body: Box<Statement>,
+        body: Box<Self>,
     },
-    Forever(Box<Statement>),
+    Forever(Box<Self>),
     Until {
         condition: Expr,
-        body: Box<Statement>,
+        body: Box<Self>,
     },
     While {
         condition: Expr,
-        body: Box<Statement>,
+        body: Box<Self>,
     },
     For {
         counter: (String, Span),
         times: Expr,
-        body: Box<Statement>,
+        body: Box<Self>,
     },
 }
 

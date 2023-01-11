@@ -6,8 +6,8 @@ pub enum Ast {
     Bool(bool, Span),
     String(String, Span),
     Sym(String, Span),
-    Node(Box<Ast>, Vec<Ast>, Span),
-    Unquote(Box<Ast>, Span),
+    Node(Box<Self>, Vec<Self>, Span),
+    Unquote(Box<Self>, Span),
 }
 
 impl Ast {
