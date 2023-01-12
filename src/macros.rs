@@ -221,6 +221,16 @@ impl MacroContext<'_> {
                 }
                 _ => false,
             },
+            "if!" => match &mut args[..] {
+                [Ast::Bool(condition, _), _, _] => {
+                    let condition = *condition;
+                    let if_false = args.pop().unwrap();
+                    let if_true = args.pop().unwrap();
+                    *ast = if condition { if_true } else { if_false };
+                    true
+                }
+                _ => false,
+            },
             "include-str" => match &args[..] {
                 [Ast::String(path, ..)] => {
                     *ast =
