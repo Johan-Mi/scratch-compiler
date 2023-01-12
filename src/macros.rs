@@ -214,6 +214,13 @@ impl MacroContext<'_> {
                 *ast = Ast::Sym(sym, *span);
                 true
             }
+            "str=!" => match &args[..] {
+                [Ast::String(lhs, _), Ast::String(rhs, _)] => {
+                    *ast = Ast::Bool(lhs == rhs, *span);
+                    true
+                }
+                _ => false,
+            },
             "include-str" => match &args[..] {
                 [Ast::String(path, ..)] => {
                     *ast =
