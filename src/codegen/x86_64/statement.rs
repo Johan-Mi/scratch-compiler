@@ -286,7 +286,9 @@ impl<'a> AsmProgram<'a> {
                     self.generate_any_expr(index)?;
                     writeln!(
                         self,
-                        "    lea r8, [{list_id}]
+                        "    mov rdi, rax
+    mov rsi, rdx
+    lea r8, [{list_id}]
     pop rdx
     pop rcx"
                     )
