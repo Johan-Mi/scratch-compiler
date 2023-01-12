@@ -569,12 +569,16 @@ impl<'a> AsmProgram<'a> {
         match lit {
             Value::Num(num) => {
                 let bits = num.to_bits();
-                writeln!(
-                    self,
-                    "    mov rax, {bits}
+                if bits == 0 {
+                    self.emit("    xorpd xmm0, xmm0");
+                } else {
+                    writeln!(
+                        self,
+                        "    mov rax, {bits}
     movq xmm0, rax"
-                )
-                .unwrap();
+                    )
+                    .unwrap();
+                }
                 Typ::Double
             }
             Value::String(s) => {
