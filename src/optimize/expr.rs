@@ -31,6 +31,7 @@ const EXPR_OPTIMIZATIONS: &[fn(&mut Expr) -> bool] = &[
     distribute_mul_into_sum,
     redundant_to_num,
     const_mathops,
+    empty_call,
 ];
 
 /// Constant folding for addition and subtraction.
@@ -309,6 +310,21 @@ fn const_mathops(expr: &mut Expr) -> bool {
     } else {
         false
     }
+}
+
+/// Some functions return known constants when applied to zero arguments.
+fn empty_call(expr: &mut Expr) -> bool {
+    let Expr::FuncCall(func_name, _, args) = expr else { return false; };
+    if !args.is_empty() {
+        return false;
+    }
+    *expr = Expr::Lit(match *func_name {
+        "++" => Value::String("".into()),
+        "and" => Value::Bool(true),
+        "or" => Value::Bool(false),
+        _ => return false,
+    });
+    true
 }
 
 fn is_guaranteed_number(expr: &Expr) -> bool {

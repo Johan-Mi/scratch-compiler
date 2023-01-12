@@ -231,13 +231,7 @@ impl<'a> AsmProgram<'a> {
                 _ => wrong_arg_count(2),
             },
             "++" => match args {
-                [] => {
-                    self.emit(
-                        "    lea rax, [str_empty]
-    xor edx, edx",
-                    );
-                    Ok(Typ::StaticStr(StrKnowledge::Exact("")))
-                }
+                [] => unreachable!(),
                 [single] => self.generate_expr(single),
                 [rest @ .., last] => {
                     self.generate_cow_expr(last)?;
@@ -284,11 +278,7 @@ impl<'a> AsmProgram<'a> {
                 }
             },
             "and" | "or" => match args {
-                [] => Ok(self.generate_lit(if func_name == "and" {
-                    &Value::Bool(true)
-                } else {
-                    &Value::Bool(false)
-                })),
+                [] => unreachable!(),
                 [single] => self.generate_expr(single),
                 [rest @ .., last] => {
                     let short_circuit = LocalLabel(self.new_uid());

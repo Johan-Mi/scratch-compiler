@@ -45,11 +45,10 @@ impl SerCtx<'_> {
             }
             Expr::AddSub(positives, negatives) => {
                 let addition = |terms, parent| {
-                    self.associative0(
+                    self.associative1(
                         "operator_add",
                         "NUM1",
                         "NUM2",
-                        &Value::Num(0.0),
                         terms,
                         parent,
                     )
@@ -89,11 +88,10 @@ impl SerCtx<'_> {
             }
             Expr::MulDiv(numerators, denominators) => {
                 let multiplication = |terms, parent| {
-                    self.associative0(
+                    self.associative1(
                         "operator_multiply",
                         "NUM1",
                         "NUM2",
-                        &Value::Num(1.0),
                         terms,
                         parent,
                     )
@@ -163,27 +161,24 @@ impl SerCtx<'_> {
         }
         match func_name {
             "!!" => func!(data_itemoflist(LIST: List, INDEX: Number)),
-            "++" => self.associative0(
+            "++" => self.associative1(
                 "operator_join",
                 "STRING1",
                 "STRING2",
-                &Value::String(smol_str::SmolStr::default()),
                 args,
                 parent,
             ),
-            "and" => self.associative0(
+            "and" => self.associative1(
                 "operator_and",
                 "OPERAND1",
                 "OPERAND2",
-                &Value::Bool(true),
                 args,
                 parent,
             ),
-            "or" => self.associative0(
+            "or" => self.associative1(
                 "operator_or",
                 "OPERAND1",
                 "OPERAND2",
-                &Value::Bool(false),
                 args,
                 parent,
             ),
@@ -277,17 +272,16 @@ impl SerCtx<'_> {
         )
     }
 
-    fn associative0(
+    fn associative1(
         &self,
         opcode: &str,
         lhs_name: &str,
         rhs_name: &str,
-        neutral: &Value,
         args: &[Expr],
         parent: Uid,
     ) -> Result<Reporter> {
         match args {
-            [] => Ok(Reporter::Literal(neutral.clone())),
+            [] => unreachable!(),
             [single] => self.serialize_expr(single, parent),
             [lhs, rhs @ ..] => self.emit_non_shadow(
                 opcode,
@@ -296,9 +290,8 @@ impl SerCtx<'_> {
                     (lhs_name, &self.empty_shadow_input(lhs)),
                     (rhs_name, &|parent| {
                         Ok(self
-                            .associative0(
-                                opcode, lhs_name, rhs_name, neutral, rhs,
-                                parent,
+                            .associative1(
+                                opcode, lhs_name, rhs_name, rhs, parent,
                             )?
                             .with_empty_shadow())
                     }),
