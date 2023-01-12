@@ -172,35 +172,23 @@ impl<'a> AsmProgram<'a> {
                         let message_id = self.allocate_static_str(message);
                         writeln!(
                             self,
-                            "    mov rax, 1
-    mov rdi, 1
+                            "    mov eax, 1
+    mov edi, 1
     lea rsi, [{message_id}]
     mov rdx, {message_len}
     syscall"
                         )
                         .unwrap();
                     } else {
-                        let stack_was_aligned = self.stack_aligned;
-                        if !stack_was_aligned {
-                            self.emit("    sub rsp, 8");
-                        }
-                        self.stack_aligned = true;
-
                         self.generate_cow_expr(message)?;
                         self.emit(
-                            "    push rdx
-    push rax
-    mov rsi, rax
-    mov rax, 1
-    mov rdi, 1
+                            "    mov rsi, rax
+    mov eax, 1
+    mov edi, 1
     syscall
-    call drop_pop_cow",
+    mov rdi, rsi",
                         );
-
-                        if !stack_was_aligned {
-                            self.emit("    add rsp, 8");
-                        }
-                        self.stack_aligned = stack_was_aligned;
+                        self.aligning_call("drop_cow");
                     }
                 }
                 _ => return wrong_arg_count(1),
