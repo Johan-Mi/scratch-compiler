@@ -30,7 +30,7 @@ impl<'a> AsmProgram<'a> {
                 self.generate_bool_expr(condition)?;
                 writeln!(
                     self,
-                    "    test rax, rax
+                    "    test al, al
     jz {else_label}"
                 )
                 .unwrap();
