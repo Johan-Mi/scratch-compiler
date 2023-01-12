@@ -120,6 +120,17 @@ impl MacroContext<'_> {
                 }
                 Ok(())
             }
+            Ast::Node(box Ast::Sym("when!", ..), mut args, _) => {
+                let Some(Ast::Bool(condition, _)) = args.get(0) else {
+                    todo!();
+                };
+                if *condition {
+                    for item in args.drain(1..) {
+                        self.transform_top_level(item)?;
+                    }
+                }
+                Ok(())
+            }
             _ => {
                 self.asts.push(ast);
                 Ok(())
