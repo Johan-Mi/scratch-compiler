@@ -120,11 +120,13 @@ impl MacroContext<'_> {
                 }
                 Ok(())
             }
-            Ast::Node(box Ast::Sym("when!", ..), mut args, _) => {
+            Ast::Node(box Ast::Sym(sym, ..), mut args, _)
+                if sym == "when!" || sym == "unless!" =>
+            {
                 let Some(Ast::Bool(condition, _)) = args.get(0) else {
                     todo!();
                 };
-                if *condition {
+                if *condition ^ (sym == "unless!") {
                     for item in args.drain(1..) {
                         self.transform_top_level(item)?;
                     }
