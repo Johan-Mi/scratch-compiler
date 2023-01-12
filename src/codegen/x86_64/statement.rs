@@ -258,9 +258,9 @@ impl<'a> AsmProgram<'a> {
                     self.generate_any_expr(value)?;
                     writeln!(
                         self,
-                        "    lea rdx, [{list_id}]
-    mov rdi, rax
-    mov rsi, rdx"
+                        "    mov rdi, rax
+    mov rsi, rdx
+    lea rdx, [{list_id}]"
                     )
                     .unwrap();
                     self.aligning_call("list_delete");
