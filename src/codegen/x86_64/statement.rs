@@ -84,7 +84,7 @@ impl<'a> AsmProgram<'a> {
                 self.generate_bool_expr(condition)?;
                 writeln!(
                     self,
-                    "    test rax, rax
+                    "    test al, al
     {end_condition} {after_loop}",
                 )
                 .unwrap();
