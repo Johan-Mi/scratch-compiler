@@ -134,8 +134,8 @@ fn trigonometry(expr: &mut Expr) -> bool {
 /// Flattens nested addition and subtraction.
 fn flatten_add_sub(expr: &mut Expr) -> bool {
     let AddSub(positives, negatives) = expr else { return false; };
-    if positives.len() == 1 && negatives.is_empty() {
-        *expr = positives.pop().unwrap();
+    if positives.len() <= 1 && negatives.is_empty() {
+        *expr = positives.pop().unwrap_or(Expr::Lit(Value::Num(0.0)));
         true
     } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
         let (flat_positives, flat_negatives): (
@@ -177,8 +177,8 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
 /// Flattens nested multiplication and division.
 fn flatten_mul_div(expr: &mut Expr) -> bool {
     let MulDiv(numerators, denominators) = expr else { return false };
-    if numerators.len() == 1 && denominators.is_empty() {
-        *expr = numerators.pop().unwrap();
+    if numerators.len() <= 1 && denominators.is_empty() {
+        *expr = numerators.pop().unwrap_or(Expr::Lit(Value::Num(1.0)));
         true
     } else if numerators.iter().any(|term| matches!(term, MulDiv(..))) {
         let (flat_numerators, flat_denominators): (

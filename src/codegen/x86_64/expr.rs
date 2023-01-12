@@ -33,7 +33,7 @@ impl<'a> AsmProgram<'a> {
         negatives: &'a [Expr],
     ) -> Result<Typ> {
         match (positives, negatives) {
-            ([], []) => self.emit("    xorpd xmm0, xmm0"),
+            ([], []) => unreachable!(),
             ([initial, positives @ ..], negatives) => {
                 self.generate_double_expr(initial)?;
                 self.emit(
@@ -94,9 +94,7 @@ impl<'a> AsmProgram<'a> {
         denominators: &'a [Expr],
     ) -> Result<Typ> {
         match (numerators, denominators) {
-            ([], []) => {
-                self.generate_lit(&Value::Num(1.0));
-            }
+            ([], []) => unreachable!(),
             ([initial, numerators @ ..], denominators) => {
                 self.generate_double_expr(initial)?;
                 self.emit(
