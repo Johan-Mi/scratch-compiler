@@ -530,14 +530,16 @@ any_lt_str:
     syscall
 
 any_eq_double:
-    cmp rdi, 2
-    jne .not_number
     xor eax, eax
+    cmp rdi, 2
+    jb .done
+    ja .is_cow
     movq xmm1, rsi
     ucomisd xmm0, xmm1
     sete al
+.done:
     ret
-.not_number:
+.is_cow:
     ; TODO
     mov eax, 60
     mov edi, 94
