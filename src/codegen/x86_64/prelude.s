@@ -216,9 +216,16 @@ any_to_double:
     cmp rdi, 1
     je .is_true
     jb .is_false
-    mov rax, 60
-    mov rdi, 98
-    syscall
+    test dil, 1
+    jnz str_to_double
+    push rdi
+    call str_to_double
+    mov rdi, [rsp]
+    movsd [rsp], xmm0
+    call free wrt ..plt
+    movsd xmm0, [rsp]
+    add rsp, 8
+    ret
 .is_number:
     movq xmm0, rsi
     ret
