@@ -4,14 +4,14 @@ use sb3_stuff::Value;
 pub enum Typ<'a> {
     Double,
     Bool,
-    StaticStr(StrKnowledge<'a>),
+    StaticStr(&'a str),
     OwnedString,
     Any,
 }
 
 pub fn expr_type(expr: &Expr) -> Typ {
     match expr {
-        Expr::Lit(Value::String(s)) => Typ::StaticStr(StrKnowledge::Exact(s)),
+        Expr::Lit(Value::String(s)) => Typ::StaticStr(s),
         Expr::Lit(Value::Bool(_)) => Typ::Bool,
         Expr::Lit(Value::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
             Typ::Double
@@ -31,8 +31,4 @@ pub fn expr_type(expr: &Expr) -> Typ {
             _ => todo!(),
         },
     }
-}
-
-pub enum StrKnowledge<'a> {
-    Exact(&'a str),
 }

@@ -1,5 +1,5 @@
 use super::{
-    typ::{expr_type, StrKnowledge, Typ},
+    typ::{expr_type, Typ},
     AsmProgram, LocalLabel,
 };
 use crate::{
@@ -714,8 +714,8 @@ impl<'a> AsmProgram<'a> {
             (Typ::Bool, Typ::StaticStr(_), false) => {
                 todo!()
             }
-            (Typ::StaticStr(StrKnowledge::Exact(s)), Typ::Bool, true)
-            | (Typ::Bool, Typ::StaticStr(StrKnowledge::Exact(s)), true) => {
+            (Typ::StaticStr(s), Typ::Bool, true)
+            | (Typ::Bool, Typ::StaticStr(s), true) => {
                 let the_bool = if matches!(lhs_type, Typ::Bool) {
                     lhs
                 } else {
@@ -731,11 +731,7 @@ impl<'a> AsmProgram<'a> {
                 }
             }
             (Typ::StaticStr(_), Typ::Bool, false) => todo!(),
-            (
-                Typ::StaticStr(StrKnowledge::Exact(lhs)),
-                Typ::StaticStr(StrKnowledge::Exact(rhs)),
-                _,
-            ) => self.emit(
+            (Typ::StaticStr(lhs), Typ::StaticStr(rhs), _) => self.emit(
                 if Value::String(lhs.into()).compare(&Value::String(rhs.into()))
                     == ordering
                 {
