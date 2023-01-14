@@ -1,5 +1,5 @@
 use super::{
-    typ::{StrKnowledge, Typ},
+    typ::{expr_type, StrKnowledge, Typ},
     AsmProgram, LocalLabel,
 };
 use crate::{
@@ -11,9 +11,12 @@ use sb3_stuff::Value;
 use std::{borrow::Cow, cmp::Ordering, fmt::Write as _};
 
 impl<'a> AsmProgram<'a> {
-    pub(super) fn generate_expr(&mut self, expr: &'a Expr) -> Result<Typ> {
+    pub(super) fn generate_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match expr {
-            Expr::Lit(lit) => Ok(self.generate_lit(lit)),
+            Expr::Lit(lit) => {
+                self.generate_lit(lit);
+                Ok(())
+            }
             Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span),
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span)
@@ -31,7 +34,7 @@ impl<'a> AsmProgram<'a> {
         &mut self,
         positives: &'a [Expr],
         negatives: &'a [Expr],
-    ) -> Result<Typ> {
+    ) -> Result<()> {
         match (positives, negatives) {
             ([], []) => unreachable!(),
             ([initial, positives @ ..], negatives) => {
@@ -85,14 +88,14 @@ impl<'a> AsmProgram<'a> {
                 self.stack_aligned ^= true;
             }
         }
-        Ok(Typ::Double)
+        Ok(())
     }
 
     fn generate_mul_div(
         &mut self,
         numerators: &'a [Expr],
         denominators: &'a [Expr],
-    ) -> Result<Typ> {
+    ) -> Result<()> {
         match (numerators, denominators) {
             ([], []) => unreachable!(),
             ([initial, numerators @ ..], denominators) => {
@@ -146,10 +149,10 @@ impl<'a> AsmProgram<'a> {
                 self.stack_aligned ^= true;
             }
         }
-        Ok(Typ::Double)
+        Ok(())
     }
 
-    fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<Typ> {
+    fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<()> {
         if let Some(param_index) =
             self.proc_params.iter().position(|&param| param == sym)
         {
@@ -162,7 +165,7 @@ impl<'a> AsmProgram<'a> {
             )
             .unwrap();
             self.aligning_call("clone_any");
-            Ok(Typ::Any)
+            Ok(())
         } else if let Some(var_id) = self.lookup_var(sym) {
             writeln!(
                 self,
@@ -171,7 +174,7 @@ impl<'a> AsmProgram<'a> {
             )
             .unwrap();
             self.aligning_call("clone_any");
-            Ok(Typ::Any)
+            Ok(())
         } else {
             Err(Box::new(Error::UnknownVarOrList {
                 span,
@@ -185,7 +188,7 @@ impl<'a> AsmProgram<'a> {
         func_name: &'static str,
         args: &'a [Expr],
         span: Span,
-    ) -> Result<Typ> {
+    ) -> Result<()> {
         let wrong_arg_count = |expected| {
             Err(Box::new(Error::FunctionWrongArgCount {
                 span,
@@ -199,7 +202,7 @@ impl<'a> AsmProgram<'a> {
             [operand] => {
                 self.generate_double_expr(operand)?;
                 self.emit(code);
-                Ok(Typ::Double)
+                Ok(())
             }
             _ => wrong_arg_count(1),
         };
@@ -208,7 +211,7 @@ impl<'a> AsmProgram<'a> {
             [operand] => {
                 this.generate_double_expr(operand)?;
                 this.aligning_call(format_args!("{func_name} wrt ..plt"));
-                Ok(Typ::Double)
+                Ok(())
             }
             _ => wrong_arg_count(1),
         };
@@ -226,7 +229,7 @@ impl<'a> AsmProgram<'a> {
                     )
                     .unwrap();
                     self.aligning_call("list_get");
-                    Ok(Typ::Any)
+                    Ok(())
                 }
                 _ => wrong_arg_count(2),
             },
@@ -274,7 +277,7 @@ impl<'a> AsmProgram<'a> {
                         self.emit("    add rsp, 8");
                     }
                     self.stack_aligned = stack_was_aligned;
-                    Ok(Typ::OwnedString)
+                    Ok(())
                 }
             },
             "and" | "or" => match args {
@@ -295,14 +298,14 @@ impl<'a> AsmProgram<'a> {
                     }
                     self.generate_bool_expr(last)?;
                     self.emit(short_circuit);
-                    Ok(Typ::Bool)
+                    Ok(())
                 }
             },
             "not" => match args {
                 [operand] => {
                     self.generate_bool_expr(operand)?;
                     self.emit("    xor al, 1");
-                    Ok(Typ::Bool)
+                    Ok(())
                 }
                 _ => wrong_arg_count(1),
             },
@@ -327,7 +330,7 @@ impl<'a> AsmProgram<'a> {
     call usize_to_double"
                     )
                     .unwrap();
-                    Ok(Typ::Double)
+                    Ok(())
                 }
                 _ => wrong_arg_count(1),
             },
@@ -357,7 +360,7 @@ impl<'a> AsmProgram<'a> {
                         "    add rsp, 16"
                     });
                     self.stack_aligned = stack_was_aligned;
-                    Ok(Typ::Double)
+                    Ok(())
                 }
                 _ => wrong_arg_count(1),
             },
@@ -391,7 +394,7 @@ impl<'a> AsmProgram<'a> {
                         self.emit("    add rsp, 8");
                     }
                     self.stack_aligned = stack_was_aligned;
-                    Ok(Typ::OwnedString)
+                    Ok(())
                 }
                 _ => wrong_arg_count(2),
             },
@@ -417,7 +420,7 @@ impl<'a> AsmProgram<'a> {
                         "    add rsp, 16"
                     });
                     self.stack_aligned = stack_was_aligned;
-                    Ok(Typ::Double)
+                    Ok(())
                 }
                 _ => wrong_arg_count(2),
             },
@@ -439,7 +442,7 @@ impl<'a> AsmProgram<'a> {
             "to-num" => match args {
                 [operand] => {
                     self.generate_double_expr(operand)?;
-                    Ok(Typ::Double)
+                    Ok(())
                 }
                 _ => wrong_arg_count(1),
             },
@@ -462,7 +465,7 @@ impl<'a> AsmProgram<'a> {
     call random_between"
                     });
                     self.stack_aligned ^= true;
-                    Ok(Typ::Double)
+                    Ok(())
                 }
                 _ => wrong_arg_count(2),
             },
@@ -474,7 +477,8 @@ impl<'a> AsmProgram<'a> {
     }
 
     pub(super) fn generate_bool_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        match self.generate_expr(expr)? {
+        self.generate_expr(expr)?;
+        match expr_type(expr) {
             Typ::Double => self.aligning_call("double_to_bool"),
             Typ::Bool => {}
             Typ::StaticStr(_) => {
@@ -506,7 +510,8 @@ impl<'a> AsmProgram<'a> {
         &mut self,
         expr: &'a Expr,
     ) -> Result<()> {
-        match self.generate_expr(expr)? {
+        self.generate_expr(expr)?;
+        match expr_type(expr) {
             Typ::Double => {}
             Typ::Bool => {
                 self.emit("mov edi, eax");
@@ -538,7 +543,8 @@ impl<'a> AsmProgram<'a> {
     }
 
     pub(super) fn generate_cow_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        match self.generate_expr(expr)? {
+        self.generate_expr(expr)?;
+        match expr_type(expr) {
             Typ::Double => self.aligning_call("double_to_cow"),
             Typ::Bool => {
                 self.emit("    mov edi, eax");
@@ -557,7 +563,8 @@ impl<'a> AsmProgram<'a> {
     }
 
     pub(super) fn generate_any_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        match self.generate_expr(expr)? {
+        self.generate_expr(expr)?;
+        match expr_type(expr) {
             Typ::Double => self.emit(
                 "    movq rdx, xmm0
     mov rax, 2",
@@ -567,7 +574,7 @@ impl<'a> AsmProgram<'a> {
         Ok(())
     }
 
-    fn generate_lit(&mut self, lit: &'a Value) -> Typ<'a> {
+    fn generate_lit(&mut self, lit: &'a Value) {
         match lit {
             Value::Num(num) => {
                 let bits = num.to_bits();
@@ -581,7 +588,6 @@ impl<'a> AsmProgram<'a> {
                     )
                     .unwrap();
                 }
-                Typ::Double
             }
             Value::String(s) => {
                 let string_id = self.allocate_static_str(Cow::Borrowed(s));
@@ -592,16 +598,9 @@ impl<'a> AsmProgram<'a> {
                     s.len(),
                 )
                 .unwrap();
-                Typ::StaticStr(StrKnowledge::Exact(s))
             }
-            Value::Bool(false) => {
-                self.emit("    xor eax, eax");
-                Typ::Bool
-            }
-            Value::Bool(true) => {
-                self.emit("    mov eax, 1");
-                Typ::Bool
-            }
+            Value::Bool(false) => self.emit("    xor eax, eax"),
+            Value::Bool(true) => self.emit("    mov eax, 1"),
         }
     }
 
@@ -610,160 +609,198 @@ impl<'a> AsmProgram<'a> {
         mut ordering: Ordering,
         mut lhs: &'a Expr,
         mut rhs: &'a Expr,
-    ) -> Result<Typ> {
+    ) -> Result<()> {
         if ordering.is_gt() {
             ordering = Ordering::Less;
             std::mem::swap(&mut lhs, &mut rhs);
         }
+        let eq = ordering.is_eq();
 
-        match self.generate_expr(lhs)? {
+        let lhs_type = expr_type(lhs);
+        let rhs_type = expr_type(rhs);
+
+        let save = |this: &mut AsmProgram, typ: &Typ| match typ {
             Typ::Double => {
-                self.emit(
+                this.emit(
                     "    sub rsp, 8
     movsd [rsp], xmm0",
                 );
-                self.stack_aligned ^= true;
-                match self.generate_expr(rhs)? {
-                    Typ::Double => {
-                        let condition =
-                            if ordering.is_lt() { 'a' } else { 'e' };
-                        writeln!(
-                            self,
-                            "    xor eax, eax
-    ucomisd xmm0, [rsp]
-    set{condition} al",
-                        )
-                        .unwrap();
-                    }
-                    Typ::Bool => self.emit(if ordering.is_eq() {
-                        "    xor eax, eax"
-                    } else {
-                        "    mov edx, 1
-    cmp qword [rsp], __?float64?__(__?Infinity?__)
-    cmovne eax, edx"
-                    }),
-                    Typ::StaticStr(_) => todo!(),
-                    Typ::OwnedString => todo!(),
-                    Typ::Any => {
-                        self.emit(
-                            "    movsd xmm0, [rsp]
-    mov rdi, rax
-    mov rsi, rdx",
-                        );
-                        self.aligning_call(if ordering.is_eq() {
-                            "any_eq_double"
-                        } else {
-                            "double_lt_any"
-                        });
-                    }
-                }
-                self.emit("    add rsp, 8");
-                self.stack_aligned ^= true;
+                this.stack_aligned ^= true;
             }
             Typ::Bool => {
-                self.emit("    push rax");
-                self.stack_aligned ^= true;
-                match self.generate_expr(rhs)? {
-                    Typ::Double => todo!(),
-                    Typ::Bool => self.emit(if ordering.is_eq() {
-                        "    cmp al, [rsp]
-    sete al"
-                    } else {
-                        "    cmp al, [rsp]
-    seta al"
-                    }),
-                    Typ::StaticStr(_) => todo!(),
-                    Typ::OwnedString => todo!(),
-                    Typ::Any => {
-                        self.emit(
-                            "    mov rdi, rax
-    mov rsi, rdx
-    mov rdx, [rsp]",
-                        );
-                        self.aligning_call(if ordering.is_eq() {
-                            "any_eq_bool"
-                        } else {
-                            "any_lt_bool"
-                        });
-                    }
-                }
-                self.stack_aligned ^= true;
-                self.emit("    add rsp, 8");
+                this.emit("    push rax");
+                this.stack_aligned ^= true;
             }
-            Typ::StaticStr(lhs_knowledge) => {
-                let lhs_is_true =
-                    matches!(lhs_knowledge, StrKnowledge::Exact("true"));
-                self.emit(
-                    "    push rdx
+            Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => this.emit(
+                "    push rdx
     push rax",
+            ),
+        };
+
+        match (&lhs_type, &rhs_type, eq) {
+            (Typ::Double, Typ::Bool, true) | (Typ::Bool, Typ::Double, true) => {
+                self.emit("    xor eax, eax");
+            }
+            (Typ::Double, Typ::Bool, false) => {
+                self.generate_expr(lhs)?;
+                save(self, &lhs_type);
+                self.generate_expr(rhs)?;
+                self.emit(
+                    "    mov edx, 1
+    mov rdi, __?float64?__(__?Infinity?__)
+    cmp qword [rsp], rdi
+    cmovne eax, edx
+    add rsp, 8",
                 );
-                match self.generate_expr(rhs)? {
-                    Typ::Double => todo!(),
-                    Typ::Bool => todo!(),
-                    Typ::StaticStr(_) => todo!(),
-                    Typ::OwnedString => todo!(),
-                    Typ::Any => {
-                        if ordering.is_eq() && lhs_is_true {
-                            self.emit(
-                                "    mov rdi, rax
+                self.stack_aligned ^= true;
+            }
+            (Typ::Bool, Typ::Double, false) => {
+                self.generate_expr(rhs)?;
+                save(self, &rhs_type);
+                self.generate_expr(lhs)?;
+                self.emit(
+                    "    mov rdx, __?float64?__(__?Infinity?__) 
+    cmp rdx, [rsp]
+    sete dl
+    andn eax, eax, edx
+    add rsp, 8",
+                );
+                self.stack_aligned ^= true;
+            }
+            (Typ::Double, Typ::Any, _) | (Typ::Any, Typ::Double, _) => {
+                let lhs_is_double = matches!(lhs_type, Typ::Double);
+                if lhs_is_double {
+                    self.generate_expr(lhs)?;
+                    save(self, &lhs_type);
+                    self.generate_expr(rhs)?;
+                } else {
+                    self.generate_expr(rhs)?;
+                    save(self, &rhs_type);
+                    self.generate_expr(lhs)?;
+                }
+                self.emit(
+                    "    movsd xmm0, [rsp]
+    mov rdi, rax
     mov rsi, rdx
-    add rsp, 16",
-                            );
-                            self.aligning_call("any_eq_true");
-                        } else {
-                            self.emit(
-                                "    mov rcx, rdx
+    add rsp, 8",
+                );
+                self.stack_aligned ^= true;
+                self.aligning_call(if eq {
+                    "any_eq_double"
+                } else if lhs_is_double {
+                    "double_lt_any"
+                } else {
+                    "any_lt_double"
+                });
+            }
+            (Typ::Bool, Typ::Bool, _) | (Typ::Double, Typ::Double, _) => {
+                self.generate_expr(lhs)?;
+                save(self, &lhs_type);
+                self.generate_expr(rhs)?;
+                let compare_instruction = if matches!(lhs_type, Typ::Bool) {
+                    "cmp al"
+                } else {
+                    "ucomisd xmm0"
+                };
+                let condition = if eq { 'e' } else { 'a' };
+                writeln!(
+                    self,
+                    "{compare_instruction}, [rsp]
+    set{condition} al
+    add rsp, 8",
+                )
+                .unwrap();
+                self.stack_aligned ^= true;
+            }
+            (Typ::Bool, Typ::StaticStr(_), false) => {
+                todo!()
+            }
+            (Typ::StaticStr(StrKnowledge::Exact(s)), Typ::Bool, true)
+            | (Typ::Bool, Typ::StaticStr(StrKnowledge::Exact(s)), true) => {
+                let the_bool = if matches!(lhs_type, Typ::Bool) {
+                    lhs
+                } else {
+                    rhs
+                };
+                if s.eq_ignore_ascii_case("true") {
+                    self.generate_expr(the_bool)?;
+                } else if s.eq_ignore_ascii_case("false") {
+                    self.generate_expr(the_bool)?;
+                    self.emit("    xor al, 1");
+                } else {
+                    self.emit("    xor eax, eax");
+                }
+            }
+            (Typ::StaticStr(_), Typ::Bool, false) => todo!(),
+            (
+                Typ::StaticStr(StrKnowledge::Exact(lhs)),
+                Typ::StaticStr(StrKnowledge::Exact(rhs)),
+                _,
+            ) => self.emit(
+                if Value::String(lhs.into()).compare(&Value::String(rhs.into()))
+                    == ordering
+                {
+                    "    mov eax, 1"
+                } else {
+                    "    xor eax, eax"
+                },
+            ),
+            (Typ::Double, Typ::StaticStr(_), _) => todo!(),
+            (Typ::Double, Typ::OwnedString, _) => todo!(),
+            (Typ::Bool, Typ::OwnedString, _) => todo!(),
+            (Typ::StaticStr(_), Typ::Double, _) => todo!(),
+            (Typ::StaticStr(_), Typ::OwnedString, _) => todo!(),
+            (Typ::StaticStr(_), Typ::Any, _) => todo!(),
+            (Typ::OwnedString, Typ::Double, _) => todo!(),
+            (Typ::OwnedString, Typ::Bool, _) => todo!(),
+            (Typ::OwnedString, Typ::StaticStr(_), _) => todo!(),
+            (Typ::OwnedString, Typ::OwnedString, _) => todo!(),
+            (Typ::OwnedString, Typ::Any, _) => todo!(),
+            (Typ::Any, Typ::StaticStr(_), _) => todo!(),
+            (Typ::Any, Typ::OwnedString, _) => todo!(),
+            (Typ::Bool, Typ::Any, _) | (Typ::Any, Typ::Bool, _) => {
+                let lhs_is_bool = matches!(lhs_type, Typ::Bool);
+                if lhs_is_bool {
+                    self.generate_expr(lhs)?;
+                    save(self, &lhs_type);
+                    self.generate_expr(rhs)?;
+                } else {
+                    self.generate_expr(rhs)?;
+                    save(self, &rhs_type);
+                    self.generate_expr(lhs)?;
+                }
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx
+    pop rdx",
+                );
+                self.stack_aligned ^= true;
+                self.aligning_call(if eq {
+                    "any_eq_bool"
+                } else if lhs_is_bool {
+                    "bool_lt_any"
+                } else {
+                    "any_lt_bool"
+                });
+            }
+            (Typ::Any, Typ::Any, _) => {
+                self.generate_expr(lhs)?;
+                save(self, &lhs_type);
+                self.generate_expr(rhs)?;
+                self.emit(
+                    "    mov rcx, rdx
     mov rdx, rax
     pop rdi
     pop rsi",
-                            );
-                            self.aligning_call(if ordering.is_eq() {
-                                "any_eq_str"
-                            } else {
-                                "any_lt_str"
-                            });
-                        }
-                    }
-                }
-            }
-            Typ::OwnedString => todo!(),
-            Typ::Any => {
-                self.emit(
-                    "    push rdx
-    push rax",
                 );
-                match self.generate_expr(rhs)? {
-                    Typ::Double => {
-                        self.emit(
-                            "pop rdi
-    pop rsi",
-                        );
-                        self.aligning_call(if ordering.is_eq() {
-                            "any_eq_double"
-                        } else {
-                            "any_lt_double"
-                        });
-                    }
-                    Typ::Bool => todo!(),
-                    Typ::StaticStr(_) => todo!(),
-                    Typ::OwnedString => todo!(),
-                    Typ::Any => {
-                        self.emit(
-                            "    mov rcx, rdx
-    mov rdx, rax
-    pop rdi
-    pop rsi",
-                        );
-                        self.aligning_call(if ordering.is_eq() {
-                            "any_eq_any"
-                        } else {
-                            "any_lt_any"
-                        });
-                    }
-                }
+                self.aligning_call(if eq {
+                    "any_eq_any"
+                } else {
+                    "any_lt_any"
+                });
             }
         }
 
-        Ok(Typ::Bool)
+        Ok(())
     }
 }
