@@ -496,7 +496,7 @@ impl<'a> AsmProgram<'a> {
                     "    mov rdi, rax
     mov rsi, rdx",
                 );
-                self.aligning_call("any_to_bool")
+                self.aligning_call("any_to_bool");
             }
         }
         Ok(())
@@ -510,7 +510,7 @@ impl<'a> AsmProgram<'a> {
             Typ::Double => {}
             Typ::Bool => {
                 self.emit("mov edi, eax");
-                self.aligning_call("bool_to_double")
+                self.aligning_call("bool_to_double");
             }
             Typ::StaticStr(_) => {
                 self.emit(
