@@ -436,7 +436,6 @@ impl<'a> AsmProgram<'a> {
             "sin" | "cos" | "tan" | "asin" | "acos" | "atan" => {
                 libc_mathop(self, func_name)
             }
-            "pressing-key" => todo!(),
             "to-num" => match args {
                 [operand] => {
                     self.generate_double_expr(operand)?;
