@@ -540,7 +540,10 @@ impl<'a> AsmProgram<'a> {
     pub(super) fn generate_cow_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match self.generate_expr(expr)? {
             Typ::Double => self.aligning_call("double_to_cow"),
-            Typ::Bool => self.aligning_call("bool_to_static_str"),
+            Typ::Bool => {
+                self.emit("    mov edi, eax");
+                self.aligning_call("bool_to_static_str");
+            }
             Typ::StaticStr(_) | Typ::OwnedString => {}
             Typ::Any => {
                 self.emit(
