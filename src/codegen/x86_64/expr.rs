@@ -282,7 +282,6 @@ impl<'a> AsmProgram<'a> {
             },
             "and" | "or" => match args {
                 [] => unreachable!(),
-                [single] => self.generate_expr(single),
                 [rest @ .., last] => {
                     let short_circuit = LocalLabel(self.new_uid());
                     let short_circuit_condition =
