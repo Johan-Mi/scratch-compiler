@@ -128,7 +128,6 @@ impl<'a> AsmProgram<'a> {
     push rdi
     call usize_to_double
     mov rdi, [{var_id}]
-    mov rsi, [{var_id}+8]
     mov qword [{var_id}], 2
     movsd [{var_id}+8], xmm0
     call drop_any"
@@ -207,7 +206,6 @@ impl<'a> AsmProgram<'a> {
                         writeln!(
                             self,
                             "    mov rdi, [{var_id}]
-    mov rsi, [{var_id}+8]
     mov [{var_id}], rax
     mov [{var_id}+8], rdx"
                         )

@@ -418,7 +418,6 @@ list_delete:
     shl rax, 4
     mov rsi, [rdx]
     mov rdi, [rsi+rax]
-    mov rsi, [rsi+rax+8]
     jmp drop_any
 .numeric_index:
     push rdx
@@ -433,7 +432,6 @@ list_delete:
     shl rax, 4
     mov rsi, [rdx]
     mov rdi, [rsi+rax]
-    mov rsi, [rsi+rax+8]
     push rdx
     push rax
     sub rsp, 8
@@ -462,7 +460,6 @@ list_delete_all:
     shl rax, 4
     mov rsi, [rbx]
     mov rdi, [rsi+rax]
-    mov rsi, [rsi+rax+8]
     call drop_any
     jmp .loop
 .done:
@@ -508,13 +505,11 @@ list_replace:
     shl rax, 4
     add rax, [r8]
     mov rdi, [rax]
-    mov rsi, [rax+8]
     mov [rax], rdx
     mov [rax+8], rcx
     jmp drop_any
 .out_of_bounds:
     mov rdi, rdx
-    mov rsi, rcx
     jmp drop_any
 
 any_eq_str:
