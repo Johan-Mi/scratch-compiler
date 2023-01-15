@@ -25,6 +25,10 @@ impl<'a> AsmProgram<'a> {
                 if_true,
                 if_false,
             } => {
+                let has_else_clause = !matches!(
+                    &**if_false,
+                    Statement::Do(stmts) if stmts.is_empty()
+                );
                 let else_label = LocalLabel(self.new_uid());
                 let end_label = LocalLabel(self.new_uid());
                 self.generate_bool_expr(condition)?;
@@ -35,10 +39,14 @@ impl<'a> AsmProgram<'a> {
                 )
                 .unwrap();
                 self.generate_statement(if_true)?;
-                writeln!(self, "    jmp {end_label}").unwrap();
+                if has_else_clause {
+                    writeln!(self, "    jmp {end_label}").unwrap();
+                }
                 self.emit(else_label);
-                self.generate_statement(if_false)?;
-                self.emit(end_label);
+                if has_else_clause {
+                    self.generate_statement(if_false)?;
+                    self.emit(end_label);
+                }
                 Ok(())
             }
             Statement::Repeat { times, body } => {
