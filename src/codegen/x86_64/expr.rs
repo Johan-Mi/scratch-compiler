@@ -562,13 +562,25 @@ impl<'a> AsmProgram<'a> {
     }
 
     pub(super) fn generate_any_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        self.generate_expr(expr)?;
-        match expr_type(expr) {
-            Typ::Double => self.emit(
-                "    movq rdx, xmm0
+        if let Expr::Lit(Value::Num(num)) = expr {
+            // Special case to avoid some back and forth moves
+            self.emit("    mov eax, 2");
+            let bits = num.to_bits();
+            if bits == 0 {
+                self.emit("    xor edx, edx");
+            } else {
+                writeln!(self, "    mov rdx, {bits}").unwrap();
+            }
+        } else {
+            self.generate_expr(expr)?;
+            match expr_type(expr) {
+                Typ::Double => self.emit(
+                    "    movq rdx, xmm0
     mov rax, 2",
-            ),
-            Typ::Bool | Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => {}
+                ),
+                Typ::Bool | Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => {
+                }
+            }
         }
         Ok(())
     }
