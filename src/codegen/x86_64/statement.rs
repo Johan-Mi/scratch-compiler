@@ -317,6 +317,16 @@ impl<'a> AsmProgram<'a> {
                 }
                 _ => return wrong_arg_count(0),
             },
+            "stop-all" => match args {
+                [] => {
+                    self.emit(
+                        "    mov eax, 60
+    xor edi, edi
+    syscall",
+                    );
+                }
+                _ => return wrong_arg_count(0),
+            },
             _ => self.generate_custom_proc_call(proc_name, args, span)?,
         }
         Ok(())
