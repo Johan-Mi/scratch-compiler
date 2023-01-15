@@ -8,6 +8,7 @@ use crate::{
     span::Span,
     uid::Uid,
 };
+use sb3_stuff::Value;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -30,6 +31,7 @@ pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
 struct AsmProgram<'a> {
     uid_generator: crate::uid::Generator,
     entry_points: Vec<Uid>,
+    broadcasts: HashMap<String, Vec<Uid>>,
     text: String,
     local_vars: HashMap<&'a str, Uid>,
     local_lists: HashMap<&'a str, Uid>,
@@ -153,11 +155,7 @@ impl<'a> AsmProgram<'a> {
         Ok(())
     }
 
-    fn generate_proc(
-        &mut self,
-        name: &str,
-        proc: &'a Procedure,
-    ) -> Result<Uid> {
+    fn generate_proc(&mut self, name: &str, proc: &'a Procedure) -> Result<()> {
         self.local_vars = proc
             .variables
             .iter()
@@ -191,10 +189,35 @@ impl<'a> AsmProgram<'a> {
                     "    pop rbp
     ret",
                 );
-                Ok(proc_id)
+                Ok(())
             }
             "when-cloned" => todo!(),
-            "when-received" => todo!(),
+            "when-received" => {
+                let [(Expr::Lit(Value::String(broadcast_name)), _)] =
+                    &proc.params[..]
+                else {
+                    todo!();
+                };
+                self.proc_stop_label = None;
+                let proc_id = self.new_uid();
+                self.broadcasts
+                    .entry(broadcast_name.to_lowercase())
+                    .or_default()
+                    .push(proc_id);
+                self.entry_points.push(proc_id);
+                self.emit(Label(proc_id));
+                self.emit(
+                    "    push rbp
+    mov rbp, rsp",
+                );
+                self.stack_aligned = true;
+                self.generate_statement(&proc.body)?;
+                self.emit(
+                    "    pop rbp
+    ret",
+                );
+                Ok(())
+            }
             _ => {
                 let CustomProcedure {
                     id: proc_id,
@@ -242,7 +265,7 @@ impl<'a> AsmProgram<'a> {
                     .unwrap();
                 }
 
-                Ok(proc_id)
+                Ok(())
             }
         }
     }
