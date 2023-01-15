@@ -704,7 +704,7 @@ impl<'a> AsmProgram<'a> {
                 let condition = if eq { 'e' } else { 'a' };
                 writeln!(
                     self,
-                    "{compare_instruction}, [rsp]
+                    "    {compare_instruction}, [rsp]
     set{condition} al
     add rsp, 8",
                 )
