@@ -205,7 +205,6 @@ impl<'a> AsmProgram<'a> {
                     .entry(broadcast_name.to_lowercase())
                     .or_default()
                     .push(proc_id);
-                self.entry_points.push(proc_id);
                 self.emit(Label(proc_id));
                 self.emit(
                     "    push rbp
