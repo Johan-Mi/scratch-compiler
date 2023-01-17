@@ -763,13 +763,47 @@ impl<'a> AsmProgram<'a> {
             (Typ::Double, Typ::OwnedString, _) => todo!(),
             (Typ::Bool, Typ::OwnedString, _) => todo!(),
             (Typ::StaticStr(_), Typ::Double, _) => todo!(),
-            (Typ::StaticStr(_), Typ::OwnedString, _) => todo!(),
             (Typ::OwnedString, Typ::Double, _) => todo!(),
             (Typ::OwnedString, Typ::Bool, _) => todo!(),
-            (Typ::OwnedString, Typ::StaticStr(_), _) => todo!(),
             (Typ::OwnedString, Typ::OwnedString, _) => todo!(),
             (Typ::OwnedString, Typ::Any, _) => todo!(),
             (Typ::Any, Typ::OwnedString, _) => todo!(),
+            (Typ::StaticStr(_), Typ::OwnedString, _)
+            | (Typ::OwnedString, Typ::StaticStr(_), _) => {
+                let lhs_is_owned = matches!(lhs_type, Typ::OwnedString);
+                if lhs_is_owned {
+                    self.generate_expr(lhs)?;
+                    save(self, &lhs_type);
+                    self.generate_expr(rhs)?;
+                } else {
+                    self.generate_expr(rhs)?;
+                    save(self, &rhs_type);
+                    self.generate_expr(lhs)?;
+                }
+                self.emit(if lhs_is_owned {
+                    "    mov rcx, rdx
+    mov rdx, rax
+    mov rdi, [rsp]
+    pop rsi, [rsp+8]"
+                } else {
+                    "    mov rdi, rax
+    mov rsi, rdx
+    mov rdx, [rsp]
+    mov rcx, [rsp+8]"
+                });
+                self.aligning_call(if eq {
+                    "str_eq_str"
+                } else {
+                    "str_lt_str"
+                });
+                self.emit(
+                    "    pop rdi
+    pop rsi
+    push rax",
+                );
+                self.aligning_call("free wrt ..plt");
+                self.emit("    pop rax");
+            }
             (Typ::StaticStr(_), Typ::Any, _)
             | (Typ::Any, Typ::StaticStr(_), _) => {
                 let lhs_is_str = matches!(lhs_type, Typ::StaticStr(_));
