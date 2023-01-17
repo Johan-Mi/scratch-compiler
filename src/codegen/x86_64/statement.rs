@@ -97,7 +97,7 @@ impl<'a> AsmProgram<'a> {
                 )
                 .unwrap();
                 self.generate_statement(body)?;
-                self.emit("    jmp {loop_label}");
+                writeln!(self, "    jmp {loop_label}").unwrap();
                 self.emit(after_loop);
                 Ok(())
             }
