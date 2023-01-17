@@ -735,3 +735,9 @@ str_to_double:
     ret
 align 8
 .inf: dq __?Infinity?__
+
+str_eq_str:
+    ; TODO
+    mov eax, 60
+    mov edi, 87
+    syscall
