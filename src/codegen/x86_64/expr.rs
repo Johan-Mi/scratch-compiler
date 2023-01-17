@@ -764,14 +764,38 @@ impl<'a> AsmProgram<'a> {
             (Typ::Bool, Typ::OwnedString, _) => todo!(),
             (Typ::StaticStr(_), Typ::Double, _) => todo!(),
             (Typ::StaticStr(_), Typ::OwnedString, _) => todo!(),
-            (Typ::StaticStr(_), Typ::Any, _) => todo!(),
             (Typ::OwnedString, Typ::Double, _) => todo!(),
             (Typ::OwnedString, Typ::Bool, _) => todo!(),
             (Typ::OwnedString, Typ::StaticStr(_), _) => todo!(),
             (Typ::OwnedString, Typ::OwnedString, _) => todo!(),
             (Typ::OwnedString, Typ::Any, _) => todo!(),
-            (Typ::Any, Typ::StaticStr(_), _) => todo!(),
             (Typ::Any, Typ::OwnedString, _) => todo!(),
+            (Typ::StaticStr(_), Typ::Any, _)
+            | (Typ::Any, Typ::StaticStr(_), _) => {
+                let lhs_is_str = matches!(lhs_type, Typ::StaticStr(_));
+                if lhs_is_str {
+                    self.generate_expr(lhs)?;
+                    save(self, &lhs_type);
+                    self.generate_expr(rhs)?;
+                } else {
+                    self.generate_expr(rhs)?;
+                    save(self, &rhs_type);
+                    self.generate_expr(lhs)?;
+                }
+                self.emit(
+                    "    mov rdi, rax
+    mov rsi, rdx
+    pop rdx
+    pop rcx",
+                );
+                self.aligning_call(if eq {
+                    "any_eq_str"
+                } else if lhs_is_str {
+                    "str_lt_any"
+                } else {
+                    "any_lt_str"
+                });
+            }
             (Typ::Bool, Typ::Any, _) | (Typ::Any, Typ::Bool, _) => {
                 let lhs_is_bool = matches!(lhs_type, Typ::Bool);
                 if lhs_is_bool {
