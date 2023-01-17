@@ -327,6 +327,39 @@ impl<'a> AsmProgram<'a> {
                 }
                 _ => return wrong_arg_count(0),
             },
+            "ask" => match args {
+                [_question] => {
+                    self.uses_ask = true;
+                    self.generate_proc_call("print", args, span)?;
+                    self.emit(if self.stack_aligned {
+                        "    sub rsp, 8"
+                    } else {
+                        "    sub rsp, 16"
+                    });
+                    self.emit(
+                        "    push qword 0
+    mov rdi, rsp
+    lea rsi, [rsp+8]
+    mov rdx, [stdin]
+    call getline wrt ..plt
+    pop rdx
+    xor edi, edi
+    cmp byte [rdx+rax], `\\n`
+    sete dil
+    sub rax, rdi
+    mov [answer+8], rax
+    mov rdi, [answer]
+    mov [answer], rdx
+    call drop_cow",
+                    );
+                    self.emit(if self.stack_aligned {
+                        "    add rsp, 8"
+                    } else {
+                        "    add rsp, 16"
+                    });
+                }
+                _ => return wrong_arg_count(1),
+            },
             _ => self.generate_custom_proc_call(proc_name, args, span)?,
         }
         Ok(())

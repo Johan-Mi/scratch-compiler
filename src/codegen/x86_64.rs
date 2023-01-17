@@ -47,6 +47,7 @@ struct AsmProgram<'a> {
     proc_params: Vec<&'a str>,
     stack_aligned: bool,
     uses_drand48: bool,
+    uses_ask: bool,
 }
 
 impl<'a> TryFrom<&'a Program> for AsmProgram<'a> {
@@ -346,6 +347,13 @@ section .data
 align 8",
             self.text,
         )?;
+        if self.uses_ask {
+            // 7 is a bogus static str pointer; the exact address doesn't
+            // matter since the length is 0, meaning that nothing will ever be
+            // read from it. All that matters is that it's odd and greater
+            // than 1, which gives it the correct type.
+            f.write_str("answer: dq 7, 0\n")?;
+        }
         for var_id in &self.var_ids {
             writeln!(f, "{var_id}: dq 2, 0")?;
         }

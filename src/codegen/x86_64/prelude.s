@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time
+extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin
 extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan, fmod
 
 %macro staticstr 2+

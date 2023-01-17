@@ -153,7 +153,14 @@ impl<'a> AsmProgram<'a> {
     }
 
     fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<()> {
-        if let Some(param_index) =
+        if sym == "answer" {
+            self.emit(
+                "    mov rdi, [answer]
+    mov rsi, [answer+8]",
+            );
+            self.aligning_call("clone_any");
+            Ok(())
+        } else if let Some(param_index) =
             self.proc_params.iter().position(|&param| param == sym)
         {
             writeln!(
