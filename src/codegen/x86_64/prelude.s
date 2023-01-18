@@ -403,7 +403,7 @@ list_delete:
     cmp rsi, 4
     jne .numeric_index
     mov eax, [rdi]
-    and eax, ~0x202020
+    and eax, ~0x20202020
     cmp eax, "LAST"
     jne .numeric_index
     test dil, 1
@@ -473,7 +473,7 @@ list_replace:
     cmp rsi, 4
     jne .numeric_index
     mov eax, [rdi]
-    and eax, ~0x202020
+    and eax, ~0x20202020
     cmp eax, "LAST"
     jne .numeric_index
     test dil, 1
