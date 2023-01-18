@@ -535,10 +535,18 @@ any_eq_double:
 .done:
     ret
 .is_cow:
-    ; TODO
-    mov eax, 60
-    mov edi, 94
-    syscall
+    sub rsp, 8
+    movsd [rsp], xmm0
+    push rsi
+    push rdi
+    call str_to_double
+    xor eax, eax
+    ucomisd xmm0, [rsp]
+    sete al
+    mov [rsp+16], rax
+    call drop_pop_cow
+    pop rax
+    ret
 
 any_lt_double:
     xor eax, eax
