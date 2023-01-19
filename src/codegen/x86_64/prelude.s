@@ -541,7 +541,7 @@ any_eq_double:
     push rdi
     call str_to_double
     xor eax, eax
-    ucomisd xmm0, [rsp]
+    ucomisd xmm0, [rsp+16]
     sete al
     mov [rsp+16], rax
     call drop_pop_cow
