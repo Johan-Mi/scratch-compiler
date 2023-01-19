@@ -286,8 +286,8 @@ impl<'a> AsmProgram<'a> {
                     let list_id = self.lookup_list(list_name, *list_span)?;
                     self.generate_any_expr(value)?;
                     self.emit(
-                        "    push rsi
-    push rdi",
+                        "    push rdx
+    push rax",
                     );
                     self.generate_any_expr(index)?;
                     writeln!(
