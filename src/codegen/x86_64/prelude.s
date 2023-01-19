@@ -412,9 +412,10 @@ list_delete:
     call free wrt ..plt
     pop rdx
 .dont_free:
-    sub qword [rdx+8], 1
-    jc .done
     mov rax, [rdx+8]
+    sub rax, 1
+    jc .done
+    mov [rdx+8], rax
     shl rax, 4
     mov rsi, [rdx]
     mov rdi, [rsi+rax]
