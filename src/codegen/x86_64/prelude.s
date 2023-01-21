@@ -612,6 +612,46 @@ align 8
 .inf: dq __?Infinity?__
 
 any_eq_any:
+    cmp rdi, 2
+    ja .first_is_cow
+    jb .todo
+    cmp rdx, 2
+    ja .double_and_cow
+    jb .todo
+    xor eax, eax
+    movq xmm0, rsi
+    movq xmm1, rcx
+    ucomisd xmm0, xmm1
+    sete al
+    ret
+.double_and_cow:
+    movq xmm0, rsi
+    mov rdi, rdx
+    mov rsi, rcx
+    test dil, 1
+    jnz str_eq_double
+    jmp .todo
+.first_is_cow:
+    cmp rdx, 2
+    jb .todo
+    je .cow_and_number
+    sub rsp, 8
+    push rdi
+    push rcx
+    call str_eq_str
+    mov [rsp+16], rax
+    mov rdi, [rsp]
+    call drop_cow
+    add rsp, 8
+    pop rdi
+    call drop_cow
+    pop rax
+    ret
+.cow_and_number:
+    movq xmm0, rcx
+    test dil, 1
+    jnz str_eq_double
+.todo:
     ; TODO
     mov eax, 60
     mov edi, 92
@@ -779,3 +819,9 @@ str_eq_str:
 .no:
     xor eax, eax
     ret
+
+str_eq_double:
+    ; TODO
+    mov eax, 60
+    mov edi, 87
+    syscall
