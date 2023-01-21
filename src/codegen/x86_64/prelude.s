@@ -514,6 +514,18 @@ list_replace:
     jmp drop_any
 
 any_eq_str:
+    cmp rdi, 2
+    jbe .todo
+    test dil, 1
+    jnz str_eq_str
+    push rdi
+    call str_eq_str
+    pop rdi
+    push rax
+    call free wrt ..plt
+    pop rax
+    ret
+.todo:
     ; TODO
     mov eax, 60
     mov edi, 96
