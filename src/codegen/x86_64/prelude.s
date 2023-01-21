@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin
+extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin, memcmp
 extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan, fmod
 
 %macro staticstr 2+
@@ -751,7 +751,19 @@ align 8
 .inf: dq __?Infinity?__
 
 str_eq_str:
-    ; TODO
-    mov eax, 60
-    mov edi, 87
-    syscall
+    cmp rsi, rcx
+    jne .no
+    ; TODO: Case insensitive comparison
+    mov rsi, rdx
+    mov rdx, rcx
+    sub rsp, 8
+    call memcmp wrt ..plt
+    add rsp, 8
+    xor edx, edx
+    test eax, eax
+    setz dl
+    mov eax, edx
+    ret
+.no:
+    xor eax, eax
+    ret
