@@ -587,10 +587,15 @@ double_lt_any:
     cmovne eax, edx
     ret
 .is_cow:
-    ; TODO
-    mov eax, 60
-    mov edi, 87
-    syscall
+    test dil, 1
+    jnz double_lt_str
+    push rdi
+    call double_lt_str
+    pop rdi
+    push rax
+    call free wrt ..plt
+    pop rax
+    ret
 align 8
 .inf: dq __?Infinity?__
 
