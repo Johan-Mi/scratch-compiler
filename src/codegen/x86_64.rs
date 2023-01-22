@@ -31,7 +31,7 @@ pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
 struct AsmProgram<'a> {
     uid_generator: crate::uid::Generator,
     entry_points: Vec<Uid>,
-    broadcasts: HashMap<String, Vec<Uid>>,
+    broadcasts: HashMap<String, (Uid, Vec<Uid>)>,
     text: String,
     local_vars: HashMap<&'a str, Uid>,
     local_lists: HashMap<&'a str, Uid>,
@@ -203,7 +203,10 @@ impl<'a> AsmProgram<'a> {
                 let proc_id = self.new_uid();
                 self.broadcasts
                     .entry(broadcast_name.to_lowercase())
-                    .or_default()
+                    .or_insert_with(|| {
+                        (self.uid_generator.new_uid(), Vec::with_capacity(1))
+                    })
+                    .1
                     .push(proc_id);
                 self.emit(Label(proc_id));
                 self.emit(
