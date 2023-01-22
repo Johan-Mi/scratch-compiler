@@ -714,7 +714,8 @@ any_eq_true:
 
 any_eq_false:
     xor eax, eax
-    lea edx, [rdi+1]
+    mov edx, edi
+    xor dl, 1
     cmp rdi, 2
     cmovb eax, edx
     jbe .done
