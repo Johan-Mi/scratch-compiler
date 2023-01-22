@@ -826,7 +826,29 @@ str_eq_str:
     ret
 
 str_eq_double:
-    ; TODO
-    mov eax, 60
-    mov edi, 87
-    syscall
+    sub rsp, 8
+    movsd [rsp], xmm0
+    call str_to_double
+    add rsp, 8
+    test al, al
+    jz .not_convertible_to_number
+    xor eax, eax
+    ucomisd xmm0, [rsp-8]
+    sete al
+    ret
+.not_convertible_to_number:
+    sub rsp, 8
+    push rsi
+    push rdi
+    call double_to_cow
+    pop rdi
+    pop rsi
+    mov [rsp], rax
+    mov rcx, rdx
+    mov rdx, rax
+    call str_eq_str
+    mov rdi, [rsp]
+    mov [rsp], rax
+    call drop_cow
+    pop rax
+    ret
