@@ -360,6 +360,18 @@ impl<'a> AsmProgram<'a> {
                 }
                 _ => return wrong_arg_count(1),
             },
+            "send-broadcast-sync" => match args {
+                [name] => {
+                    self.generate_cow_expr(name)?;
+                    // TODO
+                    self.emit(
+                        "    mov eax, 60
+    mov edi, 80
+    syscall",
+                    );
+                }
+                _ => return wrong_arg_count(1),
+            },
             _ => self.generate_custom_proc_call(proc_name, args, span)?,
         }
         Ok(())
