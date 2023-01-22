@@ -529,6 +529,8 @@ any_eq_str:
     ret
 .number:
     movq xmm0, rsi
+    mov rdi, rdx
+    mov rsi, rcx
     jmp str_eq_double
 .todo:
     ; TODO
