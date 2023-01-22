@@ -515,7 +515,8 @@ list_replace:
 
 any_eq_str:
     cmp rdi, 2
-    jbe .todo
+    je .number
+    jb .todo
     test dil, 1
     jnz str_eq_str
     push rdi
@@ -525,6 +526,9 @@ any_eq_str:
     call free wrt ..plt
     pop rax
     ret
+.number:
+    movq xmm0, rsi
+    jmp str_eq_double
 .todo:
     ; TODO
     mov eax, 60
