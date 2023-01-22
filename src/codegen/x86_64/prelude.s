@@ -281,6 +281,7 @@ clone_any:
     ret
 
 double_to_cow:
+    ; FIXME: asprintf does not format numbers exactly like JavaScript
     xorpd xmm1, xmm1
     ucomisd xmm0, xmm1
     jp .is_nan
