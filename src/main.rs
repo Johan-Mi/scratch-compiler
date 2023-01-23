@@ -38,42 +38,38 @@ fn main() -> ExitCode {
     };
     let main_file_id = FILES.lock().unwrap().add(&opts.file, input.clone());
 
-    let asts = match parser::program(Input::new(&input, main_file_id)) {
-        Ok((_, asts)) => asts,
-        Err(err) => {
-            eprintln!("{err}");
-            return ExitCode::FAILURE;
-        }
-    };
-    if opts.lint {
-        for ast in &asts {
-            lint_ast(ast);
-        }
-    }
-    if let Some(file) = opts.dump_ast.as_deref() {
-        let mut file = fs::File::create(file).unwrap();
-        for ast in &asts {
-            writeln!(file, "{ast:#?}").unwrap();
-        }
-    }
+    if let Err(err) = parser::program(Input::new(&input, main_file_id))
+        .and_then(|asts| {
+            if opts.lint {
+                for ast in &asts {
+                    lint_ast(ast);
+                }
+            }
+            if let Some(file) = opts.dump_ast.as_deref() {
+                let mut file = fs::File::create(file).unwrap();
+                for ast in &asts {
+                    writeln!(file, "{ast:#?}").unwrap();
+                }
+            }
+            let expanded = expand(asts, &opts)?;
 
-    if let Err(err) = expand(asts, &opts).and_then(|expanded| {
-        if let Some(file) = &opts.dump_expanded {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{expanded:#?}").unwrap();
-        }
-        let mut program = Program::from_asts(expanded)?;
-        if let Some(file) = &opts.dump_ir {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{program:#?}").unwrap();
-        }
-        program.optimize();
-        if let Some(file) = &opts.dump_optimized {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{program:#?}").unwrap();
-        }
-        write_program(&program, &opts)
-    }) {
+            if let Some(file) = &opts.dump_expanded {
+                let mut file = fs::File::create(file).unwrap();
+                writeln!(file, "{expanded:#?}").unwrap();
+            }
+            let mut program = Program::from_asts(expanded)?;
+            if let Some(file) = &opts.dump_ir {
+                let mut file = fs::File::create(file).unwrap();
+                writeln!(file, "{program:#?}").unwrap();
+            }
+            program.optimize();
+            if let Some(file) = &opts.dump_optimized {
+                let mut file = fs::File::create(file).unwrap();
+                writeln!(file, "{program:#?}").unwrap();
+            }
+            write_program(&program, &opts)
+        })
+    {
         err.emit();
         return ExitCode::FAILURE;
     }

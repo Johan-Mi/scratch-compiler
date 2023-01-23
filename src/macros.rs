@@ -332,7 +332,7 @@ impl MacroContext<'_> {
                 let source = fs::read_to_string(path).unwrap();
                 let file_id =
                     crate::FILES.lock().unwrap().add(path, source.clone());
-                let asts = program(Input::new(&source, file_id)).unwrap().1;
+                let asts = program(Input::new(&source, file_id))?;
                 if self.opts.lint {
                     for ast in &asts {
                         lint_ast(ast);

@@ -70,6 +70,7 @@ pub enum Error {
     MacroDefinitionMissingSignature {
         span: Span,
     },
+    Parse(String),
     ProgramMissingStage,
     SpriteMissingName {
         span: Span,
@@ -220,6 +221,10 @@ impl Error {
                     "macro definition is missing a signature",
                     *span,
                 )]
+            }
+            Parse(parse_error) => {
+                vec![just_message("syntax error")
+                    .with_notes(vec![parse_error.clone()])]
             }
             ProgramMissingStage => {
                 vec![just_message("program is missing a stage")]

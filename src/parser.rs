@@ -15,12 +15,17 @@ use nom::{
     multi::{count, many0},
     number::complete::double,
     sequence::{delimited, pair, preceded, separated_pair, terminated},
-    IResult, Parser,
+    Finish, IResult, Parser,
 };
 use std::borrow::Cow;
 
-pub fn program(input: Input) -> IResult<Input, Vec<Ast>> {
-    all_consuming(preceded(ws, many0(terminated(expr, ws))))(input)
+pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
+    Ok(
+        all_consuming(preceded(ws, many0(terminated(expr, ws))))(input)
+            .finish()
+            .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?
+            .1,
+    )
 }
 
 fn expr(input: Input) -> IResult<Input, Ast> {
