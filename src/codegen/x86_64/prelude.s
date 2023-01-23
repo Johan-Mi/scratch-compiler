@@ -2,7 +2,7 @@ default rel
 
 global main
 
-extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin, memcmp
+extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin, memcmp, memchr, strndup, strtod
 extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan, fmod
 
 %macro staticstr 2+
@@ -792,14 +792,43 @@ random_between:
     ret
 
 str_to_double:
+    ; FIXME: This should trim leading and trailing whitespace.
     xor eax, eax
     cmp rsi, 8
     je .might_be_infinity
 .regular:
-    ; TODO
-    mov eax, 60
-    mov edi, 90
-    syscall
+    ; FIXME: strtod does not use the same grammar as JavaScript.
+    sub rsp, 8
+    push rsi
+    push rdi
+    mov rdx, rsi
+    xor esi, esi
+    call memchr wrt ..plt
+    test rax, rax
+    jnz .contains_null_byte
+    mov rdi, [rsp]
+    mov rsi, [rsp+8]
+    call strndup wrt ..plt
+    mov [rsp+8], rax
+    mov rdi, rax
+    lea rsi, [rsp+16]
+    call strtod wrt ..plt
+    mov rdi, [rsp+8]
+    movsd [rsp+8], xmm0
+    call free wrt ..plt
+    pop rdx
+    movsd xmm0, [rsp]
+    add rsp, 16
+    cmp rdx, [rsp-8]
+    jne .failed_to_parse
+    mov eax, 1
+    ret
+.contains_null_byte:
+    add rsp, 24
+.failed_to_parse:
+    xor eax, eax
+    xorpd xmm0, xmm0
+    ret
 .might_be_infinity:
     mov rdx, "Infinity"
     cmp [rdi], rdx
