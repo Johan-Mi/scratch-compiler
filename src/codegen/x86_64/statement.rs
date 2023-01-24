@@ -363,12 +363,17 @@ impl<'a> AsmProgram<'a> {
             "send-broadcast-sync" => match args {
                 [name] => {
                     self.generate_cow_expr(name)?;
-                    // TODO
                     self.emit(
-                        "    mov eax, 60
-    mov edi, 80
-    syscall",
+                        "    push rax
+    mov rdi, rax",
                     );
+                    self.stack_aligned ^= true;
+                    self.aligning_call("send_broadcast");
+                    self.emit(
+                        "    pop rdi
+    call drop_cow",
+                    );
+                    self.stack_aligned ^= true;
                 }
                 _ => return wrong_arg_count(1),
             },

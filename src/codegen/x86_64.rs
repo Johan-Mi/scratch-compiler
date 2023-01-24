@@ -1,3 +1,4 @@
+mod broadcast;
 mod expr;
 mod statement;
 mod typ;
@@ -8,6 +9,7 @@ use crate::{
     span::Span,
     uid::Uid,
 };
+use broadcast::{write_broadcast_handlers, Broadcasts};
 use sb3_stuff::Value;
 use std::{
     borrow::Cow,
@@ -31,7 +33,7 @@ pub fn write_asm_file(program: &Program, path: &Path) -> Result<()> {
 struct AsmProgram<'a> {
     uid_generator: crate::uid::Generator,
     entry_points: Vec<Uid>,
-    broadcasts: HashMap<String, (Uid, Vec<Uid>)>,
+    broadcasts: Broadcasts,
     text: String,
     local_vars: HashMap<&'a str, Uid>,
     local_lists: HashMap<&'a str, Uid>,
@@ -347,18 +349,7 @@ impl fmt::Display for AsmProgram<'_> {
 {}",
             self.text,
         )?;
-        for (broadcast, receivers) in self.broadcasts.values() {
-            writeln!(f, "{broadcast}:")?;
-            let (last, rest) = receivers.split_last().unwrap();
-            if !rest.is_empty() {
-                f.write_str("    sub rsp, 8\n")?;
-                for receiver in rest {
-                    writeln!(f, "    call {receiver}")?;
-                }
-                f.write_str("    add rsp, 8\n")?;
-            }
-            writeln!(f, "    jmp {last}")?;
-        }
+        write_broadcast_handlers(&self.broadcasts, f)?;
         f.write_str(
             "
 section .data
