@@ -11,9 +11,9 @@ pub enum Typ<'a> {
 
 pub fn expr_type(expr: &Expr) -> Typ {
     match expr {
-        Expr::Lit(Value::String(s)) => Typ::StaticStr(s),
-        Expr::Lit(Value::Bool(_)) => Typ::Bool,
-        Expr::Lit(Value::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
+        Expr::Imm(Value::String(s)) => Typ::StaticStr(s),
+        Expr::Imm(Value::Bool(_)) => Typ::Bool,
+        Expr::Imm(Value::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
             Typ::Double
         }
         Expr::Sym(..) => {

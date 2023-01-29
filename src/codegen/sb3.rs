@@ -213,7 +213,7 @@ impl<'a> SerCtx<'a> {
                 );
             }
             "when-received" => {
-                let [(Expr::Lit(Value::String(broadcast_name)), _)] =
+                let [(Expr::Imm(Value::String(broadcast_name)), _)] =
                     &proc.params[..]
                 else {
                     todo!();

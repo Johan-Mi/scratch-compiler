@@ -173,7 +173,7 @@ impl<'a> AsmProgram<'a> {
         match proc_name {
             "print" => match args {
                 [message] => {
-                    if let Expr::Lit(message) = message {
+                    if let Expr::Imm(message) = message {
                         let message = message.to_cow_str();
                         let message_len = message.len();
                         let message_id = self.allocate_static_str(message);

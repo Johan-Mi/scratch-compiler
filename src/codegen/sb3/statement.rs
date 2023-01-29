@@ -206,8 +206,8 @@ impl SerCtx<'_> {
                 [name] => {
                     let broadcast_input = |parent| {
                         Ok(match name {
-                            Expr::Lit(lit) => {
-                                json!([1, [11, lit.to_string(), ""]])
+                            Expr::Imm(imm) => {
+                                json!([1, [11, imm.to_string(), ""]])
                             }
                             _ => self
                                 .serialize_expr(name, parent)?

@@ -1,6 +1,6 @@
 use crate::{
     ir::{
-        expr::Expr::Lit,
+        expr::Expr::Imm,
         statement::Statement::{self, *},
     },
     optimize::expr::optimize_expr,
@@ -66,7 +66,7 @@ fn flatten_do(stmt: &mut Statement) -> bool {
 fn const_conditions(stmt: &mut Statement) -> bool {
     match stmt {
         IfElse {
-            condition: Lit(condition),
+            condition: Imm(condition),
             if_true,
             if_false,
         } => {
@@ -78,7 +78,7 @@ fn const_conditions(stmt: &mut Statement) -> bool {
             true
         }
         Until {
-            condition: Lit(condition),
+            condition: Imm(condition),
             body,
         } => {
             *stmt = if condition.to_bool() {
@@ -89,7 +89,7 @@ fn const_conditions(stmt: &mut Statement) -> bool {
             true
         }
         While {
-            condition: Lit(condition),
+            condition: Imm(condition),
             body,
         } => {
             *stmt = if condition.to_bool() {

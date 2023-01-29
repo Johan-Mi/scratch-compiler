@@ -38,12 +38,12 @@ const EXPR_OPTIMIZATIONS: &[fn(&mut Expr) -> bool] = &[
 /// Constant folding for addition and subtraction.
 fn const_add_sub(expr: &mut Expr) -> bool {
     if let AddSub(positives, negatives) = expr
-      && positives.iter().chain(&*negatives).filter(|term| term.is_lit()).take(2).count() == 2
+      && positives.iter().chain(&*negatives).filter(|term| term.is_imm()).take(2).count() == 2
     {
-        let positive_sum: f64 = drain_lits(positives).map(|term| term.to_num()).sum();
-        let negative_sum: f64 = drain_lits(negatives).map(|term| term.to_num()).sum();
+        let positive_sum: f64 = drain_imms(positives).map(|term| term.to_num()).sum();
+        let negative_sum: f64 = drain_imms(negatives).map(|term| term.to_num()).sum();
         let sum = positive_sum - negative_sum;
-        positives.push(Lit(Value::Num(sum)));
+        positives.push(Imm(Value::Num(sum)));
         true
     } else {
         false
@@ -53,12 +53,12 @@ fn const_add_sub(expr: &mut Expr) -> bool {
 /// Constant folding for multiplication and division.
 fn const_mul_div(expr: &mut Expr) -> bool {
     if let MulDiv(numerators, denominators) = expr
-      && numerators.iter().chain(&*denominators).filter(|term| term.is_lit()).take(2).count() == 2
+      && numerators.iter().chain(&*denominators).filter(|term| term.is_imm()).take(2).count() == 2
     {
-        let numerator: f64 = drain_lits(numerators).map(|term| term.to_num()).product();
-        let denominator: f64 = drain_lits(denominators).map(|term| term.to_num()).product();
+        let numerator: f64 = drain_imms(numerators).map(|term| term.to_num()).product();
+        let denominator: f64 = drain_imms(denominators).map(|term| term.to_num()).product();
         let product = numerator / denominator;
-        numerators.push(Lit(Value::Num(product)));
+        numerators.push(Imm(Value::Num(product)));
         true
     } else {
         false
@@ -69,10 +69,10 @@ fn const_mul_div(expr: &mut Expr) -> bool {
 fn mul_zero(expr: &mut Expr) -> bool {
     if let MulDiv(numerators, _) = expr
       && numerators.iter().any(
-             |arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0),
+             |arg| matches!(arg, Imm(Value::Num(num)) if *num == 0.0),
          )
     {
-        *expr = Expr::Lit(Value::Num(0.0));
+        *expr = Expr::Imm(Value::Num(0.0));
         true
     } else {
         false
@@ -84,7 +84,7 @@ fn mul_div_one(expr: &mut Expr) -> bool {
     if let MulDiv(numerators, denominators) = expr {
         for terms in &mut [numerators, denominators] {
             if let Some(index) = terms.iter().position(
-                |arg| matches!(arg, Lit(Value::Num(num)) if *num == 1.0),
+                |arg| matches!(arg, Imm(Value::Num(num)) if *num == 1.0),
             ) {
                 terms.swap_remove(index);
                 return true;
@@ -99,7 +99,7 @@ fn add_sub_zero(expr: &mut Expr) -> bool {
     if let AddSub(positives, negatives) = expr {
         for terms in &mut [positives, negatives] {
             if let Some(index) = terms.iter().position(
-                |arg| matches!(arg, Lit(Value::Num(num)) if *num == 0.0),
+                |arg| matches!(arg, Imm(Value::Num(num)) if *num == 0.0),
             ) {
                 terms.swap_remove(index);
                 return true;
@@ -137,7 +137,7 @@ fn trigonometry(expr: &mut Expr) -> bool {
 fn flatten_add_sub(expr: &mut Expr) -> bool {
     let AddSub(positives, negatives) = expr else { return false; };
     if positives.len() <= 1 && negatives.is_empty() {
-        *expr = positives.pop().unwrap_or(Expr::Lit(Value::Num(0.0)));
+        *expr = positives.pop().unwrap_or(Expr::Imm(Value::Num(0.0)));
         true
     } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
         let (flat_positives, flat_negatives): (
@@ -180,7 +180,7 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
 fn flatten_mul_div(expr: &mut Expr) -> bool {
     let MulDiv(numerators, denominators) = expr else { return false };
     if numerators.len() <= 1 && denominators.is_empty() {
-        *expr = numerators.pop().unwrap_or(Expr::Lit(Value::Num(1.0)));
+        *expr = numerators.pop().unwrap_or(Expr::Imm(Value::Num(1.0)));
         true
     } else if numerators.iter().any(|term| matches!(term, MulDiv(..))) {
         let (flat_numerators, flat_denominators): (
@@ -241,27 +241,27 @@ fn mul_div_negation(expr: &mut Expr) -> bool {
 /// Distributes multiplication by a constant into sums containing at least one
 /// other constant.
 fn distribute_mul_into_sum(expr: &mut Expr) -> bool {
-    let contains_a_lit =
-        |v: &[Expr]| v.iter().filter(|arg| arg.is_lit()).take(1).count() == 1;
+    let contains_an_imm =
+        |v: &[Expr]| v.iter().filter(|arg| arg.is_imm()).take(1).count() == 1;
 
     if let MulDiv(args, _) = expr
       && let Some(sum_index) = args.iter().position(|arg| {
-             matches!(arg, AddSub(positives, negatives) if contains_a_lit(positives) && negatives.is_empty())
+             matches!(arg, AddSub(positives, negatives) if contains_an_imm(positives) && negatives.is_empty())
          })
-      && contains_a_lit(args)
+      && contains_an_imm(args)
     {
         let mut sum = args.swap_remove(sum_index);
-        let factor = drain_lits(args).next().unwrap();
+        let factor = drain_imms(args).next().unwrap();
         let AddSub(terms, _) = &mut sum else {
             unreachable!();
         };
-        let known_term = drain_lits(terms).next().unwrap();
+        let known_term = drain_imms(terms).next().unwrap();
         args.push(
             AddSub(vec![
                 MulDiv(vec![
-                    Expr::Lit(factor.clone()), Expr::Lit(known_term),
+                    Expr::Imm(factor.clone()), Expr::Imm(known_term),
                 ], Vec::new()),
-                MulDiv(vec![Expr::Lit(factor), sum], Vec::new()),
+                MulDiv(vec![Expr::Imm(factor), sum], Vec::new()),
             ], Vec::new()),
         );
         true
@@ -286,11 +286,11 @@ fn redundant_to_num(expr: &mut Expr) -> bool {
 /// Constant folding for math operations.
 fn const_mathops(expr: &mut Expr) -> bool {
     if let FuncCall(op, _, args) = expr
-      && let [Expr::Lit(arg)] = &args[..]
+      && let [Expr::Imm(arg)] = &args[..]
     {
         let n = arg.to_num();
         *expr = 
-        Expr::Lit(Value::Num(match *op {
+        Expr::Imm(Value::Num(match *op {
             "abs" => n.abs(),
             "floor" => n.floor(),
             "ceil" => n.ceil(),
@@ -319,7 +319,7 @@ fn empty_call(expr: &mut Expr) -> bool {
     if !args.is_empty() {
         return false;
     }
-    *expr = Expr::Lit(match *func_name {
+    *expr = Expr::Imm(match *func_name {
         "++" => Value::String("".into()),
         "and" => Value::Bool(true),
         "or" => Value::Bool(false),
@@ -366,11 +366,11 @@ fn is_guaranteed_number(expr: &Expr) -> bool {
     )
 }
 
-fn drain_lits(exprs: &mut Vec<Expr>) -> impl Iterator<Item = Value> + '_ {
+fn drain_imms(exprs: &mut Vec<Expr>) -> impl Iterator<Item = Value> + '_ {
     exprs
-        .drain_filter(|expr| expr.is_lit())
+        .drain_filter(|expr| expr.is_imm())
         .map(|expr| match expr {
-            Lit(lit) => lit,
+            Imm(imm) => imm,
             _ => unreachable!(),
         })
 }

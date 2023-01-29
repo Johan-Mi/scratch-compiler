@@ -8,7 +8,7 @@ use smol_str::SmolStr;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
-    Lit(Value),
+    Imm(Value),
     Sym(SmolStr, Span),
     FuncCall(&'static str, Span, Vec<Self>),
     AddSub(Vec<Self>, Vec<Self>),
@@ -17,16 +17,16 @@ pub enum Expr {
 
 impl Default for Expr {
     fn default() -> Self {
-        Self::Lit(Value::Num(0.0))
+        Self::Imm(Value::Num(0.0))
     }
 }
 
 impl Expr {
     pub fn from_ast(ast: Ast) -> Result<Self> {
         Ok(match ast {
-            Ast::Num(num, ..) => Self::Lit(Value::Num(num)),
-            Ast::Bool(b, ..) => Self::Lit(Value::Bool(b)),
-            Ast::String(s, ..) => Self::Lit(Value::String(s.into())),
+            Ast::Num(num, ..) => Self::Imm(Value::Num(num)),
+            Ast::Bool(b, ..) => Self::Imm(Value::Bool(b)),
+            Ast::String(s, ..) => Self::Imm(Value::String(s.into())),
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
             Ast::Node(box Ast::Sym(func_name, span), args, ..) => {
                 match &*func_name {
@@ -93,17 +93,17 @@ impl Expr {
         })
     }
 
-    /// Returns `true` if the expr is [`Lit`].
+    /// Returns `true` if the expr is [`Imm`].
     ///
-    /// [`Lit`]: Expr::Lit
+    /// [`Imm`]: Expr::Imm
     #[must_use]
-    pub const fn is_lit(&self) -> bool {
-        matches!(self, Self::Lit(..))
+    pub const fn is_imm(&self) -> bool {
+        matches!(self, Self::Imm(..))
     }
 
     pub fn traverse_postorder_mut(&mut self, f: &mut impl FnMut(&mut Self)) {
         match self {
-            Self::Lit(_) | Self::Sym(_, _) => {}
+            Self::Imm(_) | Self::Sym(_, _) => {}
             Self::FuncCall(_, _, args) => {
                 for expr in args {
                     expr.traverse_postorder_mut(f);

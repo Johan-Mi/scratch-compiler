@@ -13,8 +13,8 @@ use std::{borrow::Cow, cmp::Ordering, fmt::Write as _};
 impl<'a> AsmProgram<'a> {
     pub(super) fn generate_expr(&mut self, expr: &'a Expr) -> Result<()> {
         match expr {
-            Expr::Lit(lit) => {
-                self.generate_lit(lit);
+            Expr::Imm(imm) => {
+                self.generate_imm(imm);
                 Ok(())
             }
             Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span),
@@ -569,7 +569,7 @@ impl<'a> AsmProgram<'a> {
     }
 
     pub(super) fn generate_any_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        if let Expr::Lit(Value::Num(num)) = expr {
+        if let Expr::Imm(Value::Num(num)) = expr {
             // Special case to avoid some back and forth moves
             self.emit("    mov eax, 2");
             let bits = num.to_bits();
@@ -592,8 +592,8 @@ impl<'a> AsmProgram<'a> {
         Ok(())
     }
 
-    fn generate_lit(&mut self, lit: &'a Value) {
-        match lit {
+    fn generate_imm(&mut self, imm: &'a Value) {
+        match imm {
             Value::Num(num) => {
                 let bits = num.to_bits();
                 if bits == 0 {

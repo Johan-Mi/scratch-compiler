@@ -14,7 +14,7 @@ impl SerCtx<'_> {
         parent: Uid,
     ) -> Result<Reporter> {
         Ok(match expr {
-            Expr::Lit(lit) => Reporter::Literal(lit.clone()),
+            Expr::Imm(imm) => Reporter::Literal(imm.clone()),
             Expr::Sym(sym, span) => match &**sym {
                 "x-pos" => self.simple_symbol("motion_xposition", parent),
                 "y-pos" => self.simple_symbol("motion_yposition", parent),
