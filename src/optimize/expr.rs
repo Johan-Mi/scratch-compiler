@@ -140,34 +140,30 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
         *expr = positives.pop().unwrap_or(Expr::Imm(Value::Num(0.0)));
         true
     } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
-        let (flat_positives, flat_negatives): (
-            Vec<Vec<Expr>>,
-            Vec<Vec<Expr>>,
-        ) = positives
-            .drain_filter(|term| matches!(term, AddSub(..)))
-            .map(|term| match term {
-                AddSub(flat_positives, flat_negatives) => {
-                    (flat_positives, flat_negatives)
-                }
-                _ => unreachable!(),
-            })
-            .unzip();
+        let (flat_positives, flat_negatives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
+            positives
+                .drain_filter(|term| matches!(term, AddSub(..)))
+                .map(|term| match term {
+                    AddSub(flat_positives, flat_negatives) => {
+                        (flat_positives, flat_negatives)
+                    }
+                    _ => unreachable!(),
+                })
+                .unzip();
         positives.extend(flat_positives.into_iter().flatten());
         negatives.extend(flat_negatives.into_iter().flatten());
         true
     } else if negatives.iter().any(|term| matches!(term, AddSub(..))) {
-        let (flat_negatives, flat_positives): (
-            Vec<Vec<Expr>>,
-            Vec<Vec<Expr>>,
-        ) = negatives
-            .drain_filter(|term| matches!(term, AddSub(..)))
-            .map(|term| match term {
-                AddSub(flat_negatives, flat_positives) => {
-                    (flat_negatives, flat_positives)
-                }
-                _ => unreachable!(),
-            })
-            .unzip();
+        let (flat_negatives, flat_positives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
+            negatives
+                .drain_filter(|term| matches!(term, AddSub(..)))
+                .map(|term| match term {
+                    AddSub(flat_negatives, flat_positives) => {
+                        (flat_negatives, flat_positives)
+                    }
+                    _ => unreachable!(),
+                })
+                .unzip();
         positives.extend(flat_positives.into_iter().flatten());
         negatives.extend(flat_negatives.into_iter().flatten());
         true
@@ -289,7 +285,7 @@ fn const_mathops(expr: &mut Expr) -> bool {
       && let [Expr::Imm(arg)] = &args[..]
     {
         let n = arg.to_num();
-        *expr = 
+        *expr =
         Expr::Imm(Value::Num(match *op {
             "abs" => n.abs(),
             "floor" => n.floor(),
