@@ -32,7 +32,7 @@ const EXPR_OPTIMIZATIONS: &[fn(&mut Expr) -> bool] = &[
     redundant_to_num,
     const_mathops,
     empty_call,
-    single_and_or,
+    flatten_unary_call,
 ];
 
 /// Constant folding for addition and subtraction.
@@ -324,9 +324,12 @@ fn empty_call(expr: &mut Expr) -> bool {
     true
 }
 
-/// Flattens calls to `and` or `or` with only one argument.
-fn single_and_or(expr: &mut Expr) -> bool {
-    let Expr::FuncCall("and" | "or", _, args) = expr else { return false; };
+/// Flattens calls to some functions with only one argument.
+fn flatten_unary_call(expr: &mut Expr) -> bool {
+    let Expr::FuncCall("and" | "or" | "++", _, args) = expr
+    else {
+        return false;
+    };
     if args.len() != 1 {
         return false;
     }
