@@ -18,3 +18,7 @@ codespan = { git = "https://github.com/Johan-Mi/codespan" }
 codespan-reporting = { git = "https://github.com/Johan-Mi/codespan" }
 phf = { version = "0.11.1", features = ["macros"] }
 gumdrop = "0.8.1"
+cranelift = "0.92.0"
+cranelift-module = "0.92.0"
+cranelift-object = "0.92.0"
+env_logger = { version = "0.10.0", default-features = false }

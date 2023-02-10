@@ -1,5 +1,6 @@
 use crate::ir::expr::Expr;
-use sb3_stuff::Value;
+use cranelift::prelude::Value;
+use sb3_stuff::Value as Immediate;
 
 pub enum Typ<'a> {
     Double,
@@ -11,9 +12,9 @@ pub enum Typ<'a> {
 
 pub fn expr_type(expr: &Expr) -> Typ {
     match expr {
-        Expr::Imm(Value::String(s)) => Typ::StaticStr(s),
-        Expr::Imm(Value::Bool(_)) => Typ::Bool,
-        Expr::Imm(Value::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
+        Expr::Imm(Immediate::String(s)) => Typ::StaticStr(s),
+        Expr::Imm(Immediate::Bool(_)) => Typ::Bool,
+        Expr::Imm(Immediate::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
             Typ::Double
         }
         Expr::Sym(..) => {
@@ -30,5 +31,45 @@ pub fn expr_type(expr: &Expr) -> Typ {
             | "asin" | "acos" | "atan" | "to-num" | "random" => Typ::Double,
             _ => todo!(),
         },
+    }
+}
+
+pub enum MixedSizeValue {
+    Single(Value),
+    Pair([Value; 2]),
+}
+
+impl From<Value> for MixedSizeValue {
+    fn from(value: Value) -> Self {
+        Self::Single(value)
+    }
+}
+
+impl From<(Value, Value)> for MixedSizeValue {
+    fn from(values: (Value, Value)) -> Self {
+        Self::Pair([values.0, values.1])
+    }
+}
+
+impl MixedSizeValue {
+    pub fn single(self) -> Value {
+        match self {
+            Self::Single(v) => v,
+            Self::Pair(_) => panic!(),
+        }
+    }
+
+    pub fn pair(self) -> (Value, Value) {
+        match self {
+            Self::Single(_) => panic!(),
+            Self::Pair([v0, v1]) => (v0, v1),
+        }
+    }
+
+    pub const fn as_slice(&self) -> &[Value] {
+        match self {
+            Self::Single(v) => std::slice::from_ref(v),
+            Self::Pair(vs) => vs,
+        }
     }
 }

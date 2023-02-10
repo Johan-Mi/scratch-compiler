@@ -1,9 +1,8 @@
 default rel
 
-global main
+global drop_any, drop_cow, any_to_cow, str_length, char_at, any_to_bool, any_to_double, clone_any, clone_cow, double_to_cow, list_append, list_get, list_delete, list_delete_all, list_replace, any_eq_str, any_lt_str, any_eq_double, any_lt_double, double_lt_any, any_eq_any, any_lt_any, any_eq_bool, any_eq_true, any_eq_false, double_lt_str, str_lt_double, random_between, str_to_double, str_eq_str, str_eq_double, ask
 
-extern malloc, free, memcpy, memmove, realloc, asprintf, srand48, drand48, time, getline, stdin, memcmp, memchr, strndup, strtod
-extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan, fmod
+extern malloc, free, memcpy, memmove, realloc, asprintf, drand48, write, fflush, getline, stdin, stdout, memcmp, memchr, strndup, strtod
 
 %macro staticstr 2+
     [section .rodata]
@@ -11,6 +10,8 @@ extern log, log10, exp, exp10, sin, cos, tan, asin, acos, atan, fmod
     %1: %2
     __?SECT?__
 %endmacro
+
+section .note.GNU-stack noalloc noexec nowrite progbits
 
 section .text
 drop_any:
@@ -151,24 +152,6 @@ char_at:
     xor edx, edx
     ret
 
-usize_to_double:
-    movq xmm1, rdi
-    punpckldq xmm1, [.LCPI0_0]
-    subpd xmm1, [.LCPI0_1]
-    movapd xmm0, xmm1
-    unpckhpd xmm0, xmm1
-    addsd xmm0, xmm1
-    ret
-align 16
-.LCPI0_0:
-    dd 1127219200
-    dd 1160773632
-    dd 0
-    dd 0
-.LCPI0_1:
-    dq 0x4330000000000000
-    dq 0x4530000000000000
-
 any_to_bool:
     cmp rdi, 2
     jb .done
@@ -260,7 +243,8 @@ align 8
 
 clone_any:
     cmp rdi, 2
-    jbe .done
+    jbe clone_cow.done
+clone_cow:
     test dil, 1
     jnz .done
     sub rsp, 8
@@ -883,4 +867,26 @@ str_eq_double:
     mov [rsp], rax
     call drop_cow
     pop rax
+    ret
+
+ask:
+    mov rdx, rsi
+    mov rsi, rdi
+    mov edi, 1
+    sub rsp, 16
+    push qword 0
+    call write wrt ..plt
+    mov rdi, [stdout]
+    call fflush wrt ..plt
+    mov rdi, rsp
+    lea rsi, [rsp+8]
+    mov rdx, [stdin]
+    call getline wrt ..plt
+    mov rdx, rax
+    pop rax
+    xor edi, edi
+    cmp byte [rax+rdx-1], `\n`
+    sete dil
+    sub rdx, rdi
+    add rsp, 16
     ret

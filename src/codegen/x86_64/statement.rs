@@ -1,156 +1,175 @@
-use super::{AsmProgram, LocalLabel};
+use super::Program;
 use crate::{
     diagnostic::{Error, Result},
     ir::{expr::Expr, statement::Statement},
     span::Span,
 };
-use std::fmt::Write as _;
+use cranelift::prelude::{types::*, *};
+use cranelift_module::Module;
+use sb3_stuff::Value as Immediate;
+use std::ops::ControlFlow;
 
-impl<'a> AsmProgram<'a> {
+const CONTINUE: ControlFlow<()> = ControlFlow::Continue(());
+const BREAK: ControlFlow<()> = ControlFlow::Break(());
+
+impl<'a> Program<'a> {
     pub(super) fn generate_statement(
         &mut self,
         stmt: &'a Statement,
-    ) -> Result<()> {
+        fb: &mut FunctionBuilder,
+    ) -> Result<ControlFlow<()>> {
         match stmt {
             Statement::ProcCall {
                 proc_name,
                 args,
                 proc_span,
-            } => self.generate_proc_call(proc_name, args, *proc_span),
-            Statement::Do(stmts) => stmts
-                .iter()
-                .try_for_each(|stmt| self.generate_statement(stmt)),
+            } => self.generate_proc_call(proc_name, args, *proc_span, fb),
+            Statement::Do(stmts) => {
+                match stmts.iter().try_for_each(|stmt| {
+                    match self.generate_statement(stmt, fb) {
+                        Ok(CONTINUE) => ControlFlow::Continue(()),
+                        Ok(BREAK) => ControlFlow::Break(Ok(())),
+                        Err(err) => ControlFlow::Break(Err(err)),
+                    }
+                }) {
+                    ControlFlow::Continue(()) => Ok(CONTINUE),
+                    ControlFlow::Break(Ok(())) => Ok(BREAK),
+                    ControlFlow::Break(Err(err)) => Err(err),
+                }
+            }
             Statement::IfElse {
                 condition,
                 if_true,
                 if_false,
             } => {
-                let has_else_clause = !matches!(
-                    &**if_false,
-                    Statement::Do(stmts) if stmts.is_empty()
-                );
-                let else_label = LocalLabel(self.new_uid());
-                let end_label = LocalLabel(self.new_uid());
-                self.generate_bool_expr(condition)?;
-                writeln!(
-                    self,
-                    "    test al, al
-    jz {else_label}"
-                )
-                .unwrap();
-                self.generate_statement(if_true)?;
-                if has_else_clause {
-                    writeln!(self, "    jmp {end_label}").unwrap();
+                let then_block = fb.create_block();
+                let else_block = fb.create_block();
+                let after = fb.create_block();
+                let condition = self.generate_bool_expr(condition, fb)?;
+                fb.ins().brz(condition, else_block, &[]);
+                fb.seal_block(else_block);
+                fb.ins().jump(then_block, &[]);
+                fb.seal_block(then_block);
+                fb.switch_to_block(then_block);
+                if self.generate_statement(if_true, fb)?.is_continue() {
+                    fb.ins().jump(after, &[]);
                 }
-                self.emit(else_label);
-                if has_else_clause {
-                    self.generate_statement(if_false)?;
-                    self.emit(end_label);
+                fb.switch_to_block(else_block);
+                if self.generate_statement(if_false, fb)?.is_continue() {
+                    fb.ins().jump(after, &[]);
                 }
-                Ok(())
+                fb.switch_to_block(after);
+                fb.seal_block(after);
+                Ok(CONTINUE)
             }
             Statement::Repeat { times, body } => {
-                let loop_label = LocalLabel(self.new_uid());
-                let after_loop = LocalLabel(self.new_uid());
-                self.generate_double_expr(times)?;
-                self.emit(
-                    "    call double_to_usize
-    push rax",
-                );
-                self.stack_aligned ^= true;
-                self.emit(loop_label);
-                writeln!(
-                    self,
-                    "    sub qword [rsp], 1
-    jc {after_loop}"
-                )
-                .unwrap();
-                self.generate_statement(body)?;
-                writeln!(self, "    jmp {loop_label}").unwrap();
-                self.emit(after_loop);
-                self.emit("    add rsp, 8");
-                self.stack_aligned ^= true;
-                Ok(())
+                let counter = self.new_variable();
+                fb.declare_var(counter, I64);
+                let times = self.generate_double_expr(times, fb)?;
+                let times = fb.ins().fcvt_to_uint_sat(I64, times);
+                fb.def_var(counter, times);
+                let loop_start = fb.create_block();
+                let loop_body = fb.create_block();
+                let after = fb.create_block();
+                fb.ins().jump(loop_start, &[]);
+                fb.switch_to_block(loop_start);
+                let remaining_times = fb.use_var(counter);
+                fb.ins().brz(remaining_times, after, &[]);
+                fb.seal_block(after);
+                fb.ins().jump(loop_body, &[]);
+                fb.seal_block(loop_body);
+                fb.switch_to_block(loop_body);
+                if self.generate_statement(body, fb)?.is_continue() {
+                    let next_count = fb.ins().iadd_imm(remaining_times, -1);
+                    fb.def_var(counter, next_count);
+                    fb.ins().jump(loop_start, &[]);
+                }
+                fb.seal_block(loop_start);
+                fb.switch_to_block(after);
+                Ok(CONTINUE)
             }
             Statement::Forever(body) => {
-                let loop_label = LocalLabel(self.new_uid());
-                self.emit(loop_label);
-                self.generate_statement(body)?;
-                writeln!(self, "    jmp {loop_label}").unwrap();
-                Ok(())
+                let loop_start = fb.create_block();
+                fb.ins().jump(loop_start, &[]);
+                fb.switch_to_block(loop_start);
+                if self.generate_statement(body, fb)?.is_continue() {
+                    fb.ins().jump(loop_start, &[]);
+                }
+                fb.seal_block(loop_start);
+                Ok(BREAK)
             }
             Statement::Until { condition, body }
             | Statement::While { condition, body } => {
-                let loop_label = LocalLabel(self.new_uid());
-                let after_loop = LocalLabel(self.new_uid());
-                let end_condition = if matches!(stmt, Statement::Until { .. }) {
-                    "jnz"
+                let loop_start = fb.create_block();
+                let loop_body = fb.create_block();
+                let after = fb.create_block();
+                fb.ins().jump(loop_start, &[]);
+                fb.switch_to_block(loop_start);
+                let condition = self.generate_bool_expr(condition, fb)?;
+                if matches!(stmt, Statement::While { .. }) {
+                    fb.ins().brz(condition, after, &[]);
                 } else {
-                    "jz"
-                };
-                self.emit(loop_label);
-                self.generate_bool_expr(condition)?;
-                writeln!(
-                    self,
-                    "    test al, al
-    {end_condition} {after_loop}",
-                )
-                .unwrap();
-                self.generate_statement(body)?;
-                writeln!(self, "    jmp {loop_label}").unwrap();
-                self.emit(after_loop);
-                Ok(())
+                    fb.ins().brnz(condition, after, &[]);
+                }
+                fb.seal_block(after);
+                fb.ins().jump(loop_body, &[]);
+                fb.seal_block(loop_body);
+                fb.switch_to_block(loop_body);
+                if self.generate_statement(body, fb)?.is_continue() {
+                    fb.ins().jump(loop_start, &[]);
+                }
+                fb.seal_block(loop_start);
+                fb.switch_to_block(after);
+                Ok(CONTINUE)
             }
             Statement::For {
-                counter: (counter_name, counter_span),
+                counter,
                 times,
                 body,
             } => {
-                let var_id =
-                    self.lookup_var(counter_name).ok_or_else(|| {
-                        Box::new(Error::UnknownVar {
-                            span: *counter_span,
-                            var_name: counter_name.into(),
-                        })
-                    })?;
-                let loop_label = LocalLabel(self.new_uid());
-                let after_loop = LocalLabel(self.new_uid());
-                self.generate_double_expr(times)?;
-                let stack_was_aligned = self.stack_aligned;
-                if !stack_was_aligned {
-                    self.emit("    sub rsp, 8");
+                let var = self.lookup_var(&counter.0, fb).ok_or_else(|| {
+                    Error::UnknownVar {
+                        span: counter.1,
+                        var_name: (&counter.0).into(),
+                    }
+                })?;
+
+                let loop_start = fb.create_block();
+                let loop_body = fb.create_block();
+                let after = fb.create_block();
+                let times = self.generate_double_expr(times, fb)?;
+                let times = fb.ins().fcvt_to_uint_sat(I64, times);
+                let counter = self.new_variable();
+                fb.declare_var(counter, I64);
+                let zero = fb.ins().iconst(I64, 0);
+                fb.def_var(counter, zero);
+                fb.ins().jump(loop_start, &[]);
+                fb.switch_to_block(loop_start);
+                let old_count = fb.use_var(counter);
+                let should_break =
+                    fb.ins().icmp(IntCC::Equal, old_count, times);
+                fb.ins().brnz(should_break, after, &[]);
+                fb.ins().jump(loop_body, &[]);
+                fb.seal_block(loop_body);
+                fb.switch_to_block(loop_body);
+                let new_count = fb.ins().iadd_imm(old_count, 1);
+                fb.def_var(counter, new_count);
+
+                let new_count_as_f64 = fb.ins().fcvt_from_uint(F64, new_count);
+                let mem_flags = MemFlags::trusted();
+                let old_var_value = fb.ins().load(I64, mem_flags, var, 0);
+                self.call_extern("drop_any", &[old_var_value], fb);
+                let number_type_tag = fb.ins().iconst(I64, 2);
+                fb.ins().store(mem_flags, number_type_tag, var, 0);
+                fb.ins().store(mem_flags, new_count_as_f64, var, 8);
+
+                if self.generate_statement(body, fb)?.is_continue() {
+                    fb.ins().jump(loop_start, &[]);
                 }
-                self.stack_aligned = true;
-                self.emit(
-                    "    call double_to_usize
-    push rax
-    push qword 0",
-                );
-                self.emit(loop_label);
-                writeln!(
-                    self,
-                    "    pop rdi
-    cmp rdi, [rsp]
-    jae {after_loop}
-    inc rdi
-    push rdi
-    call usize_to_double
-    mov rdi, [{var_id}]
-    mov qword [{var_id}], 2
-    movsd [{var_id}+8], xmm0
-    call drop_any"
-                )
-                .unwrap();
-                self.generate_statement(body)?;
-                writeln!(self, "    jmp {loop_label}").unwrap();
-                self.emit(after_loop);
-                self.emit(if stack_was_aligned {
-                    "    add rsp, 8"
-                } else {
-                    "    add rsp, 16"
-                });
-                self.stack_aligned = stack_was_aligned;
-                Ok(())
+                fb.seal_block(loop_start);
+                fb.switch_to_block(after);
+                fb.seal_block(after);
+                Ok(CONTINUE)
             }
         }
     }
@@ -160,7 +179,8 @@ impl<'a> AsmProgram<'a> {
         proc_name: &str,
         args: &'a [Expr],
         span: Span,
-    ) -> Result<()> {
+        fb: &mut FunctionBuilder,
+    ) -> Result<ControlFlow<()>> {
         let wrong_arg_count = |expected| {
             Err(Box::new(Error::BuiltinProcWrongArgCount {
                 span,
@@ -173,213 +193,170 @@ impl<'a> AsmProgram<'a> {
         match proc_name {
             "print" => match args {
                 [message] => {
-                    if let Expr::Imm(message) = message {
-                        let message = message.to_cow_str();
-                        let message_len = message.len();
-                        let message_id = self.allocate_static_str(message);
-                        writeln!(
-                            self,
-                            "    mov eax, 1
-    mov edi, 1
-    lea rsi, [{message_id}]
-    mov rdx, {message_len}
-    syscall"
-                        )
-                        .unwrap();
-                    } else {
-                        self.generate_cow_expr(message)?;
-                        self.emit(
-                            "    mov rsi, rax
-    mov eax, 1
-    mov edi, 1
-    syscall
-    mov rdi, rsi",
-                        );
-                        self.aligning_call("drop_cow");
-                    }
+                    let (ptr, len) = self.generate_cow_expr(message, fb)?;
+                    let fd = fb.ins().iconst(I32, 1); // STDOUT_FILENO
+                    self.call_extern("write", &[fd, ptr, len], fb);
+                    self.call_extern("drop_cow", &[ptr], fb);
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(1),
+                _ => wrong_arg_count(1),
             },
-            ":=" | "+=" => match args {
+            ":=" => match args {
                 [Expr::Sym(var_name, var_span), value] => {
-                    let var_id =
-                        self.lookup_var(var_name).ok_or_else(|| {
-                            Box::new(Error::UnknownVar {
+                    let var =
+                        self.lookup_var(var_name, fb).ok_or_else(|| {
+                            Error::UnknownVar {
                                 span: *var_span,
                                 var_name: var_name.clone(),
-                            })
+                            }
                         })?;
-                    if proc_name == ":=" {
-                        self.generate_any_expr(value)?;
-                        writeln!(
-                            self,
-                            "    mov rdi, [{var_id}]
-    mov [{var_id}], rax
-    mov [{var_id}+8], rdx"
-                        )
-                        .unwrap();
-                        self.aligning_call("drop_any");
-                    } else {
-                        self.generate_double_expr(value)?;
-                        writeln!(
-                            self,
-                            "    sub rsp, 8
-    movsd [rsp], xmm0
-    mov rdi, [{var_id}]
-    mov rsi, [{var_id}+8]"
-                        )
-                        .unwrap();
-                        self.stack_aligned ^= true;
-                        self.aligning_call("any_to_double");
-                        writeln!(
-                            self,
-                            "    addsd xmm0, [rsp]
-    mov qword [{var_id}], 2
-    movsd [{var_id}+8], xmm0
-    add rsp, 8"
-                        )
-                        .unwrap();
-                        self.stack_aligned ^= true;
-                    }
+                    let new = self.generate_any_expr(value, fb)?;
+                    let mem_flags = MemFlags::trusted();
+                    let old = fb.ins().load(I64, mem_flags, var, 0);
+                    self.call_extern("drop_any", &[old], fb);
+                    fb.ins().store(mem_flags, new.0, var, 0);
+                    fb.ins().store(mem_flags, new.1, var, 8);
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(2),
+                _ => wrong_arg_count(2),
+            },
+            "+=" => match args {
+                [Expr::Sym(var_name, var_span), amount] => {
+                    let var =
+                        self.lookup_var(var_name, fb).ok_or_else(|| {
+                            Error::UnknownVar {
+                                span: *var_span,
+                                var_name: var_name.clone(),
+                            }
+                        })?;
+                    let amount = self.generate_double_expr(amount, fb)?;
+                    let mem_flags = MemFlags::trusted();
+                    let old_low = fb.ins().load(I64, mem_flags, var, 0);
+                    let old_high = fb.ins().load(I64, mem_flags, var, 8);
+                    let old = self.call_extern(
+                        "any_to_double",
+                        &[old_low, old_high],
+                        fb,
+                    );
+                    let old = fb.inst_results(old)[0];
+                    let new = fb.ins().fadd(old, amount);
+                    let number_type_tag = fb.ins().iconst(I64, 2);
+                    fb.ins().store(mem_flags, number_type_tag, var, 0);
+                    fb.ins().store(mem_flags, new, var, 8);
+                    Ok(CONTINUE)
+                }
+                _ => wrong_arg_count(2),
             },
             "append" => match args {
                 [Expr::Sym(list_name, list_span), value] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    self.generate_any_expr(value)?;
-                    writeln!(
-                        self,
-                        "    lea rdi, [{list_id}]
-    mov rsi, rax"
-                    )
-                    .unwrap();
-                    self.aligning_call("list_append");
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    let value = self.generate_any_expr(value, fb)?;
+                    self.call_extern(
+                        "list_append",
+                        &[list, value.0, value.1],
+                        fb,
+                    );
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(2),
+                _ => wrong_arg_count(2),
             },
             "delete" => match args {
                 [Expr::Sym(list_name, list_span), value] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    self.generate_any_expr(value)?;
-                    writeln!(
-                        self,
-                        "    mov rdi, rax
-    mov rsi, rdx
-    lea rdx, [{list_id}]"
-                    )
-                    .unwrap();
-                    self.aligning_call("list_delete");
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    let value = self.generate_any_expr(value, fb)?;
+                    self.call_extern(
+                        "list_delete",
+                        &[value.0, value.1, list],
+                        fb,
+                    );
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(2),
+                _ => wrong_arg_count(2),
             },
             "delete-all" => match args {
                 [Expr::Sym(list_name, list_span)] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    writeln!(self, "    lea rdi, [{list_id}]").unwrap();
-                    self.aligning_call("list_delete_all");
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    self.call_extern("list_delete_all", &[list], fb);
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(1),
+                _ => wrong_arg_count(1),
             },
             "replace" => match args {
                 [Expr::Sym(list_name, list_span), index, value] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    self.generate_any_expr(value)?;
-                    self.emit(
-                        "    push rdx
-    push rax",
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    let index = self.generate_any_expr(index, fb)?;
+                    let value = self.generate_any_expr(value, fb)?;
+                    self.call_extern(
+                        "list_replace",
+                        &[index.0, index.1, value.0, value.1, list],
+                        fb,
                     );
-                    self.generate_any_expr(index)?;
-                    writeln!(
-                        self,
-                        "    mov rdi, rax
-    mov rsi, rdx
-    lea r8, [{list_id}]
-    pop rdx
-    pop rcx"
-                    )
-                    .unwrap();
-                    self.aligning_call("list_replace");
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(3),
+                _ => wrong_arg_count(3),
             },
             "stop-this-script" => match args {
                 [] => {
-                    self.emit("    mov rsp, rbp");
-                    if let Some(stop_label) = self.proc_stop_label {
-                        writeln!(self, "    jmp {stop_label}").unwrap();
-                    } else {
-                        self.emit(
-                            "    pop rbp
-    ret",
-                        );
-                    }
+                    // TODO: Drop procedure parameters
+                    fb.ins().return_(&[]);
+                    Ok(BREAK)
                 }
-                _ => return wrong_arg_count(0),
+                _ => wrong_arg_count(0),
             },
             "stop-all" => match args {
                 [] => {
-                    self.emit(
-                        "    mov eax, 60
-    xor edi, edi
-    syscall",
-                    );
+                    let exit_code = fb.ins().iconst(I32, 0);
+                    self.call_extern("exit", &[exit_code], fb);
+                    fb.ins().trap(TrapCode::UnreachableCodeReached);
+                    Ok(BREAK)
                 }
-                _ => return wrong_arg_count(0),
+                _ => wrong_arg_count(0),
             },
             "ask" => match args {
-                [_question] => {
-                    self.uses_ask = true;
-                    self.generate_proc_call("print", args, span)?;
-                    self.emit(if self.stack_aligned {
-                        "    sub rsp, 8"
-                    } else {
-                        "    sub rsp, 16"
-                    });
-                    self.emit(
-                        "    push qword 0
-    mov rdi, rsp
-    lea rsi, [rsp+8]
-    mov rdx, [stdin]
-    call getline wrt ..plt
-    pop rdx
-    xor edi, edi
-    cmp byte [rdx+rax], `\\n`
-    sete dil
-    sub rax, rdi
-    mov [answer+8], rax
-    mov rdi, [answer]
-    mov [answer], rdx
-    call drop_cow",
-                    );
-                    self.emit(if self.stack_aligned {
-                        "    add rsp, 8"
-                    } else {
-                        "    add rsp, 16"
-                    });
+                [question] => {
+                    let question = self.generate_cow_expr(question, fb)?;
+                    let new =
+                        self.call_extern("ask", &[question.0, question.1], fb);
+                    let new_ptr = fb.inst_results(new)[0];
+                    let new_len = fb.inst_results(new)[1];
+                    self.call_extern("drop_cow", &[question.0], fb);
+                    let answer = self.answer(fb);
+                    let mem_flags = MemFlags::trusted();
+                    let old = fb.ins().load(I64, mem_flags, answer, 0);
+                    self.call_extern("drop_cow", &[old], fb);
+                    fb.ins().store(mem_flags, new_ptr, answer, 0);
+                    fb.ins().store(mem_flags, new_len, answer, 8);
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(1),
+                _ => wrong_arg_count(1),
             },
             "send-broadcast-sync" => match args {
-                [name] => {
-                    self.generate_cow_expr(name)?;
-                    self.emit(
-                        "    push rax
-    mov rdi, rax",
-                    );
-                    self.stack_aligned ^= true;
-                    self.aligning_call("send_broadcast");
-                    self.emit(
-                        "    pop rdi
-    call drop_cow",
-                    );
-                    self.stack_aligned ^= true;
+                [Expr::Imm(Immediate::String(name))] => {
+                    if let Some((handler, _)) =
+                        self.broadcasts.get(&*name.to_lowercase())
+                    {
+                        let handler = self
+                            .object_module
+                            .declare_func_in_func(*handler, fb.func);
+                        fb.ins().call(handler, &[]);
+                    }
+                    Ok(CONTINUE)
                 }
-                _ => return wrong_arg_count(1),
+                [name] => {
+                    let name = self.generate_cow_expr(name, fb)?;
+                    let main_broadcast_handler =
+                        self.main_broadcast_handler(fb);
+                    fb.ins().call(main_broadcast_handler, &[name.0, name.1]);
+                    self.call_extern("drop_cow", &[name.0], fb);
+                    Ok(CONTINUE)
+                }
+                _ => wrong_arg_count(1),
             },
-            _ => self.generate_custom_proc_call(proc_name, args, span)?,
+            _ => {
+                self.generate_custom_proc_call(proc_name, args, span, fb)?;
+                Ok(CONTINUE)
+            }
         }
-        Ok(())
     }
 
     fn generate_custom_proc_call(
@@ -387,6 +364,7 @@ impl<'a> AsmProgram<'a> {
         proc_name: &str,
         args: &'a [Expr],
         span: Span,
+        fb: &mut FunctionBuilder,
     ) -> Result<()> {
         let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
             Error::UnknownProc {
@@ -394,37 +372,27 @@ impl<'a> AsmProgram<'a> {
                 proc_name: proc_name.to_owned(),
             }
         })?;
-        let proc_id = proc.id;
+        let func_ref =
+            self.object_module.declare_func_in_func(proc.id, fb.func);
 
-        if args.len() != proc.params.len() {
+        let param_count = proc.param_names.len();
+        if args.len() != param_count {
             return Err(Box::new(Error::CustomProcWrongArgCount {
                 span,
                 proc_name: proc_name.to_owned(),
-                expected: proc.params.len(),
+                expected: param_count,
                 got: args.len(),
             }));
         }
 
-        let stack_was_aligned = self.stack_aligned;
-        if !stack_was_aligned {
-            self.emit("    sub rsp, 8");
-        }
-        self.stack_aligned = true;
-
-        for arg in args {
-            self.generate_any_expr(arg)?;
-            self.emit(
-                "    push rdx
-    push rax",
-            );
-        }
-
-        writeln!(self, "    call {proc_id}").unwrap();
-
-        if !stack_was_aligned {
-            self.emit("    add rsp, 8");
-        }
-        self.stack_aligned = stack_was_aligned;
+        let args = args
+            .iter()
+            .map(|arg| self.generate_any_expr(arg, fb))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flat_map(|(v0, v1)| [v0, v1])
+            .collect::<Vec<_>>();
+        fb.ins().call(func_ref, &args);
 
         Ok(())
     }

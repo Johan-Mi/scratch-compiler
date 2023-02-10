@@ -1,32 +1,36 @@
 use super::{
-    typ::{expr_type, Typ},
-    AsmProgram, LocalLabel,
+    typ::{expr_type, MixedSizeValue, Typ},
+    Program,
 };
 use crate::{
     diagnostic::{Error, Result},
     ir::expr::Expr,
     span::Span,
 };
-use sb3_stuff::Value;
-use std::{borrow::Cow, cmp::Ordering, fmt::Write as _};
+use cranelift::prelude::{types::*, *};
+use sb3_stuff::Value as Immediate;
+use std::{borrow::Cow, cmp::Ordering};
 
-impl<'a> AsmProgram<'a> {
-    pub(super) fn generate_expr(&mut self, expr: &'a Expr) -> Result<()> {
+impl<'a> Program<'a> {
+    pub(super) fn generate_expr(
+        &mut self,
+        expr: &'a Expr,
+        fb: &mut FunctionBuilder,
+    ) -> Result<MixedSizeValue> {
         match expr {
-            Expr::Imm(imm) => {
-                self.generate_imm(imm);
-                Ok(())
+            Expr::Imm(imm) => Ok(self.generate_imm(imm, fb)),
+            Expr::Sym(sym, sym_span) => {
+                self.generate_symbol(sym, *sym_span, fb)
             }
-            Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span),
             Expr::FuncCall(func_name, span, args) => {
-                self.generate_func_call(func_name, args, *span)
+                self.generate_func_call(func_name, args, *span, fb)
             }
-            Expr::AddSub(positives, negatives) => {
-                self.generate_add_sub(positives, negatives)
-            }
-            Expr::MulDiv(numerators, denominators) => {
-                self.generate_mul_div(numerators, denominators)
-            }
+            Expr::AddSub(positives, negatives) => self
+                .generate_add_sub(positives, negatives, fb)
+                .map(From::from),
+            Expr::MulDiv(numerators, denominators) => self
+                .generate_mul_div(numerators, denominators, fb)
+                .map(From::from),
         }
     }
 
@@ -34,154 +38,68 @@ impl<'a> AsmProgram<'a> {
         &mut self,
         positives: &'a [Expr],
         negatives: &'a [Expr],
-    ) -> Result<()> {
-        match (positives, negatives) {
-            ([], []) => unreachable!(),
-            ([initial, positives @ ..], negatives) => {
-                self.generate_double_expr(initial)?;
-                self.emit(
-                    "    sub rsp, 8
-    movsd [rsp], xmm0",
-                );
-                self.stack_aligned ^= true;
-                for term in positives {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    addsd xmm0, [rsp]
-    movsd [rsp], xmm0",
-                    );
-                }
-                for term in negatives {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    movsd xmm1, [rsp]
-    subsd xmm1, xmm0
-    movsd [rsp], xmm1",
-                    );
-                }
-                self.emit(
-                    "    movsd xmm0, [rsp]
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
-            }
-            ([], [initial, negatives @ ..]) => {
-                self.generate_double_expr(initial)?;
-                self.emit(
-                    "    sub rsp, 8
-    movsd [rsp], xmm0",
-                );
-                self.stack_aligned ^= true;
-                for term in negatives {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    addsd xmm0, [rsp]
-    movsd [rsp], xmm0",
-                    );
-                }
-                self.emit(
-                    "    mov rax, (1 << 63)
-    xor [rsp], rax
-    movsd xmm0, [rsp]
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
-            }
-        }
-        Ok(())
+        fb: &mut FunctionBuilder,
+    ) -> Result<Value> {
+        let positive_sum = if let [initial, rest @ ..] = positives {
+            let initial = self.generate_double_expr(initial, fb)?;
+            rest.iter().try_fold(initial, |accum, term| {
+                let term = self.generate_double_expr(term, fb)?;
+                Result::Ok(fb.ins().fadd(accum, term))
+            })?
+        } else {
+            fb.ins().f64const(0.0)
+        };
+        negatives.iter().try_fold(positive_sum, |accum, term| {
+            let term = self.generate_double_expr(term, fb)?;
+            Result::Ok(fb.ins().fsub(accum, term))
+        })
     }
 
     fn generate_mul_div(
         &mut self,
         numerators: &'a [Expr],
         denominators: &'a [Expr],
-    ) -> Result<()> {
-        match (numerators, denominators) {
-            ([], []) => unreachable!(),
-            ([initial, numerators @ ..], denominators) => {
-                self.generate_double_expr(initial)?;
-                self.emit(
-                    "    sub rsp, 8
-    movsd [rsp], xmm0",
-                );
-                self.stack_aligned ^= true;
-                for term in numerators {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    mulsd xmm0, [rsp]
-    movsd [rsp], xmm0",
-                    );
-                }
-                for term in denominators {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    movsd xmm1, [rsp]
-    divsd xmm1, xmm0
-    movsd [rsp], xmm1",
-                    );
-                }
-                self.emit(
-                    "    movsd xmm0, [rsp]
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
-            }
-            ([], [initial, denominators @ ..]) => {
-                self.generate_double_expr(initial)?;
-                self.emit(
-                    "    sub rsp, 8
-    movsd [rsp], xmm0",
-                );
-                self.stack_aligned ^= true;
-                for term in denominators {
-                    self.generate_double_expr(term)?;
-                    self.emit(
-                        "    mulsd xmm0, [rsp]
-    movsd [rsp], xmm0",
-                    );
-                }
-                self.emit(
-                    "    mov rax, __?float64?__(1.0)
-    movq xmm0, rax
-    divsd xmm0, [rsp]
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
-            }
-        }
-        Ok(())
+        fb: &mut FunctionBuilder,
+    ) -> Result<Value> {
+        let numerator_product = if let [initial, rest @ ..] = numerators {
+            let initial = self.generate_double_expr(initial, fb)?;
+            rest.iter().try_fold(initial, |accum, factor| {
+                let factor = self.generate_double_expr(factor, fb)?;
+                Result::Ok(fb.ins().fmul(accum, factor))
+            })?
+        } else {
+            fb.ins().f64const(1.0)
+        };
+        denominators
+            .iter()
+            .try_fold(numerator_product, |accum, factor| {
+                let factor = self.generate_double_expr(factor, fb)?;
+                Result::Ok(fb.ins().fdiv(accum, factor))
+            })
     }
 
-    fn generate_symbol(&mut self, sym: &str, span: Span) -> Result<()> {
+    fn generate_symbol(
+        &mut self,
+        sym: &str,
+        span: Span,
+        fb: &mut FunctionBuilder,
+    ) -> Result<MixedSizeValue> {
         if sym == "answer" {
-            self.emit(
-                "    mov rdi, [answer]
-    mov rsi, [answer+8]",
-            );
-            self.aligning_call("clone_any");
-            Ok(())
-        } else if let Some(param_index) =
-            self.proc_params.iter().position(|&param| param == sym)
-        {
-            writeln!(
-                self,
-                "    mov rdi, [rbp+{}]
-    mov rsi, [rbp+{}]",
-                (self.proc_params.len() - param_index) * 16,
-                (self.proc_params.len() - param_index) * 16 + 8,
-            )
-            .unwrap();
-            self.aligning_call("clone_any");
-            Ok(())
-        } else if let Some(var_id) = self.lookup_var(sym) {
-            writeln!(
-                self,
-                "    mov rdi, [{var_id}]
-    mov rsi, [{var_id}+8]"
-            )
-            .unwrap();
-            self.aligning_call("clone_any");
-            Ok(())
+            let answer = self.answer(fb);
+            let mem_flags = MemFlags::trusted();
+            let low = fb.ins().load(I64, mem_flags, answer, 0);
+            let high = fb.ins().load(I64, mem_flags, answer, 8);
+            let cloned = self.call_extern("clone_cow", &[low, high], fb);
+            Ok(pair(fb.inst_results(cloned)).into())
+        } else if let Some(param) = self.proc_params.get(sym) {
+            let cloned = self.call_extern("clone_any", &[param.0, param.1], fb);
+            Ok(pair(fb.inst_results(cloned)).into())
+        } else if let Some(var) = self.lookup_var(sym, fb) {
+            let mem_flags = MemFlags::trusted();
+            let low = fb.ins().load(I64, mem_flags, var, 0);
+            let high = fb.ins().load(I64, mem_flags, var, 8);
+            let cloned = self.call_extern("clone_any", &[low, high], fb);
+            Ok(pair(fb.inst_results(cloned)).into())
         } else {
             Err(Box::new(Error::UnknownVarOrList {
                 span,
@@ -195,7 +113,8 @@ impl<'a> AsmProgram<'a> {
         func_name: &'static str,
         args: &'a [Expr],
         span: Span,
-    ) -> Result<()> {
+        fb: &mut FunctionBuilder,
+    ) -> Result<MixedSizeValue> {
         let wrong_arg_count = |expected| {
             Err(Box::new(Error::FunctionWrongArgCount {
                 span,
@@ -205,20 +124,11 @@ impl<'a> AsmProgram<'a> {
             }))
         };
 
-        let mut mathop = |code| match args {
+        let mut mathop = |op| match args {
             [operand] => {
-                self.generate_double_expr(operand)?;
-                self.emit(code);
-                Ok(())
-            }
-            _ => wrong_arg_count(1),
-        };
-
-        let libc_mathop = |this: &mut Self, func_name| match args {
-            [operand] => {
-                this.generate_double_expr(operand)?;
-                this.aligning_call(format_args!("{func_name} wrt ..plt"));
-                Ok(())
+                let n = self.generate_double_expr(operand, fb)?;
+                let res = self.call_extern(op, &[n], fb);
+                Ok(fb.inst_results(res)[0].into())
             }
             _ => wrong_arg_count(1),
         };
@@ -226,92 +136,78 @@ impl<'a> AsmProgram<'a> {
         match func_name {
             "!!" => match args {
                 [Expr::Sym(list_name, list_span), index] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    self.generate_any_expr(index)?;
-                    writeln!(
-                        self,
-                        "    mov rdi, rax
-    mov rsi, rdx
-    lea rdx, [{list_id}]"
-                    )
-                    .unwrap();
-                    self.aligning_call("list_get");
-                    Ok(())
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    let index = self.generate_any_expr(index, fb)?;
+                    let got = self.call_extern(
+                        "list_get",
+                        &[index.0, index.1, list],
+                        fb,
+                    );
+                    Ok(pair(fb.inst_results(got)).into())
                 }
                 _ => wrong_arg_count(2),
             },
-            "++" => match args {
-                [] => unreachable!(),
-                [single] => self.generate_expr(single),
-                [rest @ .., last] => {
-                    self.generate_cow_expr(last)?;
-                    let stack_was_aligned = self.stack_aligned;
-                    if !stack_was_aligned {
-                        self.emit("    sub rsp, 8");
+            "++" => {
+                let args = args
+                    .iter()
+                    .map(|arg| self.generate_cow_expr(arg, fb))
+                    .collect::<Result<Vec<_>>>()?;
+                let total_len = args
+                    .iter()
+                    .map(|(_, len)| *len)
+                    .reduce(|a, b| fb.ins().iadd(a, b))
+                    .unwrap();
+                let buf = self.call_extern("malloc", &[total_len], fb);
+                let buf = fb.inst_results(buf)[0];
+
+                let dest = self.new_variable();
+                fb.declare_var(dest, I64);
+                fb.def_var(dest, buf);
+                for (i, (ptr, len)) in args.iter().enumerate() {
+                    let dest_value = fb.use_var(dest);
+                    fb.call_memcpy(
+                        self.target_frontend_config,
+                        dest_value,
+                        *ptr,
+                        *len,
+                    );
+                    if args.len() - i != 1 {
+                        let next_dest = fb.ins().iadd(dest_value, *len);
+                        fb.def_var(dest, next_dest);
                     }
-                    self.stack_aligned = true;
-                    for arg in rest.iter().rev() {
-                        self.emit(
-                            "    push rdx
-    sub rsp, 8
-    push rdx
-    push rax",
-                        );
-                        self.generate_cow_expr(arg)?;
-                        self.emit(
-                            "    add [rsp+24], rdx
-    push rdx
-    push rax
-    mov rdi, [rsp+40]
-    call malloc wrt ..plt
-    mov [rsp+32], rax
-    mov rdi, rax
-    mov rsi, [rsp]
-    mov rdx, [rsp+8]
-    call memcpy wrt ..plt
-    mov rdi, rax
-    add rdi, [rsp+8]
-    mov rsi, [rsp+16]
-    mov rdx, [rsp+24]
-    call memcpy wrt ..plt
-    call drop_pop_cow
-    call drop_pop_cow
-    pop rax
-    pop rdx",
-                        );
-                    }
-                    if !stack_was_aligned {
-                        self.emit("    add rsp, 8");
-                    }
-                    self.stack_aligned = stack_was_aligned;
-                    Ok(())
+                    self.call_extern("drop_cow", &[*ptr], fb);
                 }
-            },
+
+                Ok((buf, total_len).into())
+            }
             "and" | "or" => match args {
                 [] => unreachable!(),
                 [rest @ .., last] => {
-                    let short_circuit = LocalLabel(self.new_uid());
-                    let short_circuit_condition =
-                        if func_name == "and" { "jz" } else { "jnz" };
-                    for arg in rest {
-                        self.generate_bool_expr(arg)?;
-                        writeln!(
-                            self,
-                            "    test al, al
-    {short_circuit_condition} {short_circuit}",
-                        )
-                        .unwrap();
+                    let last_block = fb.create_block();
+                    let res = fb.append_block_param(last_block, I8);
+                    for term in rest {
+                        let term = self.generate_bool_expr(term, fb)?;
+                        let next_block = fb.create_block();
+                        if func_name == "and" {
+                            fb.ins().brz(term, last_block, &[term]);
+                        } else {
+                            fb.ins().brnz(term, last_block, &[term]);
+                        }
+                        fb.ins().jump(next_block, &[]);
+                        fb.switch_to_block(next_block);
+                        fb.seal_block(next_block);
                     }
-                    self.generate_bool_expr(last)?;
-                    self.emit(short_circuit);
-                    Ok(())
+                    let last_term = self.generate_bool_expr(last, fb)?;
+                    fb.ins().jump(last_block, &[last_term]);
+                    fb.switch_to_block(last_block);
+                    fb.seal_block(last_block);
+                    Ok(res.into())
                 }
             },
             "not" => match args {
                 [operand] => {
-                    self.generate_bool_expr(operand)?;
-                    self.emit("    xor al, 1");
-                    Ok(())
+                    let operand = self.generate_bool_expr(operand, fb)?;
+                    Ok(fb.ins().bxor_imm(operand, 1).into())
                 }
                 _ => wrong_arg_count(1),
             },
@@ -323,155 +219,100 @@ impl<'a> AsmProgram<'a> {
                         ">" => Ordering::Greater,
                         _ => unreachable!(),
                     };
-                    self.generate_comparison(ordering, lhs, rhs)
+                    Ok(self.generate_comparison(ordering, lhs, rhs, fb)?.into())
                 }
                 _ => wrong_arg_count(2),
             },
             "length" => match args {
                 [Expr::Sym(list_name, list_span)] => {
-                    let list_id = self.lookup_list(list_name, *list_span)?;
-                    writeln!(
-                        self,
-                        "    mov rdi, [{list_id}+8]
-    call usize_to_double"
-                    )
-                    .unwrap();
-                    Ok(())
+                    let list = self.lookup_list(list_name, *list_span, fb)?;
+                    let mem_flags = MemFlags::trusted();
+                    let len_as_usize = fb.ins().load(I64, mem_flags, list, 8);
+                    Ok(fb.ins().fcvt_from_uint(F64, len_as_usize).into())
                 }
                 _ => wrong_arg_count(1),
             },
             "str-length" => match args {
                 [s] => {
-                    self.generate_cow_expr(s)?;
-                    let stack_was_aligned = self.stack_aligned;
-                    self.emit(if stack_was_aligned {
-                        "    sub rsp, 8"
-                    } else {
-                        "    sub rsp, 16"
-                    });
-                    self.stack_aligned = true;
-                    self.emit(
-                        "    push rdx
-    push rax
-    call str_length
-    mov rdi, rax
-    call usize_to_double
-    movsd [rsp+16], xmm0
-    call drop_pop_cow
-    movsd xmm0, [rsp]",
-                    );
-                    self.emit(if stack_was_aligned {
-                        "    add rsp, 8"
-                    } else {
-                        "    add rsp, 16"
-                    });
-                    self.stack_aligned = stack_was_aligned;
-                    Ok(())
+                    let s = self.generate_cow_expr(s, fb)?;
+                    let len = self.call_extern("str_length", &[s.0, s.1], fb);
+                    let len = fb.inst_results(len)[0];
+                    let len = fb.ins().fcvt_from_uint(F64, len);
+                    self.call_extern("drop_cow", &[s.0], fb);
+                    Ok(len.into())
                 }
                 _ => wrong_arg_count(1),
             },
             "char-at" => match args {
                 [s, index] => {
-                    self.generate_cow_expr(s)?;
-                    self.emit(
-                        "    sub rsp, 16
-    push rdx
-    push rax",
-                    );
-                    self.generate_double_expr(index)?;
-                    let stack_was_aligned = self.stack_aligned;
-                    if !stack_was_aligned {
-                        self.emit("    sub rsp, 8");
-                    }
-                    self.stack_aligned = true;
-                    self.emit(
-                        "    call double_to_usize
-    mov rdx, rax
-    mov rdi, [rsp]
-    mov rsi, [rsp+8]
-    call char_at
-    mov [rsp+16], rax
-    mov [rsp+24], rdx
-    call drop_pop_cow
-    pop rax
-    pop rdx",
-                    );
-                    if !stack_was_aligned {
-                        self.emit("    add rsp, 8");
-                    }
-                    self.stack_aligned = stack_was_aligned;
-                    Ok(())
+                    let s = self.generate_cow_expr(s, fb)?;
+                    let index = self.generate_double_expr(index, fb)?;
+                    let index = fb.ins().fcvt_to_uint_sat(I64, index);
+                    let res =
+                        self.call_extern("char_at", &[s.0, s.1, index], fb);
+                    self.call_extern("drop_cow", &[s.0], fb);
+                    Ok(pair(fb.inst_results(res)).into())
                 }
                 _ => wrong_arg_count(2),
             },
             "mod" => match args {
-                [lhs, rhs] => {
-                    self.generate_double_expr(rhs)?;
-                    let stack_was_aligned = self.stack_aligned;
-                    self.emit(if stack_was_aligned {
-                        "    sub rsp, 8"
-                    } else {
-                        "    sub rsp, 16"
-                    });
-                    self.stack_aligned = true;
-                    self.emit("    movsd [rsp], xmm0");
-                    self.generate_double_expr(lhs)?;
-                    self.emit(
-                        "    movsd xmm1, [rsp]
-    call fmod wrt ..plt",
-                    );
-                    self.emit(if stack_was_aligned {
-                        "    add rsp, 8"
-                    } else {
-                        "    add rsp, 16"
-                    });
-                    self.stack_aligned = stack_was_aligned;
-                    Ok(())
+                [a, n] => {
+                    let a = self.generate_double_expr(a, fb)?;
+                    let n = self.generate_double_expr(n, fb)?;
+                    let res = self.call_extern("fmod", &[a, n], fb);
+                    Ok(fb.inst_results(res)[0].into())
                 }
                 _ => wrong_arg_count(2),
             },
-            "abs" => mathop(
-                "    mov rax, (1 << 63) - 1
-    movq xmm1, rax
-    andpd xmm0, xmm1",
-            ),
-            "floor" => mathop("    roundsd xmm0, xmm0, 1"),
-            "ceil" => mathop("    roundsd xmm0, xmm0, 2"),
-            "sqrt" => mathop("    sqrtsd xmm0, xmm0"),
-            "ln" => libc_mathop(self, "log"),
-            "log" => libc_mathop(self, "log10"),
-            "e^" => libc_mathop(self, "exp"),
-            "ten^" => libc_mathop(self, "exp10"),
+            "abs" => match args {
+                [operand] => {
+                    let n = self.generate_double_expr(operand, fb)?;
+                    Ok(fb.ins().fabs(n).into())
+                }
+                _ => wrong_arg_count(1),
+            },
+            "floor" => match args {
+                [operand] => {
+                    let n = self.generate_double_expr(operand, fb)?;
+                    Ok(fb.ins().floor(n).into())
+                }
+                _ => wrong_arg_count(1),
+            },
+            "ceil" => match args {
+                [operand] => {
+                    let n = self.generate_double_expr(operand, fb)?;
+                    Ok(fb.ins().ceil(n).into())
+                }
+                _ => wrong_arg_count(1),
+            },
+            "sqrt" => match args {
+                [operand] => {
+                    let n = self.generate_double_expr(operand, fb)?;
+                    Ok(fb.ins().sqrt(n).into())
+                }
+                _ => wrong_arg_count(1),
+            },
+            "ln" => mathop("log"),
+            "log" => mathop("log10"),
+            "e^" => mathop("exp"),
+            "ten^" => mathop("exp10"),
             "sin" | "cos" | "tan" | "asin" | "acos" | "atan" => {
-                libc_mathop(self, func_name)
+                mathop(func_name)
             }
             "to-num" => match args {
                 [operand] => {
-                    self.generate_double_expr(operand)?;
-                    Ok(())
+                    self.generate_double_expr(operand, fb).map(From::from)
                 }
                 _ => wrong_arg_count(1),
             },
             "random" => match args {
                 [low, high] => {
                     self.uses_drand48 = true;
-                    self.generate_double_expr(high)?;
-                    self.emit(
-                        "    sub rsp, 8
-    movsd [rsp], xmm0",
-                    );
-                    self.stack_aligned ^= true;
-                    self.generate_double_expr(low)?;
-                    self.emit("    movsd xmm1, [rsp]");
-                    self.emit(if self.stack_aligned {
-                        "    call random_between
-    add rsp, 8"
-                    } else {
-                        "    add rsp, 8
-    call random_between"
-                    });
-                    self.stack_aligned ^= true;
-                    Ok(())
+                    let low = self.generate_double_expr(low, fb)?;
+                    let high = self.generate_double_expr(high, fb)?;
+                    let res =
+                        self.call_extern("random_between", &[low, high], fb);
+                    Ok(fb.inst_results(res)[0].into())
                 }
                 _ => wrong_arg_count(2),
             },
@@ -482,143 +323,94 @@ impl<'a> AsmProgram<'a> {
         }
     }
 
-    pub(super) fn generate_bool_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        self.generate_expr(expr)?;
+    pub(super) fn generate_bool_expr(
+        &mut self,
+        expr: &'a Expr,
+        fb: &mut FunctionBuilder,
+    ) -> Result<Value> {
+        let res = self.generate_expr(expr, fb)?;
         match expr_type(expr) {
-            Typ::Double => self.aligning_call("double_to_bool"),
-            Typ::Bool => {}
-            Typ::StaticStr(_) => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("static_str_to_bool");
-            }
-            Typ::OwnedString => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("owned_string_to_bool");
-            }
+            Typ::Double => todo!(),
+            Typ::Bool => Ok(res.single()),
+            Typ::StaticStr(_) => todo!(),
+            Typ::OwnedString => todo!(),
             Typ::Any => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("any_to_bool");
+                let inst = self.call_extern("any_to_bool", res.as_slice(), fb);
+                Ok(fb.inst_results(inst)[0])
             }
         }
-        Ok(())
     }
 
     pub(super) fn generate_double_expr(
         &mut self,
         expr: &'a Expr,
-    ) -> Result<()> {
-        self.generate_expr(expr)?;
+        fb: &mut FunctionBuilder,
+    ) -> Result<Value> {
+        let res = self.generate_expr(expr, fb)?;
         match expr_type(expr) {
-            Typ::Double => {}
-            Typ::Bool => {
-                self.emit("mov edi, eax");
-                self.aligning_call("bool_to_double");
-            }
-            Typ::StaticStr(_) => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("str_to_double");
-            }
-            Typ::OwnedString => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("owned_string_to_double");
-            }
+            Typ::Double => Ok(res.single()),
+            Typ::Bool => todo!(),
+            Typ::StaticStr(_) => todo!(),
+            Typ::OwnedString => todo!(),
             Typ::Any => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("any_to_double");
+                let inst =
+                    self.call_extern("any_to_double", res.as_slice(), fb);
+                Ok(fb.inst_results(inst)[0])
             }
         }
-        Ok(())
     }
 
-    pub(super) fn generate_cow_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        self.generate_expr(expr)?;
+    pub(super) fn generate_cow_expr(
+        &mut self,
+        expr: &'a Expr,
+        fb: &mut FunctionBuilder,
+    ) -> Result<(Value, Value)> {
+        let res = self.generate_expr(expr, fb)?;
         match expr_type(expr) {
-            Typ::Double => self.aligning_call("double_to_cow"),
-            Typ::Bool => {
-                self.emit("    mov edi, eax");
-                self.aligning_call("bool_to_static_str");
+            Typ::Double => {
+                let inst =
+                    self.call_extern("double_to_cow", &[res.single()], fb);
+                Ok(pair(fb.inst_results(inst)))
             }
-            Typ::StaticStr(_) | Typ::OwnedString => {}
+            Typ::Bool => todo!(),
+            Typ::StaticStr(_) | Typ::OwnedString => Ok(res.pair()),
             Typ::Any => {
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx",
-                );
-                self.aligning_call("any_to_cow");
+                let inst = self.call_extern("any_to_cow", res.as_slice(), fb);
+                Ok(pair(fb.inst_results(inst)))
             }
         }
-        Ok(())
     }
 
-    pub(super) fn generate_any_expr(&mut self, expr: &'a Expr) -> Result<()> {
-        if let Expr::Imm(Value::Num(num)) = expr {
-            // Special case to avoid some back and forth moves
-            self.emit("    mov eax, 2");
-            let bits = num.to_bits();
-            if bits == 0 {
-                self.emit("    xor edx, edx");
-            } else {
-                writeln!(self, "    mov rdx, {bits}").unwrap();
+    pub(super) fn generate_any_expr(
+        &mut self,
+        expr: &'a Expr,
+        fb: &mut FunctionBuilder,
+    ) -> Result<(Value, Value)> {
+        let res = self.generate_expr(expr, fb)?;
+        match expr_type(expr) {
+            Typ::Double => {
+                let bits = fb.ins().bitcast(I64, MemFlags::new(), res.single());
+                Ok((fb.ins().iconst(I64, 2), bits))
             }
-        } else {
-            self.generate_expr(expr)?;
-            match expr_type(expr) {
-                Typ::Double => self.emit(
-                    "    movq rdx, xmm0
-    mov rax, 2",
-                ),
-                Typ::Bool | Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => {
-                }
+            Typ::Bool => {
+                let extended = fb.ins().uextend(I64, res.single());
+                Ok((extended, fb.ins().iconst(I64, 0)))
             }
+            Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => Ok(res.pair()),
         }
-        Ok(())
     }
 
-    fn generate_imm(&mut self, imm: &'a Value) {
+    fn generate_imm(
+        &mut self,
+        imm: &'a Immediate,
+        fb: &mut FunctionBuilder,
+    ) -> MixedSizeValue {
         match imm {
-            Value::Num(num) => {
-                let bits = num.to_bits();
-                if bits == 0 {
-                    self.emit("    xorpd xmm0, xmm0");
-                } else {
-                    writeln!(
-                        self,
-                        "    mov rax, {bits}
-    movq xmm0, rax"
-                    )
-                    .unwrap();
-                }
+            Immediate::Num(n) => fb.ins().f64const(*n).into(),
+            Immediate::String(s) => {
+                self.allocate_static_str(Cow::Borrowed(s), fb).into()
             }
-            Value::String(s) => {
-                let string_id = self.allocate_static_str(Cow::Borrowed(s));
-                writeln!(
-                    self,
-                    "    lea rax, [{string_id}]
-    mov rdx, {}",
-                    s.len(),
-                )
-                .unwrap();
-            }
-            Value::Bool(false) => self.emit("    xor eax, eax"),
-            Value::Bool(true) => self.emit("    mov eax, 1"),
+            Immediate::Bool(b) => fb.ins().iconst(I8, i64::from(*b)).into(),
         }
     }
 
@@ -627,7 +419,8 @@ impl<'a> AsmProgram<'a> {
         mut ordering: Ordering,
         mut lhs: &'a Expr,
         mut rhs: &'a Expr,
-    ) -> Result<()> {
+        fb: &mut FunctionBuilder,
+    ) -> Result<Value> {
         if ordering.is_gt() {
             ordering = Ordering::Less;
             std::mem::swap(&mut lhs, &mut rhs);
@@ -637,98 +430,56 @@ impl<'a> AsmProgram<'a> {
         let lhs_type = expr_type(lhs);
         let rhs_type = expr_type(rhs);
 
-        let save = |this: &mut AsmProgram, typ: &Typ| match typ {
-            Typ::Double => {
-                this.emit(
-                    "    sub rsp, 8
-    movsd [rsp], xmm0",
-                );
-                this.stack_aligned ^= true;
-            }
-            Typ::Bool => {
-                this.emit("    push rax");
-                this.stack_aligned ^= true;
-            }
-            Typ::StaticStr(_) | Typ::OwnedString | Typ::Any => this.emit(
-                "    push rdx
-    push rax",
-            ),
-        };
-
-        match (&lhs_type, &rhs_type, eq) {
+        Ok(match (&lhs_type, &rhs_type, eq) {
             (Typ::Double, Typ::Bool, true) | (Typ::Bool, Typ::Double, true) => {
-                self.emit("    xor eax, eax");
+                fb.ins().iconst(I8, 0)
             }
             (Typ::Double, Typ::Bool, false) => {
-                self.generate_expr(lhs)?;
-                save(self, &lhs_type);
-                self.generate_expr(rhs)?;
-                self.emit(
-                    "    mov edx, 1
-    mov rdi, __?float64?__(__?Infinity?__)
-    cmp qword [rsp], rdi
-    cmovne eax, edx
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
+                let lhs = self.generate_expr(lhs, fb)?.single();
+                let rhs = self.generate_expr(rhs, fb)?.single();
+                let inf = fb.ins().f64const(f64::INFINITY);
+                let is_inf = fb.ins().fcmp(FloatCC::Equal, lhs, inf);
+                fb.ins().bor_not(rhs, is_inf)
             }
             (Typ::Bool, Typ::Double, false) => {
-                self.generate_expr(rhs)?;
-                save(self, &rhs_type);
-                self.generate_expr(lhs)?;
-                self.emit(
-                    "    mov rdx, __?float64?__(__?Infinity?__) 
-    cmp rdx, [rsp]
-    sete dl
-    andn eax, eax, edx
-    add rsp, 8",
-                );
-                self.stack_aligned ^= true;
+                let lhs = self.generate_expr(lhs, fb)?.single();
+                let rhs = self.generate_expr(rhs, fb)?.single();
+                let inf = fb.ins().f64const(f64::INFINITY);
+                let is_inf = fb.ins().fcmp(FloatCC::Equal, rhs, inf);
+                fb.ins().bor_not(is_inf, lhs)
             }
             (Typ::Double, Typ::Any, _) | (Typ::Any, Typ::Double, _) => {
                 let lhs_is_double = matches!(lhs_type, Typ::Double);
-                if lhs_is_double {
-                    self.generate_expr(lhs)?;
-                    save(self, &lhs_type);
-                    self.generate_expr(rhs)?;
+                let (the_double, the_any) = if lhs_is_double {
+                    (self.generate_expr(lhs, fb)?, self.generate_expr(rhs, fb)?)
                 } else {
-                    self.generate_expr(rhs)?;
-                    save(self, &rhs_type);
-                    self.generate_expr(lhs)?;
-                }
-                self.emit(
-                    "    movsd xmm0, [rsp]
-    mov rdi, rax
-    mov rsi, rdx
-    add rsp, 8",
+                    (self.generate_expr(rhs, fb)?, self.generate_expr(lhs, fb)?)
+                };
+                let the_any = the_any.pair();
+                let inst = self.call_extern(
+                    if eq {
+                        "any_eq_double"
+                    } else if lhs_is_double {
+                        "double_lt_any"
+                    } else {
+                        "any_lt_double"
+                    },
+                    &[the_any.0, the_any.1, the_double.single()],
+                    fb,
                 );
-                self.stack_aligned ^= true;
-                self.aligning_call(if eq {
-                    "any_eq_double"
-                } else if lhs_is_double {
-                    "double_lt_any"
-                } else {
-                    "any_lt_double"
-                });
+                fb.inst_results(inst)[0]
             }
             (Typ::Bool, Typ::Bool, _) | (Typ::Double, Typ::Double, _) => {
-                self.generate_expr(lhs)?;
-                save(self, &lhs_type);
-                self.generate_expr(rhs)?;
-                let compare_instruction = if matches!(lhs_type, Typ::Bool) {
-                    "cmp al"
-                } else {
-                    "ucomisd xmm0"
-                };
-                let condition = if eq { 'e' } else { 'a' };
-                writeln!(
-                    self,
-                    "    {compare_instruction}, [rsp]
-    set{condition} al
-    add rsp, 8",
-                )
-                .unwrap();
-                self.stack_aligned ^= true;
+                let lhs = self.generate_expr(lhs, fb)?.single();
+                let rhs = self.generate_expr(rhs, fb)?.single();
+                match (matches!(lhs_type, Typ::Bool), eq) {
+                    (true, true) => fb.ins().icmp(IntCC::Equal, lhs, rhs),
+                    (true, false) => fb.ins().band_not(rhs, lhs),
+                    (false, true) => fb.ins().fcmp(FloatCC::Equal, lhs, rhs),
+                    (false, false) => {
+                        fb.ins().fcmp(FloatCC::LessThan, lhs, rhs)
+                    }
+                }
             }
             (Typ::Bool, Typ::StaticStr(_), false) => {
                 todo!()
@@ -741,23 +492,22 @@ impl<'a> AsmProgram<'a> {
                     rhs
                 };
                 if s.eq_ignore_ascii_case("true") {
-                    self.generate_expr(the_bool)?;
+                    self.generate_expr(the_bool, fb)?.single()
                 } else if s.eq_ignore_ascii_case("false") {
-                    self.generate_expr(the_bool)?;
-                    self.emit("    xor al, 1");
+                    let the_bool = self.generate_expr(the_bool, fb)?.single();
+                    fb.ins().bxor_imm(the_bool, 1)
                 } else {
-                    self.emit("    xor eax, eax");
+                    fb.ins().iconst(I8, 0)
                 }
             }
             (Typ::StaticStr(_), Typ::Bool, false) => todo!(),
-            (Typ::StaticStr(lhs), Typ::StaticStr(rhs), _) => self.emit(
-                if Value::String(lhs.into()).compare(&Value::String(rhs.into()))
-                    == ordering
-                {
-                    "    mov eax, 1"
-                } else {
-                    "    xor eax, eax"
-                },
+            (Typ::StaticStr(lhs), Typ::StaticStr(rhs), _) => fb.ins().iconst(
+                I8,
+                i64::from(
+                    Immediate::String(lhs.into())
+                        .compare(&Immediate::String(rhs.into()))
+                        == ordering,
+                ),
             ),
             (Typ::Double, Typ::StaticStr(_), _) => todo!(),
             (Typ::Double, Typ::OwnedString, _) => todo!(),
@@ -770,109 +520,79 @@ impl<'a> AsmProgram<'a> {
             (Typ::Any, Typ::OwnedString, _) => todo!(),
             (Typ::StaticStr(_), Typ::OwnedString, _)
             | (Typ::OwnedString, Typ::StaticStr(_), _) => {
-                let lhs_is_owned = matches!(lhs_type, Typ::OwnedString);
-                if lhs_is_owned {
-                    self.generate_expr(lhs)?;
-                    save(self, &lhs_type);
-                    self.generate_expr(rhs)?;
-                } else {
-                    self.generate_expr(rhs)?;
-                    save(self, &rhs_type);
-                    self.generate_expr(lhs)?;
-                }
-                self.emit(if lhs_is_owned {
-                    "    mov rcx, rdx
-    mov rdx, rax
-    mov rdi, [rsp]
-    pop rsi, [rsp+8]"
-                } else {
-                    "    mov rdi, rax
-    mov rsi, rdx
-    mov rdx, [rsp]
-    mov rcx, [rsp+8]"
-                });
-                self.aligning_call(if eq {
-                    "str_eq_str"
-                } else {
-                    "str_lt_str"
-                });
-                self.emit(
-                    "    pop rdi
-    pop rsi
-    push rax",
+                let lhs = self.generate_expr(lhs, fb)?.pair();
+                let rhs = self.generate_expr(rhs, fb)?.pair();
+                let inst = self.call_extern(
+                    if eq { "str_eq_str" } else { "str_lt_str" },
+                    &[lhs.0, lhs.1, rhs.0, rhs.1],
+                    fb,
                 );
-                self.aligning_call("free wrt ..plt");
-                self.emit("    pop rax");
+                let to_free = if matches!(lhs_type, Typ::OwnedString) {
+                    lhs
+                } else {
+                    rhs
+                };
+                self.call_extern("free", &[to_free.0], fb);
+                fb.inst_results(inst)[0]
             }
             (Typ::StaticStr(_), Typ::Any, _)
             | (Typ::Any, Typ::StaticStr(_), _) => {
                 let lhs_is_str = matches!(lhs_type, Typ::StaticStr(_));
-                if lhs_is_str {
-                    self.generate_expr(lhs)?;
-                    save(self, &lhs_type);
-                    self.generate_expr(rhs)?;
-                } else {
-                    self.generate_expr(rhs)?;
-                    save(self, &rhs_type);
-                    self.generate_expr(lhs)?;
-                }
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx
-    pop rdx
-    pop rcx",
+                let lhs = self.generate_expr(lhs, fb)?.pair();
+                let rhs = self.generate_expr(rhs, fb)?.pair();
+                let inst = self.call_extern(
+                    if eq {
+                        "any_eq_str"
+                    } else if lhs_is_str {
+                        "str_lt_any"
+                    } else {
+                        "any_lt_str"
+                    },
+                    &if eq && lhs_is_str {
+                        [rhs.0, rhs.1, lhs.0, lhs.1]
+                    } else {
+                        [lhs.0, lhs.1, rhs.0, rhs.1]
+                    },
+                    fb,
                 );
-                self.aligning_call(if eq {
-                    "any_eq_str"
-                } else if lhs_is_str {
-                    "str_lt_any"
-                } else {
-                    "any_lt_str"
-                });
+                fb.inst_results(inst)[0]
             }
             (Typ::Bool, Typ::Any, _) | (Typ::Any, Typ::Bool, _) => {
                 let lhs_is_bool = matches!(lhs_type, Typ::Bool);
-                if lhs_is_bool {
-                    self.generate_expr(lhs)?;
-                    save(self, &lhs_type);
-                    self.generate_expr(rhs)?;
-                } else {
-                    self.generate_expr(rhs)?;
-                    save(self, &rhs_type);
-                    self.generate_expr(lhs)?;
-                }
-                self.emit(
-                    "    mov rdi, rax
-    mov rsi, rdx
-    pop rdx",
+                let (the_bool, the_any) =
+                    if lhs_is_bool { (lhs, rhs) } else { (rhs, lhs) };
+                let the_bool = self.generate_expr(the_bool, fb)?.single();
+                let the_any = self.generate_expr(the_any, fb)?.pair();
+                let inst = self.call_extern(
+                    if eq {
+                        "any_eq_bool"
+                    } else if lhs_is_bool {
+                        "bool_lt_any"
+                    } else {
+                        "any_lt_bool"
+                    },
+                    &[the_any.0, the_any.1, the_bool],
+                    fb,
                 );
-                self.stack_aligned ^= true;
-                self.aligning_call(if eq {
-                    "any_eq_bool"
-                } else if lhs_is_bool {
-                    "bool_lt_any"
-                } else {
-                    "any_lt_bool"
-                });
+                fb.inst_results(inst)[0]
             }
             (Typ::Any, Typ::Any, _) => {
-                self.generate_expr(lhs)?;
-                save(self, &lhs_type);
-                self.generate_expr(rhs)?;
-                self.emit(
-                    "    mov rcx, rdx
-    mov rdx, rax
-    pop rdi
-    pop rsi",
+                let lhs = self.generate_expr(lhs, fb)?.pair();
+                let rhs = self.generate_expr(rhs, fb)?.pair();
+                let inst = self.call_extern(
+                    if eq { "any_eq_any" } else { "any_lt_any" },
+                    &[lhs.0, lhs.1, rhs.0, rhs.1],
+                    fb,
                 );
-                self.aligning_call(if eq {
-                    "any_eq_any"
-                } else {
-                    "any_lt_any"
-                });
+                fb.inst_results(inst)[0]
             }
-        }
+        })
+    }
+}
 
-        Ok(())
+fn pair(values: &[Value]) -> (Value, Value) {
+    match values {
+        [v0, v1] => (*v0, *v1),
+        _ => unimplemented!(),
     }
 }
