@@ -429,7 +429,6 @@ list_delete:
     add rdi, rax
     lea rsi, [rdi+16]
     mov rdx, [rdx+8]
-    dec rdx
     shl rdx, 4
     sub rdx, rax
     jmp memmove wrt ..plt
