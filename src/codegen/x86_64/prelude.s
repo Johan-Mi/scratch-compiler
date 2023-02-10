@@ -414,7 +414,6 @@ list_delete:
     jc .done
     cmp rax, [rdx+8]
     jae .done
-    mov rax, [rdx+8]
     shl rax, 4
     mov rsi, [rdx]
     mov rdi, [rsi+rax]
@@ -426,11 +425,12 @@ list_delete:
     pop rax
     pop rdx
     dec qword [rdx+8]
-    shl rax, 4
-    add rax, [rdx]
-    mov rdi, rax
+    mov rdi, [rdx]
+    add rdi, rax
     lea rsi, [rdi+16]
     mov rdx, [rdx+8]
+    dec rdx
+    shl rdx, 4
     sub rdx, rax
     jmp memmove wrt ..plt
 .done:
