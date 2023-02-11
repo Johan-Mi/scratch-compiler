@@ -203,27 +203,28 @@ impl<'a> Program<'a> {
         ctx: &mut Context,
         func_ctx: &mut FunctionBuilderContext,
     ) -> Result<()> {
-        self.sprite_vars = sprite
-            .variables
-            .iter()
-            .map(String::as_str)
-            .zip(iter::repeat_with(|| {
-                self.object_module
-                    .declare_anonymous_data(true, false)
-                    .unwrap()
-            }))
-            .collect();
+        self.sprite_vars.clear();
+        self.sprite_vars.extend(
+            sprite
+                .variables
+                .iter()
+                .map(String::as_str)
+                .zip(iter::repeat_with(|| {
+                    self.object_module
+                        .declare_anonymous_data(true, false)
+                        .unwrap()
+                })),
+        );
 
-        self.sprite_lists = sprite
-            .lists
-            .iter()
-            .map(String::as_str)
-            .zip(iter::repeat_with(|| {
-                self.object_module
-                    .declare_anonymous_data(true, false)
-                    .unwrap()
-            }))
-            .collect();
+        self.sprite_lists.clear();
+        self.sprite_lists
+            .extend(sprite.lists.iter().map(String::as_str).zip(
+                iter::repeat_with(|| {
+                    self.object_module
+                        .declare_anonymous_data(true, false)
+                        .unwrap()
+                }),
+            ));
 
         // Prevent duplicate definitions of global variables/lists.
         if name != "Stage" {
@@ -298,27 +299,25 @@ impl<'a> Program<'a> {
         ctx: &mut Context,
         func_ctx: &mut FunctionBuilderContext,
     ) -> Result<()> {
-        self.local_vars = proc
-            .variables
-            .iter()
-            .map(String::as_str)
-            .zip(iter::repeat_with(|| {
-                self.object_module
-                    .declare_anonymous_data(true, false)
-                    .unwrap()
-            }))
-            .collect();
+        self.local_vars.clear();
+        self.local_vars
+            .extend(proc.variables.iter().map(String::as_str).zip(
+                iter::repeat_with(|| {
+                    self.object_module
+                        .declare_anonymous_data(true, false)
+                        .unwrap()
+                }),
+            ));
 
-        self.local_lists = proc
-            .lists
-            .iter()
-            .map(String::as_str)
-            .zip(iter::repeat_with(|| {
-                self.object_module
-                    .declare_anonymous_data(true, false)
-                    .unwrap()
-            }))
-            .collect();
+        self.local_lists.clear();
+        self.local_lists
+            .extend(proc.lists.iter().map(String::as_str).zip(
+                iter::repeat_with(|| {
+                    self.object_module
+                        .declare_anonymous_data(true, false)
+                        .unwrap()
+                }),
+            ));
 
         for &var_id in self.local_vars.values() {
             define_variable(
@@ -414,19 +413,20 @@ impl<'a> Program<'a> {
                 fb.switch_to_block(entry);
                 fb.seal_block(entry);
                 fb.append_block_params_for_function_params(entry);
-                self.proc_params = proc
-                    .params
-                    .iter()
-                    .map(|(param, _)| match param {
-                        Expr::Sym(param, _) => &**param,
-                        _ => unreachable!(),
-                    })
-                    .zip(
-                        fb.block_params(entry)
-                            .chunks_exact(2)
-                            .map(|chunk| (chunk[0], chunk[1])),
-                    )
-                    .collect();
+                self.proc_params.clear();
+                self.proc_params.extend(
+                    proc.params
+                        .iter()
+                        .map(|(param, _)| match param {
+                            Expr::Sym(param, _) => &**param,
+                            _ => unreachable!(),
+                        })
+                        .zip(
+                            fb.block_params(entry)
+                                .chunks_exact(2)
+                                .map(|chunk| (chunk[0], chunk[1])),
+                        ),
+                );
                 if self.generate_statement(&proc.body, &mut fb)?.is_continue() {
                     // TODO: Drop parameters
                     fb.ins().return_(&[]);
