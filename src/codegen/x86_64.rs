@@ -75,6 +75,7 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
     let mut p = Program {
         target_frontend_config,
         object_module,
+        data_ctx: DataContext::new(),
         entry_points: Vec::new(),
         variable_counter: 0,
         extern_function_signatures: extern_function_signatures(),
@@ -137,31 +138,31 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
         .unwrap();
 
     for &var_id in p.global_vars.values() {
-        define_variable(var_id, &mut p.object_module);
+        define_variable(var_id, &mut p.data_ctx, &mut p.object_module);
     }
 
     for &list_id in p.global_lists.values() {
-        define_list(list_id, &mut p.object_module);
+        define_list(list_id, &mut p.data_ctx, &mut p.object_module);
     }
 
     if let Some(answer) = p.answer {
-        let mut data_context = DataContext::new();
-        data_context.set_align(8);
-        data_context.define(Box::new([
+        p.data_ctx.clear();
+        p.data_ctx.set_align(8);
+        p.data_ctx.define(Box::new([
             7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ]));
-        p.object_module.define_data(answer, &data_context).unwrap();
+        p.object_module.define_data(answer, &p.data_ctx).unwrap();
     }
 
     p.generate_broadcast_handlers(&mut ctx, &mut func_ctx);
 
     for (s, id) in &p.static_strs {
-        let mut data_context = DataContext::new();
-        data_context.set_align(2);
+        p.data_ctx.clear();
+        p.data_ctx.set_align(2);
         // The (arbitrary) null byte makes the string unaligned, which marks it
         // as static.
-        data_context.define(format!("\0{s}").into_boxed_str().into());
-        p.object_module.define_data(*id, &data_context).unwrap();
+        p.data_ctx.define(format!("\0{s}").into_boxed_str().into());
+        p.object_module.define_data(*id, &p.data_ctx).unwrap();
     }
 
     let object_bytes = p.object_module.finish().emit().unwrap();
@@ -174,6 +175,7 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
 struct Program<'a> {
     target_frontend_config: TargetFrontendConfig,
     object_module: ObjectModule,
+    data_ctx: DataContext,
     entry_points: Vec<FuncId>,
     variable_counter: u32,
     extern_function_signatures: HashMap<&'static str, Signature>,
@@ -226,11 +228,19 @@ impl<'a> Program<'a> {
         // Prevent duplicate definitions of global variables/lists.
         if name != "Stage" {
             for &var_id in self.sprite_vars.values() {
-                define_variable(var_id, &mut self.object_module);
+                define_variable(
+                    var_id,
+                    &mut self.data_ctx,
+                    &mut self.object_module,
+                );
             }
 
             for &list_id in self.sprite_lists.values() {
-                define_list(list_id, &mut self.object_module);
+                define_list(
+                    list_id,
+                    &mut self.data_ctx,
+                    &mut self.object_module,
+                );
             }
         }
 
@@ -311,11 +321,15 @@ impl<'a> Program<'a> {
             .collect();
 
         for &var_id in self.local_vars.values() {
-            define_variable(var_id, &mut self.object_module);
+            define_variable(
+                var_id,
+                &mut self.data_ctx,
+                &mut self.object_module,
+            );
         }
 
         for &list_id in self.local_lists.values() {
-            define_list(list_id, &mut self.object_module);
+            define_list(list_id, &mut self.data_ctx, &mut self.object_module);
         }
 
         ctx.clear();
@@ -535,15 +549,23 @@ impl<'a> Program<'a> {
     }
 }
 
-fn define_variable(id: DataId, object_module: &mut ObjectModule) {
-    let mut data_ctx = DataContext::new();
+fn define_variable(
+    id: DataId,
+    data_ctx: &mut DataContext,
+    object_module: &mut ObjectModule,
+) {
+    data_ctx.clear();
     data_ctx.set_align(8);
     data_ctx.define(Box::new([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
     object_module.define_data(id, &data_ctx).unwrap();
 }
 
-fn define_list(id: DataId, object_module: &mut ObjectModule) {
-    let mut data_ctx = DataContext::new();
+fn define_list(
+    id: DataId,
+    data_ctx: &mut DataContext,
+    object_module: &mut ObjectModule,
+) {
+    data_ctx.clear();
     data_ctx.set_align(8);
     data_ctx.define_zeroinit(24);
     object_module.define_data(id, &data_ctx).unwrap();
