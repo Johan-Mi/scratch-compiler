@@ -413,7 +413,6 @@ impl<'a> Program<'a> {
                 fb.switch_to_block(entry);
                 fb.seal_block(entry);
                 fb.append_block_params_for_function_params(entry);
-                self.proc_params.clear();
                 self.proc_params.extend(
                     proc.params
                         .iter()
