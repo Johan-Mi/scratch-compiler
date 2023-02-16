@@ -372,7 +372,10 @@ impl<'a> Program<'a> {
                     self.call_extern("double_to_cow", &[res.single()], fb);
                 Ok(pair(fb.inst_results(inst)))
             }
-            Typ::Bool => todo!(),
+            Typ::Bool => {
+                let inst = self.call_extern("bool_to_str", &[res.single()], fb);
+                Ok(pair(fb.inst_results(inst)))
+            }
             Typ::StaticStr(_) | Typ::OwnedString => Ok(res.pair()),
             Typ::Any => {
                 let inst = self.call_extern("any_to_cow", res.as_slice(), fb);

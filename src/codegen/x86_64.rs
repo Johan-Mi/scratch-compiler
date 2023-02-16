@@ -595,6 +595,7 @@ fn extern_function_signatures() -> HashMap<&'static str, Signature> {
         sig! { "any_to_double": I64, I64 -> F64 },
         sig! { "ask": I64, I64 -> I64, I64 },
         sig! { "bool_lt_any": I8, I64, I64 -> I8 },
+        sig! { "bool_to_str": I8 -> I64, I64 },
         sig! { "char_at": I64, I64, I64 -> I64, I64 },
         sig! { "clone_any": I64, I64 -> I64, I64 },
         sig! { "clone_cow": I64, I64 -> I64, I64 },

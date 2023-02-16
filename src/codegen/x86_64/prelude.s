@@ -1,6 +1,6 @@
 default rel
 
-global drop_any, drop_cow, any_to_cow, str_length, char_at, any_to_bool, any_to_double, clone_any, clone_cow, double_to_cow, list_append, list_get, list_delete, list_delete_all, list_replace, any_eq_str, any_lt_str, any_eq_double, any_lt_double, double_lt_any, any_eq_any, any_lt_any, any_eq_bool, any_eq_true, any_eq_false, double_lt_str, str_lt_double, random_between, str_to_double, str_eq_str, str_eq_double, ask
+global drop_any, drop_cow, any_to_cow, str_length, char_at, any_to_bool, any_to_double, clone_any, clone_cow, double_to_cow, list_append, list_get, list_delete, list_delete_all, list_replace, any_eq_str, any_lt_str, any_eq_double, any_lt_double, double_lt_any, any_eq_any, any_lt_any, any_eq_bool, any_eq_true, any_eq_false, double_lt_str, str_lt_double, random_between, str_to_double, str_eq_str, str_eq_double, ask, bool_to_str
 
 extern malloc, free, memcpy, memmove, realloc, asprintf, drand48, write, fflush, getline, stdin, stdout, memcmp, memchr, strndup, strtod
 
@@ -888,4 +888,14 @@ ask:
     sete dil
     sub rdx, rdi
     add rsp, 16
+    ret
+
+bool_to_str:
+    lea rax, [str_true]
+    mov edx, 4
+    lea rcx, [str_true]
+    mov edi, 5
+    test dil, dil
+    cmovz rax, rcx
+    cmovz edx, edi
     ret
