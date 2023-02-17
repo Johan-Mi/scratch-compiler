@@ -538,16 +538,11 @@ any_eq_double:
 .done:
     ret
 .is_cow:
-    sub rsp, 8
-    movsd [rsp], xmm0
-    push rsi
     push rdi
-    call str_to_double
-    xor eax, eax
-    ucomisd xmm0, [rsp+16]
-    sete al
-    mov [rsp+16], rax
-    call drop_pop_cow
+    call str_eq_double
+    pop rdi
+    push rax
+    call drop_cow
     pop rax
     ret
 
@@ -841,18 +836,18 @@ str_eq_str:
 str_eq_double:
     sub rsp, 8
     movsd [rsp], xmm0
+    push rsi
+    push rdi
     call str_to_double
-    add rsp, 8
     test al, al
     jz .not_convertible_to_number
+    add rsp, 24
     xor eax, eax
     ucomisd xmm0, [rsp-8]
     sete al
     ret
 .not_convertible_to_number:
-    sub rsp, 8
-    push rsi
-    push rdi
+    movsd xmm0, [rsp+16]
     call double_to_cow
     pop rdi
     pop rsi
