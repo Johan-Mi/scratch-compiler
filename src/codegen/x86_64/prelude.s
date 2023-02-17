@@ -826,15 +826,13 @@ str_eq_str:
     cmp rsi, rcx
     jne .no
     ; TODO: Case insensitive comparison
-    mov rsi, rdx
-    mov rdx, rcx
+    xchg rsi, rdx
     sub rsp, 8
     call memcmp wrt ..plt
     add rsp, 8
-    xor edx, edx
     test eax, eax
-    setz dl
-    mov eax, edx
+    setz al
+    movzx eax, al
     ret
 .no:
     xor eax, eax
