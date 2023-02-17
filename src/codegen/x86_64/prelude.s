@@ -891,7 +891,7 @@ ask:
 bool_to_str:
     lea rax, [str_true]
     mov edx, 4
-    lea rcx, [str_true]
+    lea rcx, [str_false]
     mov edi, 5
     test dil, dil
     cmovz rax, rcx
