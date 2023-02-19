@@ -556,7 +556,7 @@ fn define_variable(
     data_ctx.clear();
     data_ctx.set_align(8);
     data_ctx.define(Box::new([2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
-    object_module.define_data(id, &data_ctx).unwrap();
+    object_module.define_data(id, data_ctx).unwrap();
 }
 
 fn define_list(
@@ -567,7 +567,7 @@ fn define_list(
     data_ctx.clear();
     data_ctx.set_align(8);
     data_ctx.define_zeroinit(24);
-    object_module.define_data(id, &data_ctx).unwrap();
+    object_module.define_data(id, data_ctx).unwrap();
 }
 
 fn extern_function_signatures() -> HashMap<&'static str, Signature> {
