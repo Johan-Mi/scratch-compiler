@@ -2,11 +2,12 @@ use crate::{
     ast::Ast,
     diagnostic::{Error, Result},
     lint::lint_ast,
-    parser::{input::Input, program},
+    parser::{program, Input},
     span::Span,
     Opts,
 };
 use fancy_match::fancy_match;
+use nom8::input::Located;
 use std::{collections::HashMap, fs, mem};
 
 pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
@@ -332,7 +333,10 @@ impl MacroContext<'_> {
                 let source = fs::read_to_string(path).unwrap();
                 let file_id =
                     crate::FILES.lock().unwrap().add(path, source.clone());
-                let asts = program(Input::new(&source, file_id))?;
+                let asts = program(Input {
+                    input: Located::new(&source),
+                    state: file_id,
+                })?;
                 if self.opts.lint {
                     for ast in &asts {
                         lint_ast(ast);
