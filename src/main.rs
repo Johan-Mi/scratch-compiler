@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 #![feature(box_patterns)]
 #![feature(stmt_expr_attributes)]
 #![feature(proc_macro_hygiene)]
