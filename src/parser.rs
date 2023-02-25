@@ -3,9 +3,10 @@ use codespan::FileId;
 use std::borrow::Cow;
 use winnow::{
     branch::alt,
-    bytes::{one_of, take_till1, take_while1, take_while_m_n},
+    bytes::{any, one_of, take_till1, take_while1, take_while_m_n},
     character::{digit1, float, hex_digit1, multispace1, oct_digit1},
-    combinator::{not, opt, peek},
+    combinator::{fail, not, opt, peek, success},
+    dispatch,
     error::ParseError,
     multi::{count, many0},
     sequence::{delimited, preceded, separated_pair, terminated},
@@ -76,17 +77,18 @@ fn boolean(input: Input) -> IResult<Input, Ast> {
 fn string(input: Input) -> IResult<Input, Ast> {
     let normal = take_till1("\"\\\n").map(Cow::Borrowed);
     let null = terminated('0', not(peek(digit1))).value(Cow::Borrowed("\0"));
-    let character_escape_sequence = alt((
-        Parser::<_, _, Error>::value('"', "\""),
-        Parser::<_, _, Error>::value('\'', "'"),
-        Parser::<_, _, Error>::value('\\', "\\"),
-        Parser::<_, _, Error>::value('n', "\n"),
-        Parser::<_, _, Error>::value('t', "\t"),
-        Parser::<_, _, Error>::value('r', "\r"),
-        Parser::<_, _, Error>::value('b', "\x08"),
-        Parser::<_, _, Error>::value('f', "\x0c"),
-        Parser::<_, _, Error>::value('v', "\x11"),
-    ))
+    let character_escape_sequence = dispatch! {any;
+        '"' => success("\""),
+        '\'' => success("'"),
+        '\\' => success("\\"),
+        'n' => success("\n"),
+        't' => success("\t"),
+        'r' => success("\r"),
+        'b' => success("\x08"),
+        'f' => success("\x0c"),
+        'v' => success("\x11"),
+        _ => fail,
+    }
     .map(Cow::Borrowed);
 
     let hex_escape_sequence =
