@@ -5,7 +5,7 @@ use winnow::{
     branch::alt,
     bytes::{any, one_of, take_till1, take_while1, take_while_m_n},
     character::{digit1, float, hex_digit1, multispace1, oct_digit1},
-    combinator::{fail, not, opt, peek, success},
+    combinator::{fail, not, opt, success},
     dispatch,
     error::ParseError,
     multi::{count, many0},
@@ -76,7 +76,7 @@ fn boolean(input: Input) -> IResult<Input, Ast> {
 
 fn string(input: Input) -> IResult<Input, Ast> {
     let normal = take_till1("\"\\\n").map(Cow::Borrowed);
-    let null = terminated('0', not(peek(digit1))).value(Cow::Borrowed("\0"));
+    let null = terminated('0', not(digit1)).value(Cow::Borrowed("\0"));
     let character_escape_sequence = dispatch! {any;
         '"' => success("\""),
         '\'' => success("'"),
