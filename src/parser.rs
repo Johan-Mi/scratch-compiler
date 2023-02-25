@@ -165,18 +165,18 @@ where
     F: Parser<Input<'a>, O, E>,
 {
     move |input: Input<'a>| {
-        let file_id = input.state;
-        let (input, (parsed, range)) =
-            parser.by_ref().with_span().parse_next(input)?;
-        Ok((
-            input,
-            (
-                Span {
-                    position: (range.start as u32..range.end as u32).into(),
-                    file: file_id,
-                },
-                parsed,
-            ),
-        ))
+        parser
+            .by_ref()
+            .with_span()
+            .map(|(parsed, range)| {
+                (
+                    Span {
+                        position: (range.start as u32..range.end as u32).into(),
+                        file: input.state,
+                    },
+                    parsed,
+                )
+            })
+            .parse_next(input)
     }
 }
