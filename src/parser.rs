@@ -121,7 +121,7 @@ fn string(input: Input) -> IResult<Input, Ast> {
 }
 
 fn sym_first_char(input: Input) -> IResult<Input, char> {
-    alt((one_of(char::is_alphabetic), one_of("!$%&*+-./:<=>?@^_~[]")))(input)
+    one_of((char::is_alphabetic, "!$%&*+-./:<=>?@^_~[]"))(input)
 }
 
 fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
