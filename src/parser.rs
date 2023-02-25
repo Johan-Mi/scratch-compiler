@@ -125,7 +125,7 @@ fn sym_first_char(input: Input) -> IResult<Input, char> {
 }
 
 fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
-    alt((unit(sym_first_char), unit(digit1)))(input)
+    alt((sym_first_char.void(), digit1.void()))(input)
 }
 
 fn sym(input: Input) -> IResult<Input, Ast> {
@@ -151,18 +151,11 @@ fn unquote(input: Input) -> IResult<Input, Ast> {
 }
 
 fn eol_comment(input: Input) -> IResult<Input, ()> {
-    unit((';', opt(take_till1("\n\r")))).parse_next(input)
+    (';', opt(take_till1("\n\r"))).void().parse_next(input)
 }
 
 fn ws(input: Input) -> IResult<Input, ()> {
-    many0(alt((unit(multispace1), eol_comment))).parse_next(input)
-}
-
-fn unit<I, O, E: ParseError<I>, F>(parser: F) -> impl Parser<I, (), E>
-where
-    F: Parser<I, O, E>,
-{
-    parser.value(())
+    many0(alt((multispace1.void(), eol_comment))).parse_next(input)
 }
 
 fn spanned<'a, O, E: ParseError<Input<'a>>, F>(
