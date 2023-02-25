@@ -1,28 +1,25 @@
 use crate::{ast::Ast, span::Span};
 use codespan::FileId;
-use nom8::{
+use std::borrow::Cow;
+use winnow::{
     branch::alt,
     bytes::{one_of, take_till1, take_while1, take_while_m_n},
-    character::{digit1, f64, hex_digit1, multispace1, oct_digit1},
-    combinator::{all_consuming, not, opt, peek},
+    character::{digit1, float, hex_digit1, multispace1, oct_digit1},
+    combinator::{not, opt, peek},
     error::ParseError,
-    input::{Located, Stateful},
     multi::{count, many0},
     sequence::{delimited, preceded, separated_pair, terminated},
+    stream::{Located, Stateful},
     FinishIResult, IResult, Parser,
 };
-use std::borrow::Cow;
 
 pub type Input<'a> = Stateful<Located<&'a str>, FileId>;
-type Error<'a> = nom8::error::Error<Input<'a>>;
+type Error<'a> = winnow::error::Error<Input<'a>>;
 
 pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
-    Ok(
-        all_consuming(preceded(ws, many0(terminated(expr, ws))))(input)
-            .finish_err()
-            .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?
-            .1,
-    )
+    Ok(preceded(ws, many0(terminated(expr, ws)))(input)
+        .finish()
+        .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?)
 }
 
 fn expr(input: Input) -> IResult<Input, Ast> {
@@ -35,11 +32,11 @@ fn number(input: Input) -> IResult<Input, Ast> {
     let octal = based(8, "oO", oct_digit1);
 
     spanned(terminated(
-        alt((hex, binary, octal, f64)),
+        alt((hex, binary, octal, float)),
         not(sym_non_first_char),
     ))
     .map(|(span, num)| Ast::Num(num, span))
-    .parse(input)
+    .parse_next(input)
 }
 
 fn based<'a>(
@@ -73,7 +70,7 @@ fn boolean(input: Input) -> IResult<Input, Ast> {
         not(sym_non_first_char),
     )
     .map(|(span, b)| Ast::Bool(b, span))
-    .parse(input)
+    .parse_next(input)
 }
 
 fn string(input: Input) -> IResult<Input, Ast> {
@@ -92,8 +89,9 @@ fn string(input: Input) -> IResult<Input, Ast> {
     ))
     .map(Cow::Borrowed);
 
-    let hex_escape_sequence = preceded('x', count(hex_digit, 2).recognize());
-    let hex4digits = count(hex_digit, 4).recognize();
+    let hex_escape_sequence =
+        preceded('x', count::<_, _, (), _, _>(hex_digit, 2).recognize());
+    let hex4digits = count::<_, _, (), _, _>(hex_digit, 4).recognize();
     let bracketed_unicode = delimited(
         '{',
         take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
@@ -108,7 +106,7 @@ fn string(input: Input) -> IResult<Input, Ast> {
             null,
             alt((hex_escape_sequence, unicode_escape_sequence))
                 .map_res(|digits| u32::from_str_radix(digits, 16))
-                .map_opt(|c| {
+                .verify_map(|c| {
                     char::from_u32(c).map(String::from).map(Cow::Owned)
                 }),
         )),
@@ -116,8 +114,8 @@ fn string(input: Input) -> IResult<Input, Ast> {
     let string_char = alt((normal, escape_sequence));
 
     spanned(delimited('"', many0(string_char), '"'))
-        .map(|(span, strs)| Ast::String(strs.concat(), span))
-        .parse(input)
+        .map(|(span, strs): (_, Vec<_>)| Ast::String(strs.concat(), span))
+        .parse_next(input)
 }
 
 fn sym_first_char(input: Input) -> IResult<Input, char> {
@@ -129,30 +127,33 @@ fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
 }
 
 fn sym(input: Input) -> IResult<Input, Ast> {
-    spanned((sym_first_char, many0(sym_non_first_char)).recognize())
-        .map(|(span, sym)| Ast::Sym(sym.to_owned(), span))
-        .parse(input)
+    spanned(
+        (sym_first_char, many0::<_, _, (), _, _>(sym_non_first_char))
+            .recognize(),
+    )
+    .map(|(span, sym)| Ast::Sym(sym.to_owned(), span))
+    .parse_next(input)
 }
 
 fn node(input: Input) -> IResult<Input, Ast> {
     let content = (expr, many0(preceded(ws, expr)));
     spanned(delimited(('(', ws), content, (ws, ')')))
         .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span))
-        .parse(input)
+        .parse_next(input)
 }
 
 fn unquote(input: Input) -> IResult<Input, Ast> {
     spanned(preceded((',', ws), expr))
         .map(|(span, ast)| Ast::Unquote(Box::new(ast), span))
-        .parse(input)
+        .parse_next(input)
 }
 
 fn eol_comment(input: Input) -> IResult<Input, ()> {
-    unit((';', opt(take_till1("\n\r")))).parse(input)
+    unit((';', opt(take_till1("\n\r")))).parse_next(input)
 }
 
 fn ws(input: Input) -> IResult<Input, ()> {
-    unit(many0(alt((unit(multispace1), eol_comment)))).parse(input)
+    many0(alt((unit(multispace1), eol_comment))).parse_next(input)
 }
 
 fn unit<I, O, E: ParseError<I>, F>(parser: F) -> impl Parser<I, (), E>
@@ -171,7 +172,7 @@ where
     move |input: Input<'a>| {
         let file_id = input.state;
         let (input, (parsed, range)) =
-            parser.by_ref().with_span().parse(input)?;
+            parser.by_ref().with_span().parse_next(input)?;
         Ok((
             input,
             (

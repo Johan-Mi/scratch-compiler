@@ -7,8 +7,8 @@ use crate::{
     Opts,
 };
 use fancy_match::fancy_match;
-use nom8::input::Located;
 use std::{collections::HashMap, fs, mem};
+use winnow::stream::Located;
 
 pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {

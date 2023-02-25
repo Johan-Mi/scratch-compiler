@@ -24,8 +24,8 @@ use crate::{
 };
 use codespan::Files;
 use gumdrop::Options;
-use nom8::input::Located;
 use std::{fs, io::Write, process::ExitCode, sync::Mutex};
+use winnow::stream::Located;
 
 static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
 
