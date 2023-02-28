@@ -887,8 +887,8 @@ bool_to_str:
     lea rax, [str_true]
     mov edx, 4
     lea rcx, [str_false]
-    mov edi, 5
+    mov esi, 5
     test dil, dil
     cmovz rax, rcx
-    cmovz edx, edi
+    cmovz edx, esi
     ret
