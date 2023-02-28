@@ -787,8 +787,11 @@ str_to_double:
     mov rdi, [rsp]
     mov rsi, [rsp+8]
     call strndup wrt ..plt
+    mov rdx, [rsp+8]
     mov [rsp+8], rax
     mov rdi, rax
+    add rax, rdx
+    mov [rsp], rax
     lea rsi, [rsp+16]
     call strtod wrt ..plt
     mov rdi, [rsp+8]
