@@ -93,6 +93,7 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
         answer: None,
         main_broadcast_handler: None,
         uses_drand48: false,
+        stop_block: None,
     };
 
     p.generate_sprite(&program.stage, "Stage", &mut ctx, &mut func_ctx)?;
@@ -193,6 +194,7 @@ struct Program<'a> {
     main_broadcast_handler: Option<FuncId>,
     answer: Option<DataId>,
     uses_drand48: bool,
+    stop_block: Option<Block>,
 }
 
 impl<'a> Program<'a> {
@@ -333,6 +335,7 @@ impl<'a> Program<'a> {
 
         ctx.clear();
         self.proc_params.clear();
+        self.stop_block = None;
 
         match name {
             "when-flag-clicked" => {
@@ -426,15 +429,23 @@ impl<'a> Program<'a> {
                                 .map(|chunk| (chunk[0], chunk[1])),
                         ),
                 );
+                if !self.proc_params.is_empty() {
+                    self.stop_block = Some(fb.create_block());
+                }
                 if self.generate_statement(&proc.body, &mut fb)?.is_continue() {
-                    let params = fb
-                        .block_params(entry)
-                        .iter()
-                        .copied()
-                        .step_by(2)
-                        .collect::<Vec<_>>();
-                    for param in params {
-                        self.call_extern("drop_any", &[param], &mut fb);
+                    if let Some(stop_block) = self.stop_block {
+                        fb.ins().jump(stop_block, &[]);
+                        fb.switch_to_block(stop_block);
+                        fb.seal_block(stop_block);
+                        let params = fb
+                            .block_params(entry)
+                            .iter()
+                            .copied()
+                            .step_by(2)
+                            .collect::<Vec<_>>();
+                        for param in params {
+                            self.call_extern("drop_any", &[param], &mut fb);
+                        }
                     }
                     fb.ins().return_(&[]);
                 }

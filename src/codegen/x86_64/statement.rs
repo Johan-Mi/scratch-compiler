@@ -297,8 +297,11 @@ impl<'a> Program<'a> {
             },
             "stop-this-script" => match args {
                 [] => {
-                    // TODO: Drop procedure parameters
-                    fb.ins().return_(&[]);
+                    if let Some(stop_block) = self.stop_block {
+                        fb.ins().jump(stop_block, &[]);
+                    } else {
+                        fb.ins().return_(&[]);
+                    }
                     Ok(BREAK)
                 }
                 _ => wrong_arg_count(0),
