@@ -427,7 +427,15 @@ impl<'a> Program<'a> {
                         ),
                 );
                 if self.generate_statement(&proc.body, &mut fb)?.is_continue() {
-                    // TODO: Drop parameters
+                    let params = fb
+                        .block_params(entry)
+                        .iter()
+                        .copied()
+                        .step_by(2)
+                        .collect::<Vec<_>>();
+                    for param in params {
+                        self.call_extern("drop_any", &[param], &mut fb);
+                    }
                     fb.ins().return_(&[]);
                 }
                 fb.finalize();
