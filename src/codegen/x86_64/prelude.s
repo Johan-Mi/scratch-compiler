@@ -22,10 +22,6 @@ drop_any:
 .dont_free:
     ret
 
-drop_pop_cow:
-    pop rax
-    pop rdi
-    mov [rsp], rax
 drop_cow:
     test dil, 1
     jz free wrt ..plt
