@@ -196,6 +196,9 @@ impl SerCtx<'_> {
             "show" => proc!(looks_show()),
             "hide" => proc!(looks_hide()),
             "say" => proc!(looks_say(MESSAGE: String)),
+            "say-for-seconds" => {
+                proc!(looks_sayforsecs(SECS: Number, MESSAGE: String))
+            }
             "change-x" => proc!(motion_changexby(DX: Number)),
             "change-y" => proc!(motion_changeyby(DY: Number)),
             "set-x" => proc!(motion_setx(X: Number)),
