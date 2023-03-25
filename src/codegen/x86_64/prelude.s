@@ -53,32 +53,17 @@ staticstr str_false, db "false"
 staticstr str_empty, db ""
 
 str_length:
-    mov rax, ~0
-.loop:
-    inc rax
+    xor eax, eax
     test rsi, rsi
     jz .done
-    test byte [rdi], 0x80
-    jz .one_byte
-    cmp byte [rdi], 0b11011111
-    jbe .two_bytes
-    cmp byte [rdi], 0b11101111
-    jbe .three_bytes
-    add rdi, 4
-    sub rsi, 4
-    jmp .loop
-.one_byte:
-    inc rdi
+.loop:
+    movzx edx, byte [rdi+rsi-1]
+    and dl, 192
+    cmp dl, 128
+    setne dl
+    add rax, rdx
     dec rsi
-    jmp .loop
-.two_bytes:
-    add rdi, 2
-    sub rsi, 2
-    jmp .loop
-.three_bytes:
-    add rdi, 3
-    sub rsi, 3
-    jmp .loop
+    jnz .loop
 .done:
     ret
 
