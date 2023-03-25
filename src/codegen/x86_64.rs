@@ -638,6 +638,7 @@ fn extern_function_signatures() -> HashMap<&'static str, Signature> {
         sig! { "str_lt_any": I64, I64, I64, I64 -> I8 },
         sig! { "str_lt_str": I64, I64, I64, I64 -> I8 },
         sig! { "time": I64 -> I64 },
+        sig! { "wait_seconds": F64 -> },
         sig! { "write": I32, I64, I64 -> I64 },
         sig! { "log": F64 -> F64 },
         sig! { "log10": F64 -> F64 },

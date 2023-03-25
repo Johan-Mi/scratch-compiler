@@ -355,6 +355,14 @@ impl<'a> Program<'a> {
                 }
                 _ => wrong_arg_count(1),
             },
+            "wait" => match args {
+                [duration] => {
+                    let duration = self.generate_double_expr(duration, fb)?;
+                    self.call_extern("wait_seconds", &[duration], fb);
+                    Ok(CONTINUE)
+                }
+                _ => wrong_arg_count(1),
+            },
             _ => {
                 self.generate_custom_proc_call(proc_name, args, span, fb)?;
                 Ok(CONTINUE)

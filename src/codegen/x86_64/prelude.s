@@ -1,8 +1,8 @@
 default rel
 
-global drop_any, drop_cow, any_to_cow, str_length, char_at, any_to_bool, any_to_double, clone_any, clone_cow, double_to_cow, list_append, list_get, list_delete, list_delete_all, list_replace, any_eq_str, any_lt_str, any_eq_double, any_lt_double, double_lt_any, any_eq_any, any_lt_any, any_eq_bool, any_eq_true, any_eq_false, double_lt_str, str_lt_double, random_between, str_to_double, str_eq_str, str_eq_double, ask, bool_to_str
+global drop_any, drop_cow, any_to_cow, str_length, char_at, any_to_bool, any_to_double, clone_any, clone_cow, double_to_cow, list_append, list_get, list_delete, list_delete_all, list_replace, any_eq_str, any_lt_str, any_eq_double, any_lt_double, double_lt_any, any_eq_any, any_lt_any, any_eq_bool, any_eq_true, any_eq_false, double_lt_str, str_lt_double, random_between, str_to_double, str_eq_str, str_eq_double, ask, bool_to_str, wait_seconds
 
-extern malloc, free, memcpy, memmove, realloc, asprintf, drand48, write, fflush, getline, stdin, stdout, memcmp, memchr, strndup, strtod
+extern malloc, free, memcpy, memmove, realloc, asprintf, drand48, write, fflush, getline, stdin, stdout, memcmp, memchr, strndup, strtod, nanosleep
 
 %macro staticstr 2+
     [section .rodata]
@@ -891,3 +891,24 @@ bool_to_str:
     cmovz rax, rcx
     cmovz edx, esi
     ret
+
+wait_seconds:
+    xorpd xmm1, xmm1
+    ucomisd xmm0, xmm1
+    jb .done
+    cvtsd2si rax, xmm0
+    cvtsi2sd xmm1, rax
+    sub rsp, 16
+    push rax
+    subsd xmm0, xmm1
+    mulsd xmm0, [.billion]
+    cvtsd2si rax, xmm0
+    mov [rsp+8], rax
+    mov rdi, rsp
+    xor esi, esi
+    call nanosleep wrt ..plt
+    add rsp, 24
+.done:
+    ret
+align 8
+.billion: dq __?float64?__(1e9)
