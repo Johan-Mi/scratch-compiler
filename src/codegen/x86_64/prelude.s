@@ -745,8 +745,8 @@ random_between:
     movsd [rsp], xmm0
     movsd [rsp+8], xmm1
     call drand48 wrt ..plt
-    mulsd xmm0, [rsp+8]
-    addsd xmm0, [rsp]
+    movsd xmm1, [rsp]
+    vfmadd132sd xmm0, xmm1, [rsp+8]
     add rsp, 24
     ret
 
