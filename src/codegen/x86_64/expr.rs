@@ -349,7 +349,11 @@ impl<'a> Program<'a> {
         let res = self.generate_expr(expr, fb)?;
         match expr_type(expr) {
             Typ::Double => Ok(res.single()),
-            Typ::Bool => todo!(),
+            Typ::Bool => {
+                let zero = fb.ins().f64const(0.0);
+                let one = fb.ins().f64const(1.0);
+                Ok(fb.ins().select(res.single(), one, zero))
+            }
             Typ::StaticStr(_) => todo!(),
             Typ::OwnedString => todo!(),
             Typ::Any => {
