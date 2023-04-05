@@ -24,7 +24,7 @@ use crate::{
 };
 use codespan::Files;
 use gumdrop::Options;
-use std::{fs, io::Write, process::ExitCode, sync::Mutex};
+use std::{fs, process::ExitCode, sync::Mutex};
 use winnow::stream::Located;
 
 static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
@@ -50,28 +50,9 @@ fn main() -> ExitCode {
                 lint_ast(ast);
             }
         }
-        if let Some(file) = opts.dump_ast.as_deref() {
-            let mut file = fs::File::create(file).unwrap();
-            for ast in &asts {
-                writeln!(file, "{ast:#?}").unwrap();
-            }
-        }
         let expanded = expand(asts, &opts)?;
-
-        if let Some(file) = &opts.dump_expanded {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{expanded:#?}").unwrap();
-        }
         let mut program = Program::from_asts(expanded)?;
-        if let Some(file) = &opts.dump_ir {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{program:#?}").unwrap();
-        }
         program.optimize();
-        if let Some(file) = &opts.dump_optimized {
-            let mut file = fs::File::create(file).unwrap();
-            writeln!(file, "{program:#?}").unwrap();
-        }
         write_program(&program, &opts)
     }) {
         err.emit();

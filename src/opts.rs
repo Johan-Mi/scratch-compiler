@@ -17,22 +17,6 @@ pub struct Opts {
 
     /// Type of code to compile to: sb3 (default) or x86_64
     pub target: Target,
-
-    /// Dump the initial AST to a file
-    #[options(no_short, meta = "FILE")]
-    pub dump_ast: Option<PathBuf>,
-
-    /// Dump the expanded AST to a file
-    #[options(no_short, meta = "FILE")]
-    pub dump_expanded: Option<PathBuf>,
-
-    /// Dump the unoptimized IR to a file
-    #[options(no_short, meta = "FILE")]
-    pub dump_ir: Option<PathBuf>,
-
-    /// Dump the optimized IR to a file
-    #[options(no_short, meta = "FILE")]
-    pub dump_optimized: Option<PathBuf>,
 }
 
 #[derive(Default, Clone, Copy)]
