@@ -46,16 +46,15 @@ fn based<'a>(
     digitp: impl Parser<Input<'a>, &'a str, Error<'a>>,
 ) -> impl Parser<Input<'a>, f64, Error<'a>> {
     separated_pair(sign, ('0', one_of(prefix)), digitp).map_res(
-        move |(sgn, digits)| {
-            let sgn = Cow::Borrowed(sgn.unwrap_or_default());
-            let with_sign = sgn + digits;
-            i64::from_str_radix(&with_sign, base).map(|n| n as f64)
+        move |(sign, digits)| {
+            i64::from_str_radix(digits, base)
+                .map(|n| n as f64 * if sign == Some('-') { -1.0 } else { 1.0 })
         },
     )
 }
 
-fn sign(input: Input) -> IResult<Input, Option<&str>> {
-    opt(one_of("+-").recognize()).parse_next(input)
+fn sign(input: Input) -> IResult<Input, Option<char>> {
+    opt(one_of("+-")).parse_next(input)
 }
 
 fn hex_digit(input: Input) -> IResult<Input, char> {
