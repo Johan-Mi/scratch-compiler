@@ -189,11 +189,22 @@ impl<'a> Program<'a> {
                         let term = self.generate_bool_expr(term, fb)?;
                         let next_block = fb.create_block();
                         if func_name == "and" {
-                            fb.ins().brz(term, last_block, &[term]);
+                            fb.ins().brif(
+                                term,
+                                next_block,
+                                &[],
+                                last_block,
+                                &[term],
+                            );
                         } else {
-                            fb.ins().brnz(term, last_block, &[term]);
+                            fb.ins().brif(
+                                term,
+                                last_block,
+                                &[term],
+                                next_block,
+                                &[],
+                            );
                         }
-                        fb.ins().jump(next_block, &[]);
                         fb.switch_to_block(next_block);
                         fb.seal_block(next_block);
                     }

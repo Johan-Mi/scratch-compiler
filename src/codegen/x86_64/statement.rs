@@ -46,9 +46,8 @@ impl<'a> Program<'a> {
                 let else_block = fb.create_block();
                 let after = fb.create_block();
                 let condition = self.generate_bool_expr(condition, fb)?;
-                fb.ins().brz(condition, else_block, &[]);
+                fb.ins().brif(condition, then_block, &[], else_block, &[]);
                 fb.seal_block(else_block);
-                fb.ins().jump(then_block, &[]);
                 fb.seal_block(then_block);
                 fb.switch_to_block(then_block);
                 if self.generate_statement(if_true, fb)?.is_continue() {
@@ -74,9 +73,8 @@ impl<'a> Program<'a> {
                 fb.ins().jump(loop_start, &[]);
                 fb.switch_to_block(loop_start);
                 let remaining_times = fb.use_var(counter);
-                fb.ins().brz(remaining_times, after, &[]);
+                fb.ins().brif(remaining_times, loop_body, &[], after, &[]);
                 fb.seal_block(after);
-                fb.ins().jump(loop_body, &[]);
                 fb.seal_block(loop_body);
                 fb.switch_to_block(loop_body);
                 if self.generate_statement(body, fb)?.is_continue() {
@@ -107,12 +105,11 @@ impl<'a> Program<'a> {
                 fb.switch_to_block(loop_start);
                 let condition = self.generate_bool_expr(condition, fb)?;
                 if matches!(stmt, Statement::While { .. }) {
-                    fb.ins().brz(condition, after, &[]);
+                    fb.ins().brif(condition, loop_body, &[], after, &[]);
                 } else {
-                    fb.ins().brnz(condition, after, &[]);
+                    fb.ins().brif(condition, after, &[], loop_body, &[]);
                 }
                 fb.seal_block(after);
-                fb.ins().jump(loop_body, &[]);
                 fb.seal_block(loop_body);
                 fb.switch_to_block(loop_body);
                 if self.generate_statement(body, fb)?.is_continue() {
@@ -148,8 +145,7 @@ impl<'a> Program<'a> {
                 let old_count = fb.use_var(counter);
                 let should_break =
                     fb.ins().icmp(IntCC::Equal, old_count, times);
-                fb.ins().brnz(should_break, after, &[]);
-                fb.ins().jump(loop_body, &[]);
+                fb.ins().brif(should_break, after, &[], loop_body, &[]);
                 fb.seal_block(loop_body);
                 fb.switch_to_block(loop_body);
                 let new_count = fb.ins().iadd_imm(old_count, 1);

@@ -226,7 +226,7 @@ impl<'a> SerCtx<'a> {
                         "next": body,
                         "parent": null,
                         "fields": {
-                            "BROADCAST_OPTION": [broadcast_name, null],
+                            "BROADCAST_OPTION": [**broadcast_name, null],
                         },
                         "topLevel": true,
                         "x": 0,

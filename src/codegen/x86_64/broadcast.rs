@@ -72,8 +72,7 @@ impl Program<'_> {
                 &mut fb,
             );
             let did_match = fb.inst_results(did_match)[0];
-            fb.ins().brnz(did_match, yes_matched, &[]);
-            fb.ins().jump(next, &[]);
+            fb.ins().brif(did_match, yes_matched, &[], next, &[]);
             fb.switch_to_block(yes_matched);
             fb.seal_block(yes_matched);
             let handler = self

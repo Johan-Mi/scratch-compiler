@@ -11,20 +11,20 @@ use winnow::{
     multi::{count, many0},
     sequence::{delimited, preceded, separated_pair, terminated},
     stream::{Located, Stateful},
-    FinishIResult, IResult, Parser,
+    IResult, Parser,
 };
 
 pub type Input<'a> = Stateful<Located<&'a str>, FileId>;
 type Error<'a> = winnow::error::Error<Input<'a>>;
 
 pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
-    Ok(preceded(ws, many0(terminated(expr, ws)))(input)
-        .finish()
+    Ok(preceded(ws, many0(terminated(expr, ws)))
+        .parse(input)
         .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?)
 }
 
 fn expr(input: Input) -> IResult<Input, Ast> {
-    alt((number, boolean, string, sym, node, unquote))(input)
+    alt((number, boolean, string, sym, node, unquote)).parse_next(input)
 }
 
 fn number(input: Input) -> IResult<Input, Ast> {
@@ -55,11 +55,11 @@ fn based<'a>(
 }
 
 fn sign(input: Input) -> IResult<Input, Option<&str>> {
-    opt(one_of("+-").recognize())(input)
+    opt(one_of("+-").recognize()).parse_next(input)
 }
 
 fn hex_digit(input: Input) -> IResult<Input, char> {
-    one_of(|c: char| c.is_ascii_hexdigit())(input)
+    one_of(|c: char| c.is_ascii_hexdigit()).parse_next(input)
 }
 
 fn boolean(input: Input) -> IResult<Input, Ast> {
@@ -121,11 +121,11 @@ fn string(input: Input) -> IResult<Input, Ast> {
 }
 
 fn sym_first_char(input: Input) -> IResult<Input, char> {
-    one_of((char::is_alphabetic, "!$%&*+-./:<=>?@^_~[]"))(input)
+    one_of((char::is_alphabetic, "!$%&*+-./:<=>?@^_~[]")).parse_next(input)
 }
 
 fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
-    alt((sym_first_char.void(), digit1.void()))(input)
+    alt((sym_first_char.void(), digit1.void())).parse_next(input)
 }
 
 fn sym(input: Input) -> IResult<Input, Ast> {

@@ -26,7 +26,7 @@ impl SerCtx<'_> {
                             "argument_reporter_string_number",
                             parent,
                             &[],
-                            &[("VALUE", &|_| Ok(json!([sym, null])))],
+                            &[("VALUE", &|_| Ok(json!([**sym, null])))],
                         )?
                     } else if let Some(var) = self.lookup_var(sym).cloned() {
                         Reporter::Variable(var)
