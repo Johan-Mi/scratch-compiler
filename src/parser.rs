@@ -2,23 +2,22 @@ use crate::{ast::Ast, span::Span};
 use codespan::FileId;
 use std::borrow::Cow;
 use winnow::{
-    branch::alt,
-    bytes::{any, one_of, take_till1, take_while1, take_while_m_n},
-    character::{digit1, float, hex_digit1, multispace1, oct_digit1},
-    combinator::{fail, not, opt, success},
+    ascii::{digit1, float, hex_digit1, multispace1, oct_digit1},
+    combinator::{
+        alt, count, delimited, fail, not, opt, preceded, repeat0,
+        separated_pair, success, terminated,
+    },
     dispatch,
     error::ParseError,
-    multi::{count, many0},
-    sequence::{delimited, preceded, separated_pair, terminated},
-    stream::{Located, Stateful},
-    IResult, Parser,
+    token::{any, one_of, take_till1, take_while, take_while1},
+    IResult, Located, Parser, Stateful,
 };
 
 pub type Input<'a> = Stateful<Located<&'a str>, FileId>;
 type Error<'a> = winnow::error::Error<Input<'a>>;
 
 pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
-    Ok(preceded(ws, many0(terminated(expr, ws)))
+    Ok(preceded(ws, repeat0(terminated(expr, ws)))
         .parse(input)
         .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?)
 }
@@ -45,7 +44,7 @@ fn based<'a>(
     prefix: &'static str,
     digitp: impl Parser<Input<'a>, &'a str, Error<'a>>,
 ) -> impl Parser<Input<'a>, f64, Error<'a>> {
-    separated_pair(sign, ('0', one_of(prefix)), digitp).map_res(
+    separated_pair(sign, ('0', one_of(prefix)), digitp).try_map(
         move |(sign, digits)| {
             i64::from_str_radix(digits, base)
                 .map(|n| n as f64 * if sign == Some('-') { -1.0 } else { 1.0 })
@@ -93,11 +92,8 @@ fn string(input: Input) -> IResult<Input, Ast> {
     let hex_escape_sequence =
         preceded('x', count::<_, _, (), _, _>(hex_digit, 2).recognize());
     let hex4digits = count::<_, _, (), _, _>(hex_digit, 4).recognize();
-    let bracketed_unicode = delimited(
-        '{',
-        take_while_m_n(1, 6, |c: char| c.is_ascii_hexdigit()),
-        '}',
-    );
+    let bracketed_unicode =
+        delimited('{', take_while(1..=6, |c: char| c.is_ascii_hexdigit()), '}');
     let unicode_escape_sequence =
         preceded('u', alt((hex4digits, bracketed_unicode)));
     let escape_sequence = preceded(
@@ -106,7 +102,7 @@ fn string(input: Input) -> IResult<Input, Ast> {
             character_escape_sequence,
             null,
             alt((hex_escape_sequence, unicode_escape_sequence))
-                .map_res(|digits| u32::from_str_radix(digits, 16))
+                .try_map(|digits| u32::from_str_radix(digits, 16))
                 .verify_map(|c| {
                     char::from_u32(c).map(String::from).map(Cow::Owned)
                 }),
@@ -114,7 +110,7 @@ fn string(input: Input) -> IResult<Input, Ast> {
     );
     let string_char = alt((normal, escape_sequence));
 
-    spanned(delimited('"', many0(string_char), '"'))
+    spanned(delimited('"', repeat0(string_char), '"'))
         .map(|(span, strs): (_, Vec<_>)| Ast::String(strs.concat(), span))
         .parse_next(input)
 }
@@ -129,7 +125,10 @@ fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
 
 fn sym(input: Input) -> IResult<Input, Ast> {
     spanned(
-        (sym_first_char, many0::<_, _, (), _, _>(sym_non_first_char))
+        (
+            sym_first_char,
+            repeat0::<_, _, (), _, _>(sym_non_first_char),
+        )
             .recognize(),
     )
     .map(|(span, sym)| Ast::Sym(sym.to_owned(), span))
@@ -137,7 +136,7 @@ fn sym(input: Input) -> IResult<Input, Ast> {
 }
 
 fn node(input: Input) -> IResult<Input, Ast> {
-    let content = (expr, many0(preceded(ws, expr)));
+    let content = (expr, repeat0(preceded(ws, expr)));
     spanned(delimited(('(', ws), content, (ws, ')')))
         .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span))
         .parse_next(input)
@@ -154,7 +153,7 @@ fn eol_comment(input: Input) -> IResult<Input, ()> {
 }
 
 fn ws(input: Input) -> IResult<Input, ()> {
-    many0(alt((multispace1.void(), eol_comment))).parse_next(input)
+    repeat0(alt((multispace1.void(), eol_comment))).parse_next(input)
 }
 
 fn spanned<'a, O, E: ParseError<Input<'a>>, F>(
