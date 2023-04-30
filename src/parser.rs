@@ -9,7 +9,7 @@ use winnow::{
     },
     dispatch,
     error::ParseError,
-    token::{any, one_of, take_till1, take_while, take_while1},
+    token::{any, one_of, take_till0, take_till1, take_while, take_while1},
     IResult, Located, Parser, Stateful,
 };
 
@@ -149,7 +149,7 @@ fn unquote(input: Input) -> IResult<Input, Ast> {
 }
 
 fn eol_comment(input: Input) -> IResult<Input, ()> {
-    (';', opt(take_till1('\n'))).void().parse_next(input)
+    (';', take_till0('\n')).void().parse_next(input)
 }
 
 fn ws(input: Input) -> IResult<Input, ()> {
