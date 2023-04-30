@@ -150,7 +150,7 @@ fn unquote(input: Input) -> IResult<Input, Ast> {
 }
 
 fn eol_comment(input: Input) -> IResult<Input, ()> {
-    (';', opt(take_till1("\n\r"))).void().parse_next(input)
+    (';', opt(take_till1('\n'))).void().parse_next(input)
 }
 
 fn ws(input: Input) -> IResult<Input, ()> {
