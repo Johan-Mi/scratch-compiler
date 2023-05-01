@@ -199,4 +199,8 @@ impl Statement {
         }
         f(self);
     }
+
+    pub fn is_nop(&self) -> bool {
+        matches!(self, Self::Do(stmts) if stmts.is_empty())
+    }
 }
