@@ -15,7 +15,7 @@ impl Serialize for Uid {
     where
         S: serde::Serializer,
     {
-        self.to_string().serialize(serializer)
+        serializer.collect_str(self)
     }
 }
 
