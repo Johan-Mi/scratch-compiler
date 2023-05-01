@@ -15,6 +15,7 @@ pub enum Statement {
         condition: Expr,
         if_true: Box<Self>,
         if_false: Box<Self>,
+        span: Span,
     },
     Repeat {
         times: Expr,
@@ -45,6 +46,7 @@ impl Default for Statement {
 impl Statement {
     pub fn from_ast(ast: Ast) -> Result<Self> {
         // TODO: Error handling
+        let full_span = ast.span();
         let Ast::Node(box Ast::Sym(sym, sym_span), tail, ..) = ast else {
             todo!();
         };
@@ -60,6 +62,7 @@ impl Statement {
                     condition: Expr::from_ast(condition)?,
                     if_true: Box::new(Self::from_ast(if_true)?),
                     if_false: Box::new(Self::from_ast(if_false)?),
+                    span: full_span,
                 }
             }
             "repeat" => {
@@ -115,6 +118,7 @@ impl Statement {
                         tail.map(Self::from_ast).collect::<Result<_>>()?,
                     )),
                     if_false: Box::new(Self::Do(Vec::new())),
+                    span: full_span,
                 }
             }
             "unless" => {
@@ -125,6 +129,7 @@ impl Statement {
                     if_false: Box::new(Self::Do(
                         tail.map(Self::from_ast).collect::<Result<_>>()?,
                     )),
+                    span: full_span,
                 }
             }
             "cond" => {
@@ -145,6 +150,7 @@ impl Statement {
                         condition,
                         if_true: Box::new(then),
                         if_false: Box::new(acc),
+                        span: full_span,
                     },
                 )
             }
@@ -176,6 +182,7 @@ impl Statement {
                 condition: _,
                 if_true,
                 if_false,
+                ..
             } => {
                 if_true.traverse_postorder_mut(f);
                 if_false.traverse_postorder_mut(f);

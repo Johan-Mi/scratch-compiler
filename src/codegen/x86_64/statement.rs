@@ -41,6 +41,7 @@ impl<'a> Program<'a> {
                 condition,
                 if_true,
                 if_false,
+                ..
             } => {
                 let then_block = fb.create_block();
                 let else_block = fb.create_block();

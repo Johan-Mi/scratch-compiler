@@ -55,6 +55,7 @@ impl SerCtx<'_> {
                 condition,
                 if_true,
                 if_false,
+                ..
             } => {
                 let this = self.new_uid();
                 let condition =

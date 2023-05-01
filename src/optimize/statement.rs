@@ -69,6 +69,7 @@ fn const_conditions(stmt: &mut Statement) -> bool {
             condition: Imm(condition),
             if_true,
             if_false,
+            ..
         } => {
             *stmt = if condition.to_bool() {
                 mem::take(if_true)
