@@ -39,8 +39,8 @@ impl<'a> Program<'a> {
             }
             Statement::IfElse {
                 condition,
-                if_true,
-                if_false,
+                then,
+                else_,
                 ..
             } => {
                 let then_block = fb.create_block();
@@ -51,11 +51,11 @@ impl<'a> Program<'a> {
                 fb.seal_block(else_block);
                 fb.seal_block(then_block);
                 fb.switch_to_block(then_block);
-                if self.generate_statement(if_true, fb)?.is_continue() {
+                if self.generate_statement(then, fb)?.is_continue() {
                     fb.ins().jump(after, &[]);
                 }
                 fb.switch_to_block(else_block);
-                if self.generate_statement(if_false, fb)?.is_continue() {
+                if self.generate_statement(else_, fb)?.is_continue() {
                     fb.ins().jump(after, &[]);
                 }
                 fb.switch_to_block(after);

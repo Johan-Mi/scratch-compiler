@@ -53,26 +53,25 @@ impl SerCtx<'_> {
             },
             Statement::IfElse {
                 condition,
-                if_true,
-                if_false,
+                then,
+                else_,
                 ..
             } => {
                 let this = self.new_uid();
                 let condition =
                     self.serialize_expr(condition, this)?.without_shadow();
-                let (if_true, _) = self.serialize_stmt(if_true, this, None)?;
-                let (if_false, _) =
-                    self.serialize_stmt(if_false, this, None)?;
+                let (then, _) = self.serialize_stmt(then, this, None)?;
+                let (else_, _) = self.serialize_stmt(else_, this, None)?;
 
-                let block_json = if if_false.is_some() {
+                let block_json = if else_.is_some() {
                     json!({
                         "opcode": "control_if_else",
                         "parent": parent,
                         "next": next,
                         "inputs": {
                             "CONDITION": condition,
-                            "SUBSTACK": [2, if_true],
-                            "SUBSTACK2": [2, if_false],
+                            "SUBSTACK": [2, then],
+                            "SUBSTACK2": [2, else_],
                         },
                     })
                 } else {
@@ -82,7 +81,7 @@ impl SerCtx<'_> {
                         "next": next,
                         "inputs": {
                             "CONDITION": condition,
-                            "SUBSTACK": [2, if_true],
+                            "SUBSTACK": [2, then],
                         },
                     })
                 };

@@ -71,14 +71,14 @@ fn const_conditions(stmt: &mut Statement) -> bool {
     match stmt {
         IfElse {
             condition: Imm(condition),
-            if_true,
-            if_false,
+            then,
+            else_,
             ..
         } => {
             *stmt = if condition.to_bool() {
-                mem::take(if_true)
+                mem::take(then)
             } else {
-                mem::take(if_false)
+                mem::take(else_)
             };
             true
         }
@@ -113,18 +113,18 @@ fn const_conditions(stmt: &mut Statement) -> bool {
 fn nested_ifs(stmt: &mut Statement) -> bool {
     if let Statement::IfElse {
         condition: outer_condition,
-        if_true:
+        then:
             box Statement::IfElse {
                 condition: inner_condition,
-                if_true: inner_if_true,
-                if_false: inner_if_false,
+                then: inner_then,
+                else_: inner_else,
                 ..
             },
-        if_false: outer_if_false,
+        else_: outer_else,
         span,
     } = stmt
-      && outer_if_false.is_nop()
-      && inner_if_false.is_nop()
+      && outer_else.is_nop()
+      && inner_else.is_nop()
     {
         *stmt = Statement::IfElse {
             condition: Expr::FuncCall(
@@ -132,8 +132,8 @@ fn nested_ifs(stmt: &mut Statement) -> bool {
                 *span,
                 vec![mem::take(outer_condition), mem::take(inner_condition)],
             ),
-            if_true: mem::take(inner_if_true),
-            if_false: Box::default(),
+            then: mem::take(inner_then),
+            else_: Box::default(),
             span: *span,
         };
         true

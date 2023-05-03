@@ -13,8 +13,8 @@ pub enum Statement {
     Do(Vec<Self>),
     IfElse {
         condition: Expr,
-        if_true: Box<Self>,
-        if_false: Box<Self>,
+        then: Box<Self>,
+        else_: Box<Self>,
         span: Span,
     },
     Repeat {
@@ -55,13 +55,13 @@ impl Statement {
             "do" => Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?),
             "if" => {
                 let condition = tail.next().unwrap();
-                let if_true = tail.next().unwrap();
-                let if_false = tail.next().unwrap();
+                let then = tail.next().unwrap();
+                let else_ = tail.next().unwrap();
                 assert!(tail.next().is_none());
                 Self::IfElse {
                     condition: Expr::from_ast(condition)?,
-                    if_true: Box::new(Self::from_ast(if_true)?),
-                    if_false: Box::new(Self::from_ast(if_false)?),
+                    then: Box::new(Self::from_ast(then)?),
+                    else_: Box::new(Self::from_ast(else_)?),
                     span: full_span,
                 }
             }
@@ -114,10 +114,10 @@ impl Statement {
                 let condition = tail.next().unwrap();
                 Self::IfElse {
                     condition: Expr::from_ast(condition)?,
-                    if_true: Box::new(Self::Do(
+                    then: Box::new(Self::Do(
                         tail.map(Self::from_ast).collect::<Result<_>>()?,
                     )),
-                    if_false: Box::new(Self::Do(Vec::new())),
+                    else_: Box::new(Self::Do(Vec::new())),
                     span: full_span,
                 }
             }
@@ -125,8 +125,8 @@ impl Statement {
                 let condition = tail.next().unwrap();
                 Self::IfElse {
                     condition: Expr::from_ast(condition)?,
-                    if_true: Box::new(Self::Do(Vec::new())),
-                    if_false: Box::new(Self::Do(
+                    then: Box::new(Self::Do(Vec::new())),
+                    else_: Box::new(Self::Do(
                         tail.map(Self::from_ast).collect::<Result<_>>()?,
                     )),
                     span: full_span,
@@ -148,8 +148,8 @@ impl Statement {
                     else_branch,
                     |acc, (condition, then)| Self::IfElse {
                         condition,
-                        if_true: Box::new(then),
-                        if_false: Box::new(acc),
+                        then: Box::new(then),
+                        else_: Box::new(acc),
                         span: full_span,
                     },
                 )
@@ -180,12 +180,12 @@ impl Statement {
             }
             Self::IfElse {
                 condition: _,
-                if_true,
-                if_false,
+                then,
+                else_,
                 ..
             } => {
-                if_true.traverse_postorder_mut(f);
-                if_false.traverse_postorder_mut(f);
+                then.traverse_postorder_mut(f);
+                else_.traverse_postorder_mut(f);
             }
             Self::Repeat { times: _, body }
             | Self::Forever(body)
