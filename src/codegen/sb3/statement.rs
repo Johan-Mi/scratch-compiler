@@ -2,9 +2,9 @@ use crate::{
     codegen::sb3::{Call, Param, SerCtx},
     diagnostic::{Error, Result},
     ir::{expr::Expr, statement::Statement},
-    span::Span,
     uid::Uid,
 };
+use codemap::Span;
 use serde_json::{json, Value as Json};
 
 impl SerCtx<'_> {

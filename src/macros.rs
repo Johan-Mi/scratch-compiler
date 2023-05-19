@@ -3,10 +3,9 @@ use crate::{
     diagnostic::{Error, Result},
     lint::lint_ast,
     parser::{program, Input},
-    span::Span,
     Opts,
 };
-use codespan::Files;
+use codemap::{CodeMap, Span};
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs, mem};
 use winnow::stream::Located;
@@ -14,11 +13,11 @@ use winnow::stream::Located;
 pub fn expand(
     program: Vec<Ast>,
     opts: &Opts,
-    files: &mut Files<String>,
+    code_map: &mut CodeMap,
 ) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
         opts,
-        files,
+        code_map,
         asts: Vec::new(),
         symbols: HashMap::new(),
         functions: HashMap::new(),
@@ -68,7 +67,7 @@ impl Macro {
 
 struct MacroContext<'a> {
     opts: &'a Opts,
-    files: &'a mut Files<String>,
+    code_map: &'a mut CodeMap,
     asts: Vec<Ast>,
     symbols: HashMap<String, Ast>,
     functions: HashMap<String, FunctionMacro>,
@@ -339,14 +338,14 @@ impl MacroContext<'_> {
         match args {
             [Ast::String(path, ..)] => {
                 let source = fs::read_to_string(path).unwrap();
-                let file_id = self.files.add(path, source.clone());
+                let file = self.code_map.add_file(path.clone(), source.clone());
                 let asts = program(Input {
                     input: Located::new(&source),
-                    state: file_id,
+                    state: &file,
                 })?;
                 if self.opts.lint {
                     for ast in &asts {
-                        lint_ast(ast, self.files);
+                        lint_ast(ast, self.code_map);
                     }
                 }
                 Ok(asts)

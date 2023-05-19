@@ -1,5 +1,5 @@
-use crate::{ast::Ast, span::Span};
-use codespan::FileId;
+use crate::ast::Ast;
+use codemap::{File, Span};
 use std::borrow::Cow;
 use winnow::{
     ascii::{digit1, float, hex_digit1, multispace1, oct_digit1},
@@ -13,7 +13,7 @@ use winnow::{
     IResult, Located, Parser, Stateful,
 };
 
-pub type Input<'a> = Stateful<Located<&'a str>, FileId>;
+pub type Input<'a> = Stateful<Located<&'a str>, &'a File>;
 type Error<'a> = winnow::error::Error<Input<'a>>;
 
 pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
@@ -168,10 +168,10 @@ where
             .with_span()
             .map(|(parsed, range)| {
                 (
-                    Span {
-                        position: (range.start as u32..range.end as u32).into(),
-                        file: input.state,
-                    },
+                    input.state.span.subspan(
+                        range.start.try_into().unwrap(),
+                        range.end.try_into().unwrap(),
+                    ),
                     parsed,
                 )
             })

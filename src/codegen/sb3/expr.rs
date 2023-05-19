@@ -1,9 +1,9 @@
 use crate::{
     codegen::sb3::{Call, Expr, Param, Reporter, SerCtx},
     diagnostic::{Error, Result},
-    span::Span,
     uid::Uid,
 };
+use codemap::Span;
 use sb3_stuff::Value;
 use serde_json::json;
 

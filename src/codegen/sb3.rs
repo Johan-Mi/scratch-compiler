@@ -12,9 +12,9 @@ use crate::{
         Program,
         {proc::Procedure, statement::Statement},
     },
-    span::Span,
     uid::Uid,
 };
+use codemap::Span;
 use reporter::Reporter;
 use sb3_stuff::Value;
 use serde_json::{json, Value as Json};

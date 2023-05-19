@@ -2,9 +2,9 @@ use crate::{
     ast::{all_symbols, Ast},
     diagnostic::Result,
     ir::{expr::Expr, statement::Statement},
-    span::Span,
     uid::Uid,
 };
+use codemap::Span;
 use fancy_match::fancy_match;
 use smol_str::SmolStr;
 use std::collections::HashSet;

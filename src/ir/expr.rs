@@ -1,8 +1,8 @@
 use crate::{
     ast::Ast,
     diagnostic::{Error, Result},
-    span::Span,
 };
+use codemap::Span;
 use sb3_stuff::Value;
 use smol_str::SmolStr;
 

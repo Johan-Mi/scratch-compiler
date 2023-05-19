@@ -2,8 +2,8 @@ use super::Program;
 use crate::{
     diagnostic::{Error, Result},
     ir::{expr::Expr, statement::Statement},
-    span::Span,
 };
+use codemap::Span;
 use cranelift::prelude::{types::*, *};
 use cranelift_module::Module;
 use sb3_stuff::Value as Immediate;

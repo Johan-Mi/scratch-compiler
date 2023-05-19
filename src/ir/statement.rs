@@ -1,7 +1,8 @@
 use crate::{
     ast::Ast, diagnostic::Result, ir::expr::Expr,
-    optimize::statement::optimize_stmt, span::Span,
+    optimize::statement::optimize_stmt,
 };
+use codemap::Span;
 
 #[derive(Debug)]
 pub enum Statement {

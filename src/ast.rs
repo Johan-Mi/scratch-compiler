@@ -1,4 +1,4 @@
-use crate::span::Span;
+use codemap::Span;
 
 #[derive(Debug, Clone)]
 pub enum Ast {

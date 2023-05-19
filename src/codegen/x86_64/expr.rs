@@ -5,8 +5,8 @@ use super::{
 use crate::{
     diagnostic::{Error, Result},
     ir::expr::Expr,
-    span::Span,
 };
+use codemap::Span;
 use cranelift::prelude::{types::*, *};
 use sb3_stuff::Value as Immediate;
 use std::{borrow::Cow, cmp::Ordering};

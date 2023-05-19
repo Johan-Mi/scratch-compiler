@@ -15,14 +15,13 @@ mod macros;
 mod optimize;
 mod opts;
 mod parser;
-mod span;
 mod uid;
 
 use crate::{
     codegen::write_program, ir::Program, lint::lint_ast, macros::expand,
     opts::Opts, parser::Input,
 };
-use codespan::Files;
+use codemap::CodeMap;
 use gumdrop::Options;
 use std::{fs, process::ExitCode};
 use winnow::stream::Located;
@@ -37,25 +36,26 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut files = Files::new();
-    let main_file_id = files.add(&opts.file, input.clone());
+    let mut code_map = CodeMap::new();
+    let main_file =
+        code_map.add_file(opts.file.display().to_string(), input.clone());
 
     if let Err(err) = parser::program(Input {
         input: Located::new(&input),
-        state: main_file_id,
+        state: &main_file,
     })
     .and_then(|asts| {
         if opts.lint {
             for ast in &asts {
-                lint_ast(ast, &files);
+                lint_ast(ast, &code_map);
             }
         }
-        let expanded = expand(asts, &opts, &mut files)?;
+        let expanded = expand(asts, &opts, &mut code_map)?;
         let mut program = Program::from_asts(expanded)?;
         program.optimize();
         write_program(&program, &opts)
     }) {
-        err.emit(&files);
+        err.emit(&code_map);
         return ExitCode::FAILURE;
     }
 

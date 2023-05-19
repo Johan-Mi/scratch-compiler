@@ -6,9 +6,9 @@ mod typ;
 use crate::{
     diagnostic::{Error, Result},
     ir::{self, expr::Expr, proc::Procedure, sprite::Sprite},
-    span::Span,
 };
 use broadcast::Broadcasts;
+use codemap::Span;
 use cranelift::{
     codegen::{
         ir::{FuncRef, Function, Inst, UserFuncName},

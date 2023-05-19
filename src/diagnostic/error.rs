@@ -1,6 +1,6 @@
 use super::{emit_all, plural, primary, secondary, Diagnostic};
-use crate::span::Span;
-use codespan::Files;
+use codemap::{CodeMap, Span};
+use codemap_diagnostic::SpanLabel as Label;
 use smol_str::SmolStr;
 use std::io;
 
@@ -113,7 +113,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn emit(&self, files: &Files<String>) {
+    pub fn emit(&self, code_map: &CodeMap) {
         use Error::*;
         let diagnostics = match self {
             BuiltinProcWrongArgCount {
@@ -128,18 +128,18 @@ impl Error {
                 *got,
                 *span,
             )],
-            CouldNotCreateSb3File { inner } => {
-                vec![just_message("could not create SB3 file")
-                    .with_notes(vec![inner.to_string()])]
-            }
-            CouldNotCreateProjectJson { inner } => {
-                vec![just_message("could not create `project.json`")
-                    .with_notes(vec![inner.to_string()])]
-            }
-            CouldNotFinishZip { inner } => {
-                vec![just_message("could not finish zip archive")
-                    .with_notes(vec![inner.to_string()])]
-            }
+            CouldNotCreateSb3File { inner } => vec![
+                error("could not create SB3 file", Vec::new()),
+                note(inner.to_string()),
+            ],
+            CouldNotCreateProjectJson { inner } => vec![
+                error("could not create `project.json`", Vec::new()),
+                note(inner.to_string()),
+            ],
+            CouldNotFinishZip { inner } => vec![
+                error("could not finish zip archive", Vec::new()),
+                note(inner.to_string()),
+            ],
             CustomProcWrongArgCount {
                 span,
                 proc_name,
@@ -156,14 +156,16 @@ impl Error {
                 pattern,
                 provided,
                 macro_name,
-            } => vec![just_message(format!(
-                "argument to function macro `{macro_name}` does not match the \
-                pattern in its definition"
-            ))
-            .with_labels(vec![
-                primary(*provided).with_message("argument provided here"),
-                secondary(*pattern).with_message("pattern was defined here"),
-            ])],
+            } => vec![error(
+                format!(
+                    "argument to function macro `{macro_name}` does not match \
+                    the pattern in its definition"
+                ),
+                vec![
+                    primary(*provided, "argument provided here".to_owned()),
+                    secondary(*pattern, "pattern was defined here".to_owned()),
+                ],
+            )],
             FunctionMacroWrongArgCount {
                 span,
                 macro_name,
@@ -176,9 +178,10 @@ impl Error {
                 *got,
                 *span,
             )],
-            FunctionNameMustBeSymbol { span } => {
-                vec![with_span("function name must be a symbol", *span)]
-            }
+            FunctionNameMustBeSymbol { span } => vec![error(
+                "function name must be a symbol",
+                vec![primary(*span, None)],
+            )],
             FunctionWrongArgCount {
                 span,
                 func_name,
@@ -187,63 +190,68 @@ impl Error {
             } => vec![wrong_arg_count(
                 "function", func_name, *expected, *got, *span,
             )],
-            InvalidArgsForInclude { span } => {
-                vec![with_span("invalid arguments for `include`", *span)]
-            }
-            InvalidItemInSprite { span } => {
-                vec![with_span("invalid arguments in sprite", *span)]
-            }
-            InvalidMacroParameter { span } => {
-                vec![with_span("invalid macro parameter", *span).with_notes(
-                    vec![
-                        "expected symbol or node consisiting of a symbol and \
-                        more parameters"
-                            .to_owned(),
-                    ],
-                )]
-            }
-            InvalidMacroSignature { span } => {
-                vec![with_span("invalid macro signature", *span)]
-            }
-            InvalidParameterForCustomProcDef { span } => vec![just_message(
-                "invalid parameter for custom procedure definition",
-            )
-            .with_labels(vec![primary(*span).with_message("expected symbol")])],
-            InvalidTopLevelItem { span } => {
-                vec![just_message("invalid top-level item")
-                    .with_labels(vec![primary(*span)
-                        .with_message("expected macro or sprite definition")])]
-            }
-            MacroDefinitionMissingBody { span } => {
-                vec![with_span("macro definition is missing a body", *span)]
-            }
-            MacroDefinitionMissingSignature { span } => {
-                vec![with_span(
-                    "macro definition is missing a signature",
+            InvalidArgsForInclude { span } => vec![error(
+                "invalid arguments for `include`",
+                vec![primary(*span, None)],
+            )],
+            InvalidItemInSprite { span } => vec![error(
+                "invalid item in sprite",
+                vec![primary(*span, None)],
+            )],
+            InvalidMacroParameter { span } => vec![error(
+                "invalid macro parameter",
+                vec![primary(
                     *span,
-                )]
-            }
+                    "expected symbol or node consisiting of a symbol and \
+                        more parameters"
+                        .to_owned(),
+                )],
+            )],
+            InvalidMacroSignature { span } => vec![error(
+                "invalid macro signature",
+                vec![primary(*span, None)],
+            )],
+            InvalidParameterForCustomProcDef { span } => vec![error(
+                "invalid parameter for custom procedure definition",
+                vec![primary(*span, "expected symbol".to_owned())],
+            )],
+            InvalidTopLevelItem { span } => vec![error(
+                "invalid top-level item",
+                vec![primary(
+                    *span,
+                    "expected macro or sprite definition".to_owned(),
+                )],
+            )],
+            MacroDefinitionMissingBody { span } => vec![error(
+                "macro definition is missing a body",
+                vec![primary(*span, None)],
+            )],
+            MacroDefinitionMissingSignature { span } => vec![error(
+                "macro definition is missing a signature",
+                vec![primary(*span, None)],
+            )],
             Parse(parse_error) => {
-                vec![just_message("syntax error")
-                    .with_notes(vec![parse_error.clone()])]
+                vec![error("syntax error", Vec::new()), note(parse_error)]
             }
             ProgramMissingStage => {
-                vec![just_message("program is missing a stage")]
+                vec![error("program is missing a stage", Vec::new())]
             }
             SpriteMissingName {
                 span,
                 candidate_symbol,
             } => {
-                let mut diagnostic =
-                    with_span("sprite is missing a name", *span);
+                let mut diagnostic = error(
+                    "sprite is missing a name",
+                    vec![primary(*span, None)],
+                );
                 if let Some(candidate_symbol) = candidate_symbol {
-                    diagnostic.labels.push(
-                        secondary(*candidate_symbol)
-                            .with_message("expected string but got a symbol"),
-                    );
+                    diagnostic.spans.push(secondary(
+                        *candidate_symbol,
+                        "expected string but got a symbol".to_owned(),
+                    ));
                     vec![
                         diagnostic,
-                        Diagnostic::help().with_message(
+                        help(
                             "If this symbol is meant to be the name, try \
                             wrapping it in double quotes",
                         ),
@@ -252,63 +260,49 @@ impl Error {
                     vec![diagnostic]
                 }
             }
-            SymbolMacroInInlinePosition { span } => vec![with_span(
+            SymbolMacroInInlinePosition { span } => vec![error(
                 "symbol macro cannot be used in inline position",
-                *span,
+                vec![primary(*span, None)],
             )],
             SymConcatEmptySymbol { span } => vec![
-                with_span("`sym-concat!` cannot create an empty symbol", *span),
-                Diagnostic::help().with_message(
-                    "At least one symbol must be provided as an argument",
+                error(
+                    "`sym-concat!` cannot create an empty symbol",
+                    vec![primary(*span, None)],
                 ),
+                note("at least one symbol must be provided as an argument"),
             ],
-            UnknownFunction { span, func_name } => {
-                vec![with_span(
-                    format!("unknown function: `{func_name}`"),
-                    *span,
-                )]
-            }
-            UnknownList { span, list_name } => {
-                vec![with_span(format!("unknown list: `{list_name}`"), *span)]
-            }
-            UnknownMetavariable { span, var_name } => {
-                vec![with_span(
-                    format!("unknown metavariable: `{var_name}`"),
-                    *span,
-                )]
-            }
-            UnknownProc { span, proc_name } => {
-                vec![with_span(
-                    format!("unknown procedure: `{proc_name}`"),
-                    *span,
-                )]
-            }
-            UnknownVar { span, var_name } => {
-                vec![with_span(
-                    format!("unknown variable: `{var_name}`"),
-                    *span,
-                )]
-            }
-            UnknownVarOrList { span, sym_name } => vec![with_span(
-                format!("unknown variable or list: `{sym_name}`"),
-                *span,
+            UnknownFunction { span, func_name } => vec![error(
+                format!("unknown function: `{func_name}`"),
+                vec![primary(*span, None)],
             )],
-            UnquoteOutsideOfMacro { span } => vec![with_span(
+            UnknownList { span, list_name } => vec![error(
+                format!("unknown list: `{list_name}`"),
+                vec![primary(*span, None)],
+            )],
+            UnknownMetavariable { span, var_name } => vec![error(
+                format!("unknown metavariable: `{var_name}`"),
+                vec![primary(*span, None)],
+            )],
+            UnknownProc { span, proc_name } => vec![error(
+                format!("unknown procedure: `{proc_name}`"),
+                vec![primary(*span, None)],
+            )],
+            UnknownVar { span, var_name } => vec![error(
+                format!("unknown variable: `{var_name}`"),
+                vec![primary(*span, None)],
+            )],
+            UnknownVarOrList { span, sym_name } => vec![error(
+                format!("unknown variable or list: `{sym_name}`"),
+                vec![primary(*span, None)],
+            )],
+            UnquoteOutsideOfMacro { span } => vec![error(
                 "unquote can only be used in macro definitions",
-                *span,
+                vec![primary(*span, None)],
             )],
         };
 
-        emit_all(&diagnostics, files);
+        emit_all(&diagnostics, code_map);
     }
-}
-
-fn just_message(message: impl Into<String>) -> Diagnostic {
-    Diagnostic::error().with_message(message)
-}
-
-fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
-    just_message(message).with_labels(vec![primary(span)])
 }
 
 fn wrong_arg_count(
@@ -318,11 +312,38 @@ fn wrong_arg_count(
     got: usize,
     span: Span,
 ) -> Diagnostic {
-    with_span(
+    error(
         format!(
             "{kind} `{name}` expected {expected} {} but got {got}",
             plural(expected, "argument", "arguments"),
         ),
-        span,
+        vec![primary(span, None)],
     )
+}
+
+fn error(message: impl Into<String>, labels: Vec<Label>) -> Diagnostic {
+    Diagnostic {
+        level: codemap_diagnostic::Level::Error,
+        message: message.into(),
+        code: None,
+        spans: labels,
+    }
+}
+
+fn note(message: impl Into<String>) -> Diagnostic {
+    Diagnostic {
+        level: codemap_diagnostic::Level::Note,
+        message: message.into(),
+        code: None,
+        spans: Vec::new(),
+    }
+}
+
+fn help(message: impl Into<String>) -> Diagnostic {
+    Diagnostic {
+        level: codemap_diagnostic::Level::Help,
+        message: message.into(),
+        code: None,
+        spans: Vec::new(),
+    }
 }

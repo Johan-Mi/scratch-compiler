@@ -1,7 +1,6 @@
-use codespan::Files;
-
 use super::{emit_all, primary, secondary, Diagnostic};
-use crate::span::Span;
+use codemap::{CodeMap, Span};
+use codemap_diagnostic::SpanLabel as Label;
 
 pub enum Warning {
     ParenTooFarLeft {
@@ -16,36 +15,40 @@ pub enum Warning {
 }
 
 impl Warning {
-    pub fn emit(&self, files: &Files<String>) {
+    pub fn emit(&self, code_map: &CodeMap) {
         use Warning::*;
-        let diagnostics = match self {
-            ParenTooFarLeft { left, right } => vec![Diagnostic::warning()
-                .with_message("misleading formatting")
-                .with_labels(vec![primary(*right).with_message(
-                    "this parenthesis is further to the left than its match",
-                ), secondary(*left).with_message("match is here")])],
+        let diagnostic = match self {
+            ParenTooFarLeft { left, right } => warning(
+                "misleading formatting",
+                vec![
+                    primary(
+                        *right,
+                        "this parenthesis is further to the left than its match"
+                        .to_owned(),
+                    ),
+                    secondary(*left, "match is here".to_owned()),
+                ],
+            ),
             InconsistentIndentation {
                 node,
                 good,
                 offender,
-            } => {
-                vec![Diagnostic::warning()
-                    .with_message("inconsistent indentation")
-                    .with_labels(vec![
-                    primary(*node).with_message(
-                        "nodes spanning multiple lines should have the same \
-                        level of indentation for all non-initial lines"
-                    ),
-                    secondary(*good).with_message(
-                        "if this item is indented correctly..."
-                    ),
-                    secondary(*offender).with_message(
-                        "...then this is not"
-                    ),
-                ])]
-            }
+            } => warning("inconsistent indentation", vec![
+                primary(*node, "nodes spanning multiple lines should have the same level of indentation for all non-initial lines".to_owned()),
+                secondary(*good, "if this item is indented correctly...".to_owned()),
+                secondary(*offender, "...then this is not".to_owned()),
+            ]),
         };
 
-        emit_all(&diagnostics, files);
+        emit_all(&[diagnostic], code_map);
+    }
+}
+
+fn warning(message: impl Into<String>, labels: Vec<Label>) -> Diagnostic {
+    Diagnostic {
+        level: codemap_diagnostic::Level::Warning,
+        message: message.into(),
+        code: None,
+        spans: labels,
     }
 }
