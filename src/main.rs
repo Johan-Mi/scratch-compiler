@@ -24,10 +24,8 @@ use crate::{
 };
 use codespan::Files;
 use gumdrop::Options;
-use std::{fs, process::ExitCode, sync::Mutex};
+use std::{fs, process::ExitCode};
 use winnow::stream::Located;
-
-static FILES: Mutex<Files<String>> = Mutex::new(Files::new());
 
 fn main() -> ExitCode {
     let opts = Opts::parse_args_default_or_exit();
@@ -38,7 +36,9 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let main_file_id = FILES.lock().unwrap().add(&opts.file, input.clone());
+
+    let mut files = Files::new();
+    let main_file_id = files.add(&opts.file, input.clone());
 
     if let Err(err) = parser::program(Input {
         input: Located::new(&input),
@@ -47,15 +47,15 @@ fn main() -> ExitCode {
     .and_then(|asts| {
         if opts.lint {
             for ast in &asts {
-                lint_ast(ast);
+                lint_ast(ast, &files);
             }
         }
-        let expanded = expand(asts, &opts)?;
+        let expanded = expand(asts, &opts, &mut files)?;
         let mut program = Program::from_asts(expanded)?;
         program.optimize();
         write_program(&program, &opts)
     }) {
-        err.emit();
+        err.emit(&files);
         return ExitCode::FAILURE;
     }
 

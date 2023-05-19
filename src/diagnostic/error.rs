@@ -1,5 +1,6 @@
 use super::{emit_all, plural, primary, secondary, Diagnostic};
 use crate::span::Span;
+use codespan::Files;
 use smol_str::SmolStr;
 use std::io;
 
@@ -112,7 +113,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn emit(&self) {
+    pub fn emit(&self, files: &Files<String>) {
         use Error::*;
         let diagnostics = match self {
             BuiltinProcWrongArgCount {
@@ -298,15 +299,15 @@ impl Error {
             )],
         };
 
-        emit_all(&diagnostics);
+        emit_all(&diagnostics, files);
     }
 }
 
-fn just_message(message: impl ToString) -> Diagnostic {
+fn just_message(message: impl Into<String>) -> Diagnostic {
     Diagnostic::error().with_message(message)
 }
 
-fn with_span(message: impl ToString, span: Span) -> Diagnostic {
+fn with_span(message: impl Into<String>, span: Span) -> Diagnostic {
     just_message(message).with_labels(vec![primary(span)])
 }
 

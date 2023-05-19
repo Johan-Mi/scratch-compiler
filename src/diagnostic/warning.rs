@@ -1,3 +1,5 @@
+use codespan::Files;
+
 use super::{emit_all, primary, secondary, Diagnostic};
 use crate::span::Span;
 
@@ -14,7 +16,7 @@ pub enum Warning {
 }
 
 impl Warning {
-    pub fn emit(&self) {
+    pub fn emit(&self, files: &Files<String>) {
         use Warning::*;
         let diagnostics = match self {
             ParenTooFarLeft { left, right } => vec![Diagnostic::warning()
@@ -44,6 +46,6 @@ impl Warning {
             }
         };
 
-        emit_all(&diagnostics);
+        emit_all(&diagnostics, files);
     }
 }

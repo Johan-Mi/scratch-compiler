@@ -6,13 +6,19 @@ use crate::{
     span::Span,
     Opts,
 };
+use codespan::Files;
 use fancy_match::fancy_match;
 use std::{collections::HashMap, fs, mem};
 use winnow::stream::Located;
 
-pub fn expand(program: Vec<Ast>, opts: &Opts) -> Result<Vec<Ast>> {
+pub fn expand(
+    program: Vec<Ast>,
+    opts: &Opts,
+    files: &mut Files<String>,
+) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
         opts,
+        files,
         asts: Vec::new(),
         symbols: HashMap::new(),
         functions: HashMap::new(),
@@ -62,6 +68,7 @@ impl Macro {
 
 struct MacroContext<'a> {
     opts: &'a Opts,
+    files: &'a mut Files<String>,
     asts: Vec<Ast>,
     symbols: HashMap<String, Ast>,
     functions: HashMap<String, FunctionMacro>,
@@ -80,7 +87,7 @@ impl MacroContext<'_> {
         Ok(())
     }
 
-    fn transform_shallow(&self, ast: &mut Ast) -> Result<bool> {
+    fn transform_shallow(&mut self, ast: &mut Ast) -> Result<bool> {
         Ok(Self::use_builtin_function_macros(ast)?
             | self.use_builtin_symbol_macros(ast)
             | self.use_user_defined_macros(ast)?
@@ -88,7 +95,7 @@ impl MacroContext<'_> {
             | self.use_inline_macros(ast)?)
     }
 
-    fn transform_deep(&self, ast: &mut Ast) -> Result<bool> {
+    fn transform_deep(&mut self, ast: &mut Ast) -> Result<bool> {
         let mut dirty = false;
         while {
             let mut this_step_dirty = false;
@@ -141,7 +148,7 @@ impl MacroContext<'_> {
         }
     }
 
-    fn use_user_defined_macros(&self, ast: &mut Ast) -> Result<bool> {
+    fn use_user_defined_macros(&mut self, ast: &mut Ast) -> Result<bool> {
         Ok(match ast {
             Ast::Sym(sym, ..) => {
                 let Some(symbol_macro) = self.symbols.get(sym) else {
@@ -154,7 +161,7 @@ impl MacroContext<'_> {
                 let Some(func_macro) = self.functions.get(sym) else {
                     return Ok(false);
                 };
-                let params = &func_macro.params;
+                let params = &func_macro.params.clone();
                 let num_args = args.len();
                 let num_params = params.len();
                 if num_args != num_params {
@@ -165,12 +172,13 @@ impl MacroContext<'_> {
                         got: num_args,
                     }));
                 }
+                let body = func_macro.body.clone();
                 let mut bindings = HashMap::new();
                 for (param, mut arg) in params.iter().zip(mem::take(args)) {
                     self.transform_deep(&mut arg)?;
                     param.pattern_match(sym, arg, &mut bindings)?;
                 }
-                *ast = interpolate(func_macro.body.clone(), &bindings)?;
+                *ast = interpolate(body, &bindings)?;
                 true
             }
             _ => false,
@@ -257,7 +265,7 @@ impl MacroContext<'_> {
         })
     }
 
-    fn use_inline_include(&self, ast: &mut Ast) -> Result<bool> {
+    fn use_inline_include(&mut self, ast: &mut Ast) -> Result<bool> {
         let Ast::Node(_, tail, _) = ast else {
             return Ok(false);
         };
@@ -285,7 +293,7 @@ impl MacroContext<'_> {
         Ok(true)
     }
 
-    fn use_inline_macros(&self, ast: &mut Ast) -> Result<bool> {
+    fn use_inline_macros(&mut self, ast: &mut Ast) -> Result<bool> {
         let (macro_definition, def_span, args, span) = #[fancy_match]
         match ast {
             Ast::Node(
@@ -327,19 +335,18 @@ impl MacroContext<'_> {
         Ok(true)
     }
 
-    fn include(&self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
+    fn include(&mut self, args: &[Ast], span: Span) -> Result<Vec<Ast>> {
         match args {
             [Ast::String(path, ..)] => {
                 let source = fs::read_to_string(path).unwrap();
-                let file_id =
-                    crate::FILES.lock().unwrap().add(path, source.clone());
+                let file_id = self.files.add(path, source.clone());
                 let asts = program(Input {
                     input: Located::new(&source),
                     state: file_id,
                 })?;
                 if self.opts.lint {
                     for ast in &asts {
-                        lint_ast(ast);
+                        lint_ast(ast, self.files);
                     }
                 }
                 Ok(asts)
@@ -375,6 +382,7 @@ struct FunctionMacro {
     body: Ast,
 }
 
+#[derive(Clone)]
 enum Parameter {
     Var(String),
     Constructor(String, Vec<Parameter>, Span),

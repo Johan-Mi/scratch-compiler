@@ -1,9 +1,10 @@
 mod error;
+use codespan::Files;
 pub use error::Error;
 mod warning;
 pub use warning::Warning;
 
-use crate::{span::Span, FILES};
+use crate::span::Span;
 use codespan_reporting::term::{
     self,
     termcolor::{ColorChoice, StandardStream},
@@ -30,10 +31,9 @@ fn secondary(span: Span) -> Label {
     Label::secondary(span.file, span.position)
 }
 
-fn emit_all(diagnostics: &[Diagnostic]) {
+fn emit_all(diagnostics: &[Diagnostic], files: &Files<String>) {
     let writer = StandardStream::stderr(ColorChoice::Always);
     let config = term::Config::default();
-    let files = &*FILES.lock().unwrap();
 
     for diagnostic in diagnostics {
         term::emit(&mut writer.lock(), &config, files, diagnostic).unwrap();
