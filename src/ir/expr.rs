@@ -21,6 +21,15 @@ impl Default for Expr {
     }
 }
 
+macro_rules! known_func_name {
+    ($s:expr, $($lit:literal),* $(,)?) => {
+        match $s {
+            $($lit => Some($lit),)*
+            _ => None,
+        }
+    }
+}
+
 impl Expr {
     pub fn from_ast(ast: Ast) -> Result<Self> {
         Ok(match ast {
@@ -69,7 +78,12 @@ impl Expr {
                     }
                     _ => {
                         let func_name =
-                            KNOWN_FUNC_NAMES.get_key(&*func_name).ok_or(
+                            known_func_name! { &*func_name,
+                                "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
+                                "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
+                                "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
+                                "to-num", "random",
+                            }.ok_or(
                                 Error::UnknownFunction { span, func_name },
                             )?;
                         Self::FuncCall(
@@ -118,10 +132,3 @@ impl Expr {
         f(self);
     }
 }
-
-static KNOWN_FUNC_NAMES: phf::Set<&'static str> = phf::phf_set! {
-    "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
-    "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
-    "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
-    "to-num", "random",
-};
