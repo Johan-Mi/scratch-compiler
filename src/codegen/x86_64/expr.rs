@@ -246,7 +246,8 @@ impl<'a> Program<'a> {
             "str-length" => match args {
                 [s] => {
                     let s = self.generate_cow_expr(s, fb)?;
-                    let len = self.call_extern("str_length", &[s.0, s.1], fb);
+                    let len =
+                        self.call_extern("str_length", &<[_; 2]>::from(s), fb);
                     let len = fb.inst_results(len)[0];
                     let len = fb.ins().fcvt_from_uint(F64, len);
                     self.call_extern("drop_cow", &[s.0], fb);

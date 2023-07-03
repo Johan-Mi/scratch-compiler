@@ -316,7 +316,7 @@ impl<'a> Program<'a> {
                 [question] => {
                     let question = self.generate_cow_expr(question, fb)?;
                     let new =
-                        self.call_extern("ask", &[question.0, question.1], fb);
+                        self.call_extern("ask", &<[_; 2]>::from(question), fb);
                     let new_ptr = fb.inst_results(new)[0];
                     let new_len = fb.inst_results(new)[1];
                     self.call_extern("drop_cow", &[question.0], fb);
@@ -346,7 +346,8 @@ impl<'a> Program<'a> {
                     let name = self.generate_cow_expr(name, fb)?;
                     let main_broadcast_handler =
                         self.main_broadcast_handler(fb);
-                    fb.ins().call(main_broadcast_handler, &[name.0, name.1]);
+                    fb.ins()
+                        .call(main_broadcast_handler, &<[_; 2]>::from(name));
                     self.call_extern("drop_cow", &[name.0], fb);
                     Ok(CONTINUE)
                 }
@@ -398,7 +399,7 @@ impl<'a> Program<'a> {
             .map(|arg| self.generate_any_expr(arg, fb))
             .collect::<Result<Vec<_>>>()?
             .into_iter()
-            .flat_map(|(v0, v1)| [v0, v1])
+            .flat_map(<[_; 2]>::from)
             .collect::<Vec<_>>();
         fb.ins().call(func_ref, &args);
 

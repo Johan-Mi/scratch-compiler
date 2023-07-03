@@ -47,7 +47,7 @@ impl From<Value> for MixedSizeValue {
 
 impl From<(Value, Value)> for MixedSizeValue {
     fn from(values: (Value, Value)) -> Self {
-        Self::Pair([values.0, values.1])
+        Self::Pair(values.into())
     }
 }
 
