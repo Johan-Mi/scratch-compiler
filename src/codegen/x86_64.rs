@@ -20,7 +20,7 @@ use cranelift::{
         *,
     },
 };
-use cranelift_module::{DataContext, DataId, FuncId, Linkage, Module};
+use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use cranelift_object::{ObjectBuilder, ObjectModule};
 use sb3_stuff::Value as Immediate;
 use std::{
@@ -75,7 +75,7 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
     let mut p = Program {
         target_frontend_config,
         object_module,
-        data_ctx: DataContext::new(),
+        data_ctx: DataDescription::new(),
         entry_points: Vec::new(),
         variable_counter: 0,
         extern_function_signatures: extern_function_signatures(),
@@ -176,7 +176,7 @@ pub fn write_object_file(program: &ir::Program, path: &Path) -> Result<()> {
 struct Program<'a> {
     target_frontend_config: TargetFrontendConfig,
     object_module: ObjectModule,
-    data_ctx: DataContext,
+    data_ctx: DataDescription,
     entry_points: Vec<FuncId>,
     variable_counter: u32,
     extern_function_signatures: HashMap<&'static str, Signature>,
@@ -571,7 +571,7 @@ impl<'a> Program<'a> {
 
 fn define_variable(
     id: DataId,
-    data_ctx: &mut DataContext,
+    data_ctx: &mut DataDescription,
     object_module: &mut ObjectModule,
 ) {
     data_ctx.clear();
@@ -582,7 +582,7 @@ fn define_variable(
 
 fn define_list(
     id: DataId,
-    data_ctx: &mut DataContext,
+    data_ctx: &mut DataDescription,
     object_module: &mut ObjectModule,
 ) {
     data_ctx.clear();

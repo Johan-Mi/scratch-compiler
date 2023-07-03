@@ -144,7 +144,7 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
     } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
         let (flat_positives, flat_negatives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
             positives
-                .drain_filter(|term| matches!(term, AddSub(..)))
+                .extract_if(|term| matches!(term, AddSub(..)))
                 .map(|term| match term {
                     AddSub(flat_positives, flat_negatives) => {
                         (flat_positives, flat_negatives)
@@ -158,7 +158,7 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
     } else if negatives.iter().any(|term| matches!(term, AddSub(..))) {
         let (flat_negatives, flat_positives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
             negatives
-                .drain_filter(|term| matches!(term, AddSub(..)))
+                .extract_if(|term| matches!(term, AddSub(..)))
                 .map(|term| match term {
                     AddSub(flat_negatives, flat_positives) => {
                         (flat_negatives, flat_positives)
@@ -187,7 +187,7 @@ fn flatten_mul_div(expr: &mut Expr) -> bool {
             Vec<Vec<Expr>>,
             Vec<Vec<Expr>>,
         ) = numerators
-            .drain_filter(|term| matches!(term, MulDiv(..)))
+            .extract_if(|term| matches!(term, MulDiv(..)))
             .map(|term| match term {
                 MulDiv(flat_numerators, flat_denominators) => {
                     (flat_numerators, flat_denominators)
@@ -203,7 +203,7 @@ fn flatten_mul_div(expr: &mut Expr) -> bool {
             Vec<Vec<Expr>>,
             Vec<Vec<Expr>>,
         ) = denominators
-            .drain_filter(|term| matches!(term, MulDiv(..)))
+            .extract_if(|term| matches!(term, MulDiv(..)))
             .map(|term| match term {
                 MulDiv(flat_denominators, flat_numerators) => {
                     (flat_denominators, flat_numerators)
@@ -372,7 +372,7 @@ fn is_guaranteed_number(expr: &Expr) -> bool {
 
 fn drain_imms(exprs: &mut Vec<Expr>) -> impl Iterator<Item = Value> + '_ {
     exprs
-        .drain_filter(|expr| expr.is_imm())
+        .extract_if(|expr| expr.is_imm())
         .map(|expr| match expr {
             Imm(imm) => imm,
             _ => unreachable!(),
