@@ -361,8 +361,8 @@ impl<'a> Program<'a> {
                 self.object_module.define_function(func_id, ctx).unwrap();
             }
             "when-received" => {
-                let [(Expr::Imm(Immediate::String(broadcast_name)), _)]
-                    = &proc.params[..]
+                let [(Expr::Imm(Immediate::String(broadcast_name)), _)] =
+                    &proc.params[..]
                 else {
                     todo!();
                 };
@@ -495,7 +495,9 @@ impl<'a> Program<'a> {
     ) -> Inst {
         let func_id =
             *self.extern_functions.entry(func_name).or_insert_with(|| {
-                let Some(signature) = self.extern_function_signatures.get(func_name) else {
+                let Some(signature) =
+                    self.extern_function_signatures.get(func_name)
+                else {
                     panic!("extern function `{func_name}` missing signature");
                 };
                 self.object_module

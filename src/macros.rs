@@ -309,9 +309,9 @@ impl MacroContext<'_> {
         let (macro_name, Macro::Function(func_macro)) =
             Macro::parse(mem::take(macro_definition), *def_span)?
         else {
-            return Err(Box::new(
-                Error::SymbolMacroInInlinePosition { span: *span }
-            ));
+            return Err(Box::new(Error::SymbolMacroInInlinePosition {
+                span: *span,
+            }));
         };
 
         let num_args = args.len();

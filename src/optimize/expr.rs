@@ -135,7 +135,9 @@ fn trigonometry(expr: &mut Expr) -> bool {
 
 /// Flattens nested addition and subtraction.
 fn flatten_add_sub(expr: &mut Expr) -> bool {
-    let AddSub(positives, negatives) = expr else { return false; };
+    let AddSub(positives, negatives) = expr else {
+        return false;
+    };
     if positives.len() <= 1 && negatives.is_empty() {
         *expr = positives.pop().unwrap_or(Expr::Imm(Value::Num(0.0)));
         true
@@ -174,7 +176,9 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
 
 /// Flattens nested multiplication and division.
 fn flatten_mul_div(expr: &mut Expr) -> bool {
-    let MulDiv(numerators, denominators) = expr else { return false };
+    let MulDiv(numerators, denominators) = expr else {
+        return false;
+    };
     if numerators.len() <= 1 && denominators.is_empty() {
         *expr = numerators.pop().unwrap_or(Expr::Imm(Value::Num(1.0)));
         true
@@ -311,7 +315,9 @@ fn const_mathops(expr: &mut Expr) -> bool {
 
 /// Some functions return known constants when applied to zero arguments.
 fn empty_call(expr: &mut Expr) -> bool {
-    let Expr::FuncCall(func_name, _, args) = expr else { return false; };
+    let Expr::FuncCall(func_name, _, args) = expr else {
+        return false;
+    };
     if !args.is_empty() {
         return false;
     }
@@ -326,8 +332,7 @@ fn empty_call(expr: &mut Expr) -> bool {
 
 /// Flattens calls to some functions with only one argument.
 fn flatten_unary_call(expr: &mut Expr) -> bool {
-    let Expr::FuncCall("and" | "or" | "++", _, args) = expr
-    else {
+    let Expr::FuncCall("and" | "or" | "++", _, args) = expr else {
         return false;
     };
     if args.len() != 1 {
