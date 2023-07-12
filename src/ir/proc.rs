@@ -5,7 +5,6 @@ use crate::{
     uid::Uid,
 };
 use codemap::Span;
-use fancy_match::fancy_match;
 use smol_str::SmolStr;
 use std::collections::HashSet;
 
@@ -28,7 +27,6 @@ impl Procedure {
         let mut lists = HashSet::new();
 
         for stmt_or_decl in args {
-            #[fancy_match]
             match stmt_or_decl {
                 Ast::Node(box Ast::Sym("variables", ..), var_decls, ..) => {
                     variables.extend(all_symbols(var_decls).unwrap());

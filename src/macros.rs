@@ -6,7 +6,6 @@ use crate::{
     Opts,
 };
 use codemap::{CodeMap, Span};
-use fancy_match::fancy_match;
 use std::{collections::HashMap, fs, mem};
 use winnow::stream::Located;
 
@@ -116,7 +115,6 @@ impl MacroContext<'_> {
             self.transform_deep(&mut ast)?;
         };
 
-        #[fancy_match]
         match ast {
             Ast::Node(box Ast::Sym("macro", ..), args, span) => {
                 self.define(args, span)
@@ -275,14 +273,11 @@ impl MacroContext<'_> {
 
         *tail = mem::take(tail)
             .into_iter()
-            .map(|item| {
-                #[fancy_match]
-                match &item {
-                    Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                        self.include(args, *span)
-                    }
-                    _ => Ok(vec![item]),
+            .map(|item| match &item {
+                Ast::Node(box Ast::Sym("include", ..), args, span) => {
+                    self.include(args, *span)
                 }
+                _ => Ok(vec![item]),
             })
             .collect::<Result<Vec<Vec<Ast>>>>()?
             .into_iter()
@@ -293,8 +288,7 @@ impl MacroContext<'_> {
     }
 
     fn use_inline_macros(&mut self, ast: &mut Ast) -> Result<bool> {
-        let (macro_definition, def_span, args, span) = #[fancy_match]
-        match ast {
+        let (macro_definition, def_span, args, span) = match ast {
             Ast::Node(
                 box Ast::Node(
                     box Ast::Sym("macro", _),

@@ -230,15 +230,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fancy-match"
-version = "0.1.0"
-source = "git+https://github.com/Johan-Mi/fancy-match#5828a423cf30acca3329a5e52ffde5ee5d3b8c69"
-dependencies = [
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
 name = "flate2"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -438,7 +429,6 @@ dependencies = [
  "cranelift-module",
  "cranelift-object",
  "env_logger",
- "fancy-match",
  "gumdrop",
  "md5",
  "sb3-stuff",

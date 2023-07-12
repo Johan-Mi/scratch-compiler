@@ -3,7 +3,6 @@ use crate::{
     diagnostic::{Error, Result},
     ir::proc::Procedure,
 };
-use fancy_match::fancy_match;
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     path::PathBuf,
@@ -19,13 +18,12 @@ pub struct Sprite {
 
 impl Sprite {
     pub fn from_ast(ast: Ast) -> Result<(String, Self)> {
-        let (mut tail, span) = (#[fancy_match]
-        match ast {
+        let (mut tail, span) = match ast {
             Ast::Node(box Ast::Sym("sprite", ..), tail, span) => {
                 Ok((tail.into_iter(), span))
             }
             _ => Err(Error::InvalidTopLevelItem { span: ast.span() }),
-        })?;
+        }?;
 
         let name = match tail.next() {
             Some(Ast::String(name, ..)) => Ok(name),

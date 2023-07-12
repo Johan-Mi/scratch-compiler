@@ -1,7 +1,6 @@
 #![forbid(unsafe_code)]
 #![feature(box_patterns)]
-#![feature(stmt_expr_attributes)]
-#![feature(proc_macro_hygiene)]
+#![feature(string_deref_patterns)]
 #![feature(extract_if)]
 #![feature(let_chains)]
 

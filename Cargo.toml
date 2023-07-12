@@ -6,7 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fancy-match = { git = "https://github.com/Johan-Mi/fancy-match" }
 sb3-stuff = { git = "https://github.com/Johan-Mi/sb3-stuff" }
 md5 = "0.7.0"
 serde = { version = "1.0.164", features = ["derive"] }
