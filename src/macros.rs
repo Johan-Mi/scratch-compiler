@@ -288,17 +288,13 @@ impl MacroContext<'_> {
     }
 
     fn use_inline_macros(&mut self, ast: &mut Ast) -> Result<bool> {
-        let (macro_definition, def_span, args, span) = match ast {
-            Ast::Node(
-                box Ast::Node(
-                    box Ast::Sym("macro", _),
-                    macro_definition,
-                    def_span,
-                ),
-                args,
-                span,
-            ) => (macro_definition, def_span, args, span),
-            _ => return Ok(false),
+        let Ast::Node(
+            box Ast::Node(box Ast::Sym("macro", _), macro_definition, def_span),
+            args,
+            span,
+        ) = ast
+        else {
+            return Ok(false);
         };
         let (macro_name, Macro::Function(func_macro)) =
             Macro::parse(mem::take(macro_definition), *def_span)?
