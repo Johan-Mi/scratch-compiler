@@ -8,13 +8,12 @@ use winnow::{
         success, terminated,
     },
     dispatch,
-    error::ParseError,
+    error::{ContextError as Error, ParserError},
     token::{any, one_of, take_till0, take_till1, take_while},
-    IResult, Located, Parser, Stateful,
+    Located, PResult, Parser, Stateful,
 };
 
 pub type Input<'a> = Stateful<Located<&'a str>, &'a File>;
-type Error<'a> = winnow::error::Error<Input<'a>>;
 
 pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
     Ok(preceded(ws, repeat(0.., terminated(expr, ws)))
@@ -22,14 +21,14 @@ pub fn program(input: Input) -> crate::diagnostic::Result<Vec<Ast>> {
         .map_err(|err| crate::diagnostic::Error::Parse(format!("{err:?}")))?)
 }
 
-fn expr(input: Input) -> IResult<Input, Ast> {
+fn expr(input: &mut Input) -> PResult<Ast> {
     alt((number, boolean, string, sym, node, unquote)).parse_next(input)
 }
 
-fn number(input: Input) -> IResult<Input, Ast> {
-    let hex = based(16, "xX", hex_digit1);
-    let binary = based(2, "bB", take_while(1.., "01"));
-    let octal = based(8, "oO", oct_digit1);
+fn number(input: &mut Input) -> PResult<Ast> {
+    let hex = based(16, &['x', 'X'], hex_digit1);
+    let binary = based(2, &['b', 'B'], take_while(1.., ['0', '1']));
+    let octal = based(8, &['o', 'O'], oct_digit1);
 
     spanned(terminated(
         alt((hex, binary, octal, float)),
@@ -41,9 +40,9 @@ fn number(input: Input) -> IResult<Input, Ast> {
 
 fn based<'a>(
     base: u32,
-    prefix: &'static str,
-    digitp: impl Parser<Input<'a>, &'a str, Error<'a>>,
-) -> impl Parser<Input<'a>, f64, Error<'a>> {
+    prefix: &'static [char],
+    digitp: impl Parser<Input<'a>, &'a str, Error>,
+) -> impl Parser<Input<'a>, f64, Error> {
     separated_pair(sign, ('0', one_of(prefix)), digitp).try_map(
         move |(sign, digits)| {
             i64::from_str_radix(digits, base)
@@ -52,15 +51,15 @@ fn based<'a>(
     )
 }
 
-fn sign(input: Input) -> IResult<Input, Option<char>> {
-    opt(one_of("+-")).parse_next(input)
+fn sign(input: &mut Input) -> PResult<Option<char>> {
+    opt(one_of(['+', '-'])).parse_next(input)
 }
 
-fn hex_digit(input: Input) -> IResult<Input, char> {
+fn hex_digit(input: &mut Input) -> PResult<char> {
     one_of(|c: char| c.is_ascii_hexdigit()).parse_next(input)
 }
 
-fn boolean(input: Input) -> IResult<Input, Ast> {
+fn boolean(input: &mut Input) -> PResult<Ast> {
     terminated(
         spanned(alt((
             Parser::<_, _, Error>::value("true", true),
@@ -72,8 +71,8 @@ fn boolean(input: Input) -> IResult<Input, Ast> {
     .parse_next(input)
 }
 
-fn string(input: Input) -> IResult<Input, Ast> {
-    let normal = take_till1("\"\\\n").map(Cow::Borrowed);
+fn string(input: &mut Input) -> PResult<Ast> {
+    let normal = take_till1(['\"', '\\', '\n']).map(Cow::Borrowed);
     let null = terminated('0', not(digit1)).value(Cow::Borrowed("\0"));
     let character_escape_sequence = dispatch! {any;
         '"' => success("\""),
@@ -115,15 +114,22 @@ fn string(input: Input) -> IResult<Input, Ast> {
         .parse_next(input)
 }
 
-fn sym_first_char(input: Input) -> IResult<Input, char> {
-    one_of((char::is_alphabetic, "!$%&*+-./:<=>?@^_~[]")).parse_next(input)
+fn sym_first_char(input: &mut Input) -> PResult<char> {
+    one_of((
+        char::is_alphabetic,
+        [
+            '!', '$', '%', '&', '*', '+', '-', '.', '/', ':', '<', '=', '>',
+            '?', '@', '^', '_', '~', '[', ']',
+        ],
+    ))
+    .parse_next(input)
 }
 
-fn sym_non_first_char(input: Input) -> IResult<Input, ()> {
+fn sym_non_first_char(input: &mut Input) -> PResult<()> {
     alt((sym_first_char.void(), digit1.void())).parse_next(input)
 }
 
-fn sym(input: Input) -> IResult<Input, Ast> {
+fn sym(input: &mut Input) -> PResult<Ast> {
     spanned(
         (
             sym_first_char,
@@ -135,34 +141,34 @@ fn sym(input: Input) -> IResult<Input, Ast> {
     .parse_next(input)
 }
 
-fn node(input: Input) -> IResult<Input, Ast> {
+fn node(input: &mut Input) -> PResult<Ast> {
     let content = (expr, repeat(0.., preceded(ws, expr)));
     spanned(delimited(('(', ws), content, (ws, ')')))
         .map(|(span, (first, rest))| Ast::Node(Box::new(first), rest, span))
         .parse_next(input)
 }
 
-fn unquote(input: Input) -> IResult<Input, Ast> {
+fn unquote(input: &mut Input) -> PResult<Ast> {
     spanned(preceded((',', ws), expr))
         .map(|(span, ast)| Ast::Unquote(Box::new(ast), span))
         .parse_next(input)
 }
 
-fn eol_comment(input: Input) -> IResult<Input, ()> {
+fn eol_comment(input: &mut Input) -> PResult<()> {
     (';', take_till0('\n')).void().parse_next(input)
 }
 
-fn ws(input: Input) -> IResult<Input, ()> {
+fn ws(input: &mut Input) -> PResult<()> {
     repeat(0.., alt((multispace1.void(), eol_comment))).parse_next(input)
 }
 
-fn spanned<'a, O, E: ParseError<Input<'a>>, F>(
+fn spanned<'a, O, E: ParserError<Input<'a>>, F>(
     mut parser: F,
 ) -> impl Parser<Input<'a>, (Span, O), E>
 where
     F: Parser<Input<'a>, O, E>,
 {
-    move |input: Input<'a>| {
+    move |input: &mut Input<'a>| {
         parser
             .by_ref()
             .with_span()
