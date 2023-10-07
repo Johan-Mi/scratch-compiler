@@ -52,14 +52,14 @@ impl From<(Value, Value)> for MixedSizeValue {
 }
 
 impl MixedSizeValue {
-    pub fn single(self) -> Value {
+    pub const fn single(self) -> Value {
         match self {
             Self::Single(v) => v,
             Self::Pair(_) => panic!(),
         }
     }
 
-    pub fn pair(self) -> (Value, Value) {
+    pub const fn pair(self) -> (Value, Value) {
         match self {
             Self::Single(_) => panic!(),
             Self::Pair([v0, v1]) => (v0, v1),
