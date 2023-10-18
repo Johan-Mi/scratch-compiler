@@ -44,91 +44,98 @@ impl SerCtx<'_> {
                 self.serialize_func_call(func_name, args, parent, *span)?
             }
             Expr::AddSub(positives, negatives) => {
-                let addition = |terms, parent| {
-                    self.associative1(
-                        "operator_add",
-                        "NUM1",
-                        "NUM2",
-                        terms,
-                        parent,
-                    )
-                };
-
-                match (positives.is_empty(), negatives.is_empty()) {
-                    (true, true) => Reporter::Literal(Value::Num(0.0)),
-                    (true, false) => self.emit_non_shadow(
-                        "operator_subtract",
-                        parent,
-                        &[
-                            ("NUM1", &|_| Ok(json!([1, [10, ""]]))),
-                            ("NUM2", &|parent| {
-                                Ok(addition(negatives, parent)?
-                                    .with_empty_shadow())
-                            }),
-                        ],
-                        &[],
-                    )?,
-                    (false, true) => addition(positives, parent)?,
-                    (false, false) => self.emit_non_shadow(
-                        "operator_subtract",
-                        parent,
-                        &[
-                            ("NUM1", &|parent| {
-                                Ok(addition(positives, parent)?
-                                    .with_empty_shadow())
-                            }),
-                            ("NUM2", &|parent| {
-                                Ok(addition(negatives, parent)?
-                                    .with_empty_shadow())
-                            }),
-                        ],
-                        &[],
-                    )?,
-                }
+                self.serialize_add_sub(positives, negatives, parent)?
             }
             Expr::MulDiv(numerators, denominators) => {
-                let multiplication = |terms, parent| {
-                    self.associative1(
-                        "operator_multiply",
-                        "NUM1",
-                        "NUM2",
-                        terms,
-                        parent,
-                    )
-                };
-
-                match (numerators.is_empty(), denominators.is_empty()) {
-                    (true, true) => Reporter::Literal(Value::Num(1.0)),
-                    (true, false) => self.emit_non_shadow(
-                        "operator_divide",
-                        parent,
-                        &[
-                            ("NUM1", &|_| Ok(json!([1, [10, "1"]]))),
-                            ("NUM2", &|parent| {
-                                Ok(multiplication(denominators, parent)?
-                                    .with_empty_shadow())
-                            }),
-                        ],
-                        &[],
-                    )?,
-                    (false, true) => multiplication(numerators, parent)?,
-                    (false, false) => self.emit_non_shadow(
-                        "operator_divide",
-                        parent,
-                        &[
-                            ("NUM1", &|parent| {
-                                Ok(multiplication(numerators, parent)?
-                                    .with_empty_shadow())
-                            }),
-                            ("NUM2", &|parent| {
-                                Ok(multiplication(denominators, parent)?
-                                    .with_empty_shadow())
-                            }),
-                        ],
-                        &[],
-                    )?,
-                }
+                self.serialize_mul_div(numerators, denominators, parent)?
             }
+        })
+    }
+
+    fn serialize_mul_div(
+        &self,
+        numerators: &[Expr],
+        denominators: &[Expr],
+        parent: Uid,
+    ) -> Result<Reporter> {
+        let multiplication = |terms, parent| {
+            self.associative1(
+                "operator_multiply",
+                "NUM1",
+                "NUM2",
+                terms,
+                parent,
+            )
+        };
+        Ok(match (numerators.is_empty(), denominators.is_empty()) {
+            (true, true) => Reporter::Literal(Value::Num(1.0)),
+            (true, false) => self.emit_non_shadow(
+                "operator_divide",
+                parent,
+                &[
+                    ("NUM1", &|_| Ok(json!([1, [10, "1"]]))),
+                    ("NUM2", &|parent| {
+                        Ok(multiplication(denominators, parent)?
+                            .with_empty_shadow())
+                    }),
+                ],
+                &[],
+            )?,
+            (false, true) => multiplication(numerators, parent)?,
+            (false, false) => self.emit_non_shadow(
+                "operator_divide",
+                parent,
+                &[
+                    ("NUM1", &|parent| {
+                        Ok(multiplication(numerators, parent)?
+                            .with_empty_shadow())
+                    }),
+                    ("NUM2", &|parent| {
+                        Ok(multiplication(denominators, parent)?
+                            .with_empty_shadow())
+                    }),
+                ],
+                &[],
+            )?,
+        })
+    }
+
+    fn serialize_add_sub(
+        &self,
+        positives: &[Expr],
+        negatives: &[Expr],
+        parent: Uid,
+    ) -> Result<Reporter> {
+        let addition = |terms, parent| {
+            self.associative1("operator_add", "NUM1", "NUM2", terms, parent)
+        };
+        Ok(match (positives.is_empty(), negatives.is_empty()) {
+            (true, true) => Reporter::Literal(Value::Num(0.0)),
+            (true, false) => self.emit_non_shadow(
+                "operator_subtract",
+                parent,
+                &[
+                    ("NUM1", &|_| Ok(json!([1, [10, ""]]))),
+                    ("NUM2", &|parent| {
+                        Ok(addition(negatives, parent)?.with_empty_shadow())
+                    }),
+                ],
+                &[],
+            )?,
+            (false, true) => addition(positives, parent)?,
+            (false, false) => self.emit_non_shadow(
+                "operator_subtract",
+                parent,
+                &[
+                    ("NUM1", &|parent| {
+                        Ok(addition(positives, parent)?.with_empty_shadow())
+                    }),
+                    ("NUM2", &|parent| {
+                        Ok(addition(negatives, parent)?.with_empty_shadow())
+                    }),
+                ],
+                &[],
+            )?,
         })
     }
 
