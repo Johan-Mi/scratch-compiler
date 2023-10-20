@@ -330,7 +330,6 @@ impl SerCtx<'_> {
                 got: args.len(),
             }));
         }
-        assert_eq!(params.len(), args.len());
         let (inputs, fields) =
             self.create_inputs_and_fields(params, args, this)?;
 
