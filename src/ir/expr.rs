@@ -3,13 +3,13 @@ use crate::{
     diagnostic::{Error, Result},
 };
 use codemap::Span;
+use ecow::EcoString;
 use sb3_stuff::Value;
-use smol_str::SmolStr;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
     Imm(Value),
-    Sym(SmolStr, Span),
+    Sym(EcoString, Span),
     FuncCall(&'static str, Span, Vec<Self>),
     AddSub(Vec<Self>, Vec<Self>),
     MulDiv(Vec<Self>, Vec<Self>),

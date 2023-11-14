@@ -128,7 +128,7 @@ impl<'a> Program<'a> {
                 let var = self.lookup_var(&counter.0, fb).ok_or_else(|| {
                     Error::UnknownVar {
                         span: counter.1,
-                        var_name: (&counter.0).into(),
+                        var_name: (&*counter.0).into(),
                     }
                 })?;
 

@@ -523,8 +523,8 @@ impl<'a> Program<'a> {
             (Typ::StaticStr(lhs), Typ::StaticStr(rhs), _) => fb.ins().iconst(
                 I8,
                 i64::from(
-                    Immediate::String(lhs.into())
-                        .compare(&Immediate::String(rhs.into()))
+                    Immediate::String((*lhs).into())
+                        .compare(&Immediate::String((*rhs).into()))
                         == ordering,
                 ),
             ),

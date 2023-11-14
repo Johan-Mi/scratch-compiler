@@ -1,7 +1,7 @@
 use super::{emit_all, plural, primary, secondary, Diagnostic};
 use codemap::{CodeMap, Span};
 use codemap_diagnostic::SpanLabel as Label;
-use smol_str::SmolStr;
+use ecow::EcoString;
 use std::io;
 
 #[derive(Debug)]
@@ -89,7 +89,7 @@ pub enum Error {
     },
     UnknownList {
         span: Span,
-        list_name: SmolStr,
+        list_name: EcoString,
     },
     UnknownMetavariable {
         span: Span,
@@ -101,11 +101,11 @@ pub enum Error {
     },
     UnknownVar {
         span: Span,
-        var_name: SmolStr,
+        var_name: EcoString,
     },
     UnknownVarOrList {
         span: Span,
-        sym_name: SmolStr,
+        sym_name: EcoString,
     },
     UnquoteOutsideOfMacro {
         span: Span,

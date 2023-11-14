@@ -5,7 +5,7 @@ use crate::{
     uid::Uid,
 };
 use codemap::Span;
-use smol_str::SmolStr;
+use ecow::EcoString;
 use std::collections::HashSet;
 
 #[derive(Debug)]
@@ -70,5 +70,5 @@ fn parse_signature(ast: Ast) -> Result<(String, Vec<(Expr, Span)>)> {
 }
 
 pub struct CustomProcedure {
-    pub params: Vec<(SmolStr, Uid)>,
+    pub params: Vec<(EcoString, Uid)>,
 }
