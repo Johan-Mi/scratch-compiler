@@ -129,6 +129,12 @@ struct SerCtx<'a> {
     global_lists: HashMap<&'a str, Mangled<'a>>,
 }
 
+struct BuiltProcs<'a> {
+    blocks: HashMap<Uid, Json>,
+    local_vars: Vec<Mangled<'a>>,
+    local_lists: Vec<Mangled<'a>>,
+}
+
 impl<'a> SerCtx<'a> {
     fn new_uid(&self) -> Uid {
         self.uid_gen.new_uid()
@@ -137,13 +143,21 @@ impl<'a> SerCtx<'a> {
     pub fn serialize_procs(
         &mut self,
         procs: &'a HashMap<String, Vec<Procedure>>,
-    ) -> Result<HashMap<Uid, Json>> {
+    ) -> Result<BuiltProcs<'a>> {
+        let mut local_vars = vec![];
+        let mut local_lists = vec![];
         for (name, procs) in procs {
             for proc in procs {
                 self.serialize_proc(name, proc)?;
+                local_vars.extend(self.local_vars.values().cloned());
+                local_lists.extend(self.local_lists.values().cloned());
             }
         }
-        Ok(self.blocks.take())
+        Ok(BuiltProcs {
+            blocks: self.blocks.take(),
+            local_vars,
+            local_lists,
+        })
     }
 
     fn serialize_proc(

@@ -40,14 +40,17 @@ impl<'a> SerCtx<'a> {
             })
             .collect::<HashMap<_, _>>();
 
-        let var_initializers = variables
-            .iter()
-            .map(|(name, mangled)| (mangled.id.to_string(), json!([name, 0])))
-            .collect::<Json>();
-        let list_initializers = lists
-            .iter()
-            .map(|(name, mangled)| (mangled.id.to_string(), json!([name, []])))
-            .collect::<Json>();
+        let mangled_var = |mangled: &Mangled| {
+            (mangled.id.to_string(), json!([mangled.name, 0]))
+        };
+        let mangled_list = |mangled: &Mangled| {
+            (mangled.id.to_string(), json!([mangled.name, []]))
+        };
+
+        let mut var_initializers =
+            variables.values().map(mangled_var).collect::<Json>();
+        let mut list_initializers =
+            lists.values().map(mangled_list).collect::<Json>();
 
         if name != "Stage" {
             // Variables and lists belonging to the stage are considered global,
@@ -95,7 +98,15 @@ impl<'a> SerCtx<'a> {
             .filter_map(Result::transpose)
             .collect::<Result<_>>()?;
 
-        let blocks = self.serialize_procs(&sprite.procedures)?;
+        let procs = self.serialize_procs(&sprite.procedures)?;
+        var_initializers
+            .as_object_mut()
+            .unwrap()
+            .extend(procs.local_vars.iter().map(mangled_var));
+        list_initializers
+            .as_object_mut()
+            .unwrap()
+            .extend(procs.local_lists.iter().map(mangled_list));
 
         Ok(json!({
             "name": name,
@@ -105,7 +116,7 @@ impl<'a> SerCtx<'a> {
             "costumes": costumes,
             "currentCostume": 1,
             "sounds": [],
-            "blocks": blocks,
+            "blocks": procs.blocks,
         }))
     }
 }
