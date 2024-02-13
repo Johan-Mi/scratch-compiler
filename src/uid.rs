@@ -35,7 +35,7 @@ impl Generator {
 impl Default for Generator {
     fn default() -> Self {
         Self {
-            counter: Cell::new(NonZeroU32::new(1).unwrap()),
+            counter: Cell::new(NonZeroU32::MIN),
         }
     }
 }
