@@ -314,7 +314,7 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 [[package]]
 name = "lispfmt"
 version = "0.1.0"
-source = "git+https://github.com/Johan-Mi/lispfmt#be585fc2c46997d40256ff993c963300d43b2535"
+source = "git+https://github.com/Johan-Mi/lispfmt#2ff209f03c86efa68fcdeb0732a8b5d03e235988"
 
 [[package]]
 name = "log"
