@@ -12,7 +12,9 @@ pub fn format_stdin_to_stdout() -> Result<(), std::io::Error> {
                 TokenKind::Unquote => Token::PrefixOperator(&source_code[span]),
                 TokenKind::LParen => Token::LParen,
                 TokenKind::RParen => Token::RParen,
-                TokenKind::Comment => Token::Comment(&source_code[span]),
+                TokenKind::Comment => {
+                    Token::Comment(source_code[span].trim_end_matches('\n'))
+                }
                 TokenKind::NewLine => Token::NewLine,
             });
     let output = lispfmt::format(&mut tokens, 2).unwrap();
