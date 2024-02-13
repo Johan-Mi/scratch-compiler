@@ -128,7 +128,7 @@ impl MacroContext<'_> {
             Ast::Node(box Ast::Sym(sym, ..), mut args, _)
                 if sym == "when!" || sym == "unless!" =>
             {
-                let Some(Ast::Bool(condition, _)) = args.get(0) else {
+                let Some(Ast::Bool(condition, _)) = args.first() else {
                     todo!();
                 };
                 if *condition ^ (sym == "unless!") {
