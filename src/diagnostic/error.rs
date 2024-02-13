@@ -27,6 +27,9 @@ pub enum Error {
         expected: usize,
         got: usize,
     },
+    FailedToReadSourceCode {
+        inner: io::Error,
+    },
     FunctionMacroMatchFailed {
         pattern: Span,
         provided: Span,
@@ -152,6 +155,10 @@ impl Error {
                 *got,
                 *span,
             )],
+            FailedToReadSourceCode { inner } => vec![
+                error("failed to read source code", Vec::new()),
+                note(inner.to_string()),
+            ],
             FunctionMacroMatchFailed {
                 pattern,
                 provided,

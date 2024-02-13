@@ -27,36 +27,36 @@ use winnow::stream::Located;
 
 fn main() -> ExitCode {
     let opts = Opts::parse_args_default_or_exit();
-    let input = match fs::read_to_string(&opts.file) {
-        Ok(input) => input,
-        Err(err) => {
-            eprintln!("IO error: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
-
     let mut code_map = CodeMap::new();
+
+    match real_main(opts, &mut code_map) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            err.emit(&code_map);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn real_main(opts: Opts, code_map: &mut CodeMap) -> diagnostic::Result<()> {
+    let input = fs::read_to_string(&opts.file).map_err(|err| {
+        diagnostic::Error::FailedToReadSourceCode { inner: err }
+    })?;
+
     let main_file =
         code_map.add_file(opts.file.display().to_string(), input.clone());
 
-    if let Err(err) = parser::program(Input {
+    let asts = parser::program(Input {
         input: Located::new(&input),
         state: &main_file,
-    })
-    .and_then(|asts| {
-        if opts.lint {
-            for ast in &asts {
-                lint_ast(ast, &code_map);
-            }
+    })?;
+    if opts.lint {
+        for ast in &asts {
+            lint_ast(ast, code_map);
         }
-        let expanded = expand(asts, &opts, &mut code_map)?;
-        let mut program = Program::from_asts(expanded)?;
-        program.optimize();
-        write_program(&program, &opts)
-    }) {
-        err.emit(&code_map);
-        return ExitCode::FAILURE;
     }
-
-    ExitCode::SUCCESS
+    let expanded = expand(asts, &opts, code_map)?;
+    let mut program = Program::from_asts(expanded)?;
+    program.optimize();
+    write_program(&program, &opts)
 }
