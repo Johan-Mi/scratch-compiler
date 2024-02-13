@@ -54,7 +54,8 @@ impl lispfmt::Atom for Atom<'_> {
 #[derive(Logos)]
 #[logos(skip r"[ \t]+")]
 enum TokenKind {
-    #[regex(r"[^ \t\n,();]+")]
+    #[regex(r#"[^ \t\n,();"]+"#)]
+    #[regex(r#""[^"\n]*"?"#)]
     Atom,
     #[token(",")]
     Unquote,
