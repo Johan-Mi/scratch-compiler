@@ -8,6 +8,7 @@ mod asset;
 mod ast;
 mod codegen;
 mod diagnostic;
+mod formatter;
 mod ir;
 mod lint;
 mod macros;
@@ -17,8 +18,12 @@ mod parser;
 mod uid;
 
 use crate::{
-    codegen::write_program, ir::Program, lint::lint_ast, macros::expand,
-    opts::Opts, parser::Input,
+    codegen::write_program,
+    ir::Program,
+    lint::lint_ast,
+    macros::expand,
+    opts::{Command, CompileOpts, Opts},
+    parser::Input,
 };
 use codemap::CodeMap;
 use gumdrop::Options;
@@ -29,7 +34,20 @@ fn main() -> ExitCode {
     let opts = Opts::parse_args_default_or_exit();
     let mut code_map = CodeMap::new();
 
-    match real_main(opts, &mut code_map) {
+    let res = match opts.command {
+        Some(Command::Compile(opts)) => real_main(opts, &mut code_map),
+        Some(Command::Format(_)) => formatter::format_stdin_to_stdout()
+            .map_err(|err| {
+                Box::new(diagnostic::Error::FailedToReadSourceCode {
+                    inner: err,
+                })
+            }),
+        None => {
+            eprintln!("error: no command provided");
+            return ExitCode::FAILURE;
+        }
+    };
+    match res {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             err.emit(&code_map);
@@ -38,7 +56,10 @@ fn main() -> ExitCode {
     }
 }
 
-fn real_main(opts: Opts, code_map: &mut CodeMap) -> diagnostic::Result<()> {
+fn real_main(
+    opts: CompileOpts,
+    code_map: &mut CodeMap,
+) -> diagnostic::Result<()> {
     let input = fs::read_to_string(&opts.file).map_err(|err| {
         diagnostic::Error::FailedToReadSourceCode { inner: err }
     })?;

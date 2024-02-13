@@ -7,6 +7,22 @@ pub struct Opts {
     /// Display this help message
     pub help: bool,
 
+    #[options(command)]
+    pub command: Option<Command>,
+}
+
+#[derive(Options)]
+pub enum Command {
+    Compile(CompileOpts),
+    Format(FormatOpts),
+}
+
+#[derive(Options)]
+/// Compiles Lisp code into Scratch projects.
+pub struct CompileOpts {
+    /// Display this help message
+    pub help: bool,
+
     /// The source file to compile
     #[options(free, required)]
     pub file: PathBuf,
@@ -53,4 +69,11 @@ impl fmt::Display for InvalidTarget {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "invalid target: {}", self.0)
     }
+}
+
+#[derive(Options)]
+/// Formats source code.
+pub struct FormatOpts {
+    /// Display this help message
+    pub help: bool,
 }
