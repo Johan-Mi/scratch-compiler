@@ -4,12 +4,12 @@ use std::borrow::Cow;
 use winnow::{
     ascii::{digit1, float, hex_digit1, multispace1, oct_digit1},
     combinator::{
-        alt, delimited, fail, not, opt, preceded, repeat, separated_pair,
-        success, terminated,
+        alt, delimited, empty, fail, not, opt, preceded, repeat,
+        separated_pair, terminated,
     },
     dispatch,
     error::{ContextError as Error, ParserError},
-    token::{any, one_of, take_till0, take_till1, take_while},
+    token::{any, one_of, take_till, take_while},
     Located, PResult, Parser, Stateful,
 };
 
@@ -72,18 +72,18 @@ fn boolean(input: &mut Input) -> PResult<Ast> {
 }
 
 fn string(input: &mut Input) -> PResult<Ast> {
-    let normal = take_till1(['\"', '\\', '\n']).map(Cow::Borrowed);
+    let normal = take_till(1.., ['\"', '\\', '\n']).map(Cow::Borrowed);
     let null = terminated('0', not(digit1)).value(Cow::Borrowed("\0"));
     let character_escape_sequence = dispatch! {any;
-        '"' => success("\""),
-        '\'' => success("'"),
-        '\\' => success("\\"),
-        'n' => success("\n"),
-        't' => success("\t"),
-        'r' => success("\r"),
-        'b' => success("\x08"),
-        'f' => success("\x0c"),
-        'v' => success("\x11"),
+        '"' => empty.value("\""),
+        '\'' => empty.value("'"),
+        '\\' => empty.value("\\"),
+        'n' => empty.value("\n"),
+        't' => empty.value("\t"),
+        'r' => empty.value("\r"),
+        'b' => empty.value("\x08"),
+        'f' => empty.value("\x0c"),
+        'v' => empty.value("\x11"),
         _ => fail,
     }
     .map(Cow::Borrowed);
@@ -155,7 +155,7 @@ fn unquote(input: &mut Input) -> PResult<Ast> {
 }
 
 fn eol_comment(input: &mut Input) -> PResult<()> {
-    (';', take_till0('\n')).void().parse_next(input)
+    (';', take_till(0.., '\n')).void().parse_next(input)
 }
 
 fn ws(input: &mut Input) -> PResult<()> {
