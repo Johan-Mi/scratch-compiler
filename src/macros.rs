@@ -1,7 +1,6 @@
 use crate::{
     ast::Ast,
     diagnostic::{Error, Result},
-    lint::lint_ast,
     opts::CompileOpts,
     parser::{program, Input},
 };
@@ -333,11 +332,6 @@ impl MacroContext<'_> {
                     input: Located::new(&source),
                     state: &file,
                 })?;
-                if self.opts.lint {
-                    for ast in &asts {
-                        lint_ast(ast, self.code_map);
-                    }
-                }
                 Ok(asts)
             }
             _ => Err(Box::new(Error::InvalidArgsForInclude { span })),

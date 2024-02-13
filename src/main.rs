@@ -10,7 +10,6 @@ mod codegen;
 mod diagnostic;
 mod formatter;
 mod ir;
-mod lint;
 mod macros;
 mod optimize;
 mod opts;
@@ -20,7 +19,6 @@ mod uid;
 use crate::{
     codegen::write_program,
     ir::Program,
-    lint::lint_ast,
     macros::expand,
     opts::{Command, CompileOpts, Opts},
     parser::Input,
@@ -71,11 +69,6 @@ fn real_main(
         input: Located::new(&input),
         state: &main_file,
     })?;
-    if opts.lint {
-        for ast in &asts {
-            lint_ast(ast, code_map);
-        }
-    }
     let expanded = expand(asts, &opts, code_map)?;
     let mut program = Program::from_asts(expanded)?;
     program.optimize();

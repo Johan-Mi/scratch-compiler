@@ -1,7 +1,5 @@
 mod error;
 pub use error::Error;
-mod warning;
-pub use warning::Warning;
 
 use codemap::{CodeMap, Span};
 use codemap_diagnostic::{

@@ -27,10 +27,6 @@ pub struct CompileOpts {
     #[options(free, required)]
     pub file: PathBuf,
 
-    /// Run the linter while compiling
-    #[options(no_short)]
-    pub lint: bool,
-
     /// Type of code to compile to: sb3 (default) or x86_64
     pub target: Target,
 }
