@@ -52,7 +52,7 @@ enum WrappedToken<'src> {
     #[token(",", |_| Token::PrefixOperator(","))]
     #[token("(", |_| Token::LParen)]
     #[token(")", |_| Token::RParen)]
-    #[regex(r";.*\n?", |lex| Token::Comment(lex.slice()))]
+    #[regex(r";.*\n?", |lex| Token::Comment(lex.slice().trim_end_matches('\n')))]
     #[token("\n", |_| Token::NewLine)]
     Of(Token<'src, Atom<'src>>),
 }
