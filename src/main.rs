@@ -66,8 +66,8 @@ fn real_main(opts: &Compile, code_map: &mut CodeMap) -> diagnostic::Result<()> {
         input: Located::new(&input),
         state: &main_file,
     })?;
-    let expanded = expand(asts, &opts, code_map)?;
+    let expanded = expand(asts, opts, code_map)?;
     let mut program = Program::from_asts(expanded)?;
     program.optimize();
-    write_program(&program, &opts)
+    write_program(&program, opts)
 }
