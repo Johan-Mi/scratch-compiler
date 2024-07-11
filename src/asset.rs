@@ -4,7 +4,8 @@ use std::path::Path;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Asset {
-    asset_id: String,
+    #[serde(rename = "assetId")]
+    id: String,
     name: String,
     pub md5ext: String,
     data_format: String,
@@ -18,7 +19,7 @@ impl Asset {
         let extension = path.extension().unwrap().to_str().unwrap().to_owned();
 
         Self {
-            asset_id: format!("{md5_sum:x}"),
+            id: format!("{md5_sum:x}"),
             name,
             md5ext: format!("{md5_sum:x}.{extension}"),
             data_format: extension,
