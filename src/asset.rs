@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::{fs::File, io::Read, path::Path};
+use std::path::Path;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,10 +13,8 @@ pub struct Asset {
 impl Asset {
     pub fn new(name: &str, path: &Path) -> Self {
         // TODO: Error handling
-        let mut file = File::open(path).unwrap();
-        let mut buf = Vec::new();
-        file.read_to_end(&mut buf).unwrap();
-        let md5_sum = md5::compute(&buf);
+        let buf = std::fs::read(path).unwrap();
+        let md5_sum = md5::compute(buf);
         let extension = path.extension().unwrap().to_str().unwrap().to_owned();
 
         Self {
