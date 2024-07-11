@@ -33,7 +33,7 @@ fn main() -> ExitCode {
     let mut code_map = CodeMap::new();
 
     let res = match opts.command {
-        Some(Command::Compile(opts)) => real_main(opts, &mut code_map),
+        Some(Command::Compile(opts)) => real_main(&opts, &mut code_map),
         Some(Command::Format(_)) => formatter::format_stdin_to_stdout()
             .map_err(|err| {
                 Box::new(diagnostic::Error::FailedToReadSourceCode {
@@ -54,7 +54,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn real_main(opts: Compile, code_map: &mut CodeMap) -> diagnostic::Result<()> {
+fn real_main(opts: &Compile, code_map: &mut CodeMap) -> diagnostic::Result<()> {
     let input = fs::read_to_string(&opts.file).map_err(|err| {
         diagnostic::Error::FailedToReadSourceCode { inner: err }
     })?;
