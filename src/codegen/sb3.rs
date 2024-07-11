@@ -100,7 +100,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
         .chain(iter::once(&program.stage))
         .flat_map(|sprite| &sprite.costumes)
     {
-        let asset = Asset::new(name, path);
+        let asset = Asset::new(name.to_owned(), path);
         let mut file = File::open(path).unwrap();
         zip.start_file(asset.md5ext, FileOptions::default())
             .unwrap();

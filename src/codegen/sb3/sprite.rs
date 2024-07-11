@@ -63,7 +63,7 @@ impl<'a> SerCtx<'a> {
             .costumes
             .iter()
             .map(|(name, path)| {
-                serde_json::to_value(Asset::new(name, path)).unwrap()
+                serde_json::to_value(Asset::new(name.to_owned(), path)).unwrap()
             })
             .collect::<Vec<_>>();
 

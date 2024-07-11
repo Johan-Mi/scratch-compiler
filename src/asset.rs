@@ -11,7 +11,7 @@ pub struct Asset {
 }
 
 impl Asset {
-    pub fn new(name: &str, path: &Path) -> Self {
+    pub fn new(name: String, path: &Path) -> Self {
         // TODO: Error handling
         let buf = std::fs::read(path).unwrap();
         let md5_sum = md5::compute(buf);
@@ -19,7 +19,7 @@ impl Asset {
 
         Self {
             asset_id: format!("{md5_sum:x}"),
-            name: name.to_owned(),
+            name,
             md5ext: format!("{md5_sum:x}.{extension}"),
             data_format: extension,
         }
