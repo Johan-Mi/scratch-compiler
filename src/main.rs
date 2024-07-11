@@ -20,7 +20,7 @@ use crate::{
     codegen::write_program,
     ir::Program,
     macros::expand,
-    opts::{Command, CompileOpts, Opts},
+    opts::{Command, Compile, Opts},
     parser::Input,
 };
 use codemap::CodeMap;
@@ -54,10 +54,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn real_main(
-    opts: CompileOpts,
-    code_map: &mut CodeMap,
-) -> diagnostic::Result<()> {
+fn real_main(opts: Compile, code_map: &mut CodeMap) -> diagnostic::Result<()> {
     let input = fs::read_to_string(&opts.file).map_err(|err| {
         diagnostic::Error::FailedToReadSourceCode { inner: err }
     })?;

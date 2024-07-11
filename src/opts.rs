@@ -13,13 +13,13 @@ pub struct Opts {
 
 #[derive(Options)]
 pub enum Command {
-    Compile(CompileOpts),
-    Format(FormatOpts),
+    Compile(Compile),
+    Format(Format),
 }
 
 #[derive(Options)]
 /// Compiles Lisp code into Scratch projects.
-pub struct CompileOpts {
+pub struct Compile {
     /// Display this help message
     pub help: bool,
 
@@ -69,7 +69,7 @@ impl fmt::Display for InvalidTarget {
 
 #[derive(Options)]
 /// Formats source code.
-pub struct FormatOpts {
+pub struct Format {
     /// Display this help message
     pub help: bool,
 }

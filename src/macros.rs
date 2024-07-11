@@ -1,7 +1,7 @@
 use crate::{
     ast::Ast,
     diagnostic::{Error, Result},
-    opts::CompileOpts,
+    opts,
     parser::{program, Input},
 };
 use codemap::{CodeMap, Span};
@@ -10,7 +10,7 @@ use winnow::stream::Located;
 
 pub fn expand(
     program: Vec<Ast>,
-    opts: &CompileOpts,
+    opts: &opts::Compile,
     code_map: &mut CodeMap,
 ) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
@@ -64,7 +64,7 @@ impl Macro {
 }
 
 struct MacroContext<'a> {
-    opts: &'a CompileOpts,
+    opts: &'a opts::Compile,
     code_map: &'a mut CodeMap,
     asts: Vec<Ast>,
     symbols: HashMap<String, Ast>,
