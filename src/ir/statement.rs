@@ -1,7 +1,4 @@
-use crate::{
-    ast::Ast, diagnostic::Result, ir::expr::Expr,
-    optimize::statement::optimize_stmt,
-};
+use crate::{ast::Ast, diagnostic::Result, ir::expr::Expr};
 use codemap::Span;
 
 #[derive(Debug)]
@@ -161,10 +158,6 @@ impl Statement {
                 args: tail.map(Expr::from_ast).collect::<Result<_>>()?,
             },
         })
-    }
-
-    pub fn optimize(&mut self) {
-        optimize_stmt(self);
     }
 
     pub fn traverse_postorder_mut(&mut self, f: &mut impl FnMut(&mut Self)) {

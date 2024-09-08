@@ -50,7 +50,7 @@ impl Procedure {
     }
 
     pub fn optimize(&mut self) {
-        self.body.optimize();
+        crate::optimize::stmt(&mut self.body);
     }
 }
 
