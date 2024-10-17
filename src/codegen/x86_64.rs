@@ -267,9 +267,9 @@ impl<'a> Program<'a> {
                             )),
                         }
                     }).collect::<Result<_>>()?;
-                    let params = iter::repeat_with(|| AbiParam::new(I64))
-                        .take(proc.params.len() * 2)
-                        .collect();
+                    let params = iter::repeat_n(
+                        AbiParam::new(I64), proc.params.len() * 2,
+                    ) .collect();
                     let id = self
                         .object_module
                         .declare_anonymous_function(
