@@ -4,8 +4,7 @@ use std::borrow::Cow;
 use winnow::{
     ascii::{digit1, float, hex_digit1, multispace1, oct_digit1},
     combinator::{
-        alt, delimited, empty, fail, not, opt, preceded, repeat,
-        separated_pair, terminated,
+        alt, delimited, empty, fail, not, opt, preceded, repeat, separated_pair, terminated,
     },
     dispatch,
     error::{ContextError as Error, ParserError},
@@ -43,12 +42,10 @@ fn based<'a>(
     prefix: &'static [char],
     digitp: impl Parser<Input<'a>, &'a str, Error>,
 ) -> impl Parser<Input<'a>, f64, Error> {
-    separated_pair(sign, ('0', one_of(prefix)), digitp).try_map(
-        move |(sign, digits)| {
-            i64::from_str_radix(digits, base)
-                .map(|n| n as f64 * if sign == Some('-') { -1.0 } else { 1.0 })
-        },
-    )
+    separated_pair(sign, ('0', one_of(prefix)), digitp).try_map(move |(sign, digits)| {
+        i64::from_str_radix(digits, base)
+            .map(|n| n as f64 * if sign == Some('-') { -1.0 } else { 1.0 })
+    })
 }
 
 fn sign(input: &mut Input) -> PResult<Option<char>> {
@@ -88,13 +85,10 @@ fn string(input: &mut Input) -> PResult<Ast> {
     }
     .map(Cow::Borrowed);
 
-    let hex_escape_sequence =
-        preceded('x', repeat::<_, _, (), _, _>(2, hex_digit).recognize());
+    let hex_escape_sequence = preceded('x', repeat::<_, _, (), _, _>(2, hex_digit).recognize());
     let hex4digits = repeat::<_, _, (), _, _>(4, hex_digit).recognize();
-    let bracketed_unicode =
-        delimited('{', take_while(1..=6, |c: char| c.is_ascii_hexdigit()), '}');
-    let unicode_escape_sequence =
-        preceded('u', alt((hex4digits, bracketed_unicode)));
+    let bracketed_unicode = delimited('{', take_while(1..=6, |c: char| c.is_ascii_hexdigit()), '}');
+    let unicode_escape_sequence = preceded('u', alt((hex4digits, bracketed_unicode)));
     let escape_sequence = preceded(
         '\\',
         alt((
@@ -102,9 +96,7 @@ fn string(input: &mut Input) -> PResult<Ast> {
             null,
             alt((hex_escape_sequence, unicode_escape_sequence))
                 .try_map(|digits| u32::from_str_radix(digits, 16))
-                .verify_map(|c| {
-                    char::from_u32(c).map(String::from).map(Cow::Owned)
-                }),
+                .verify_map(|c| char::from_u32(c).map(String::from).map(Cow::Owned)),
         )),
     );
     let string_char = alt((normal, escape_sequence));
@@ -118,8 +110,8 @@ fn sym_first_char(input: &mut Input) -> PResult<char> {
     one_of((
         char::is_alphabetic,
         [
-            '!', '$', '%', '&', '*', '+', '-', '.', '/', ':', '<', '=', '>',
-            '?', '@', '^', '_', '~', '[', ']',
+            '!', '$', '%', '&', '*', '+', '-', '.', '/', ':', '<', '=', '>', '?', '@', '^', '_',
+            '~', '[', ']',
         ],
     ))
     .parse_next(input)

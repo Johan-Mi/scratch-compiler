@@ -14,9 +14,7 @@ pub fn expr_type(expr: &Expr) -> Typ {
     match expr {
         Expr::Imm(Immediate::String(s)) => Typ::StaticStr(s),
         Expr::Imm(Immediate::Bool(_)) => Typ::Bool,
-        Expr::Imm(Immediate::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => {
-            Typ::Double
-        }
+        Expr::Imm(Immediate::Num(_)) | Expr::AddSub(..) | Expr::MulDiv(..) => Typ::Double,
         Expr::Sym(..) => {
             // NOTE: This will need to be changed when we add support for converting
             // lists to strings or start perform static type analysis on variables.
@@ -26,9 +24,9 @@ pub fn expr_type(expr: &Expr) -> Typ {
             "!!" => Typ::Any,
             "not" | "and" | "or" | "<" | "=" | ">" => Typ::Bool,
             "++" | "char-at" => Typ::OwnedString,
-            "length" | "str-length" | "mod" | "abs" | "floor" | "ceil"
-            | "sqrt" | "ln" | "log" | "e^" | "ten^" | "sin" | "cos" | "tan"
-            | "asin" | "acos" | "atan" | "to-num" | "random" => Typ::Double,
+            "length" | "str-length" | "mod" | "abs" | "floor" | "ceil" | "sqrt" | "ln" | "log"
+            | "e^" | "ten^" | "sin" | "cos" | "tan" | "asin" | "acos" | "atan" | "to-num"
+            | "random" => Typ::Double,
             _ => todo!(),
         },
     }

@@ -110,8 +110,7 @@ pub fn write_sb3_file(program: &Program, path: &Path) -> Result<()> {
     let buf = zip
         .finish()
         .map_err(|err| Error::CouldNotFinishZip { inner: err })?;
-    fs::write(path, buf.into_inner())
-        .map_err(|err| Error::CouldNotCreateSb3File { inner: err })?;
+    fs::write(path, buf.into_inner()).map_err(|err| Error::CouldNotCreateSb3File { inner: err })?;
 
     Ok(())
 }
@@ -160,11 +159,7 @@ impl<'a> SerCtx<'a> {
         })
     }
 
-    fn serialize_proc(
-        &mut self,
-        name: &str,
-        proc: &'a Procedure,
-    ) -> Result<()> {
+    fn serialize_proc(&mut self, name: &str, proc: &'a Procedure) -> Result<()> {
         self.local_vars = proc
             .variables
             .iter()
@@ -227,9 +222,7 @@ impl<'a> SerCtx<'a> {
                 );
             }
             "when-received" => {
-                let [(Expr::Imm(Value::String(broadcast_name)), _)] =
-                    &proc.params[..]
-                else {
+                let [(Expr::Imm(Value::String(broadcast_name)), _)] = &proc.params[..] else {
                     todo!();
                 };
                 let (body, _) = self.serialize_stmt(&proc.body, this, None)?;
@@ -270,18 +263,13 @@ impl<'a> SerCtx<'a> {
                     .map(|(_, uid)| *uid)
                     .collect();
 
-                let proccode =
-                    format!("{name}{}", " %s".repeat(proc.params.len()));
+                let proccode = format!("{name}{}", " %s".repeat(proc.params.len()));
                 let argumentids = serde_json::to_string(&param_ids).unwrap();
-                let argumentnames =
-                    serde_json::to_string(&self.proc_args).unwrap();
+                let argumentnames = serde_json::to_string(&self.proc_args).unwrap();
                 let argumentdefaults =
-                    serde_json::to_string(&[""].repeat(proc.params.len()))
-                        .unwrap();
+                    serde_json::to_string(&[""].repeat(proc.params.len())).unwrap();
                 let reporters = proc.params.iter().map(|(param, _)| {
-                    Result::Ok(
-                        self.serialize_expr(param, this)?.without_shadow(),
-                    )
+                    Result::Ok(self.serialize_expr(param, this)?.without_shadow())
                 });
                 let inputs: Json = param_ids
                     .iter()
@@ -328,38 +316,24 @@ impl<'a> SerCtx<'a> {
         Ok(())
     }
 
-    fn stmt_input<'s>(
-        &'s self,
-        stmt: &'s Statement,
-    ) -> impl Fn(Uid) -> Result<Json> + 's {
+    fn stmt_input<'s>(&'s self, stmt: &'s Statement) -> impl Fn(Uid) -> Result<Json> + 's {
         |this| Ok(json!([2, self.serialize_stmt(stmt, this, None)?.0]))
     }
 
-    fn empty_shadow_input<'s>(
-        &'s self,
-        expr: &'s Expr,
-    ) -> impl Fn(Uid) -> Result<Json> + 's {
+    fn empty_shadow_input<'s>(&'s self, expr: &'s Expr) -> impl Fn(Uid) -> Result<Json> + 's {
         |this| Ok(self.serialize_expr(expr, this)?.with_empty_shadow())
     }
 
-    fn shadowless_input<'s>(
-        &'s self,
-        expr: &'s Expr,
-    ) -> impl Fn(Uid) -> Result<Json> + 's {
+    fn shadowless_input<'s>(&'s self, expr: &'s Expr) -> impl Fn(Uid) -> Result<Json> + 's {
         |this| Ok(self.serialize_expr(expr, this)?.without_shadow())
     }
 
-    fn var_input<'s>(
-        &'s self,
-        var_name: &'s str,
-        span: Span,
-    ) -> impl Fn(Uid) -> Result<Json> + 's {
+    fn var_input<'s>(&'s self, var_name: &'s str, span: Span) -> impl Fn(Uid) -> Result<Json> + 's {
         move |_| {
-            let var =
-                self.lookup_var(var_name).ok_or_else(|| Error::UnknownVar {
-                    span,
-                    var_name: var_name.into(),
-                })?;
+            let var = self.lookup_var(var_name).ok_or_else(|| Error::UnknownVar {
+                span,
+                var_name: var_name.into(),
+            })?;
             Ok(json!([var.name, var.id]))
         }
     }
@@ -443,13 +417,10 @@ impl<'a> SerCtx<'a> {
             .zip(args)
             .map(|(param, arg)| {
                 Ok(match param {
-                    Param::String(param_name) | Param::Number(param_name) => {
-                        Some((
-                            *param_name,
-                            self.serialize_expr(arg, parent)?
-                                .with_empty_shadow(),
-                        ))
-                    }
+                    Param::String(param_name) | Param::Number(param_name) => Some((
+                        *param_name,
+                        self.serialize_expr(arg, parent)?.with_empty_shadow(),
+                    )),
                     Param::Bool(param_name) => Some((
                         *param_name,
                         self.serialize_expr(arg, parent)?.without_shadow(),
@@ -468,13 +439,10 @@ impl<'a> SerCtx<'a> {
                         let Expr::Sym(ref var_name, span) = *arg else {
                             todo!();
                         };
-                        let var =
-                            self.lookup_var(var_name).ok_or_else(|| {
-                                Error::UnknownVar {
-                                    span,
-                                    var_name: var_name.clone(),
-                                }
-                            })?;
+                        let var = self.lookup_var(var_name).ok_or_else(|| Error::UnknownVar {
+                            span,
+                            var_name: var_name.clone(),
+                        })?;
                         Some((*param_name, json!([var.name, var.id])))
                     }
                     Param::List(param_name) => {
@@ -482,12 +450,11 @@ impl<'a> SerCtx<'a> {
                             todo!();
                         };
                         let list =
-                            self.lookup_list(list_name).ok_or_else(|| {
-                                Error::UnknownList {
+                            self.lookup_list(list_name)
+                                .ok_or_else(|| Error::UnknownList {
                                     span,
                                     list_name: list_name.clone(),
-                                }
-                            })?;
+                                })?;
                         Some((*param_name, json!([list.name, list.id])))
                     }
                     _ => None,

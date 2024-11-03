@@ -35,11 +35,7 @@ fn main() -> ExitCode {
     let res = match opts.command {
         Some(Command::Compile(opts)) => real_main(&opts, &mut code_map),
         Some(Command::Format(_)) => formatter::format_stdin_to_stdout()
-            .map_err(|err| {
-                Box::new(diagnostic::Error::FailedToReadSourceCode {
-                    inner: err,
-                })
-            }),
+            .map_err(|err| Box::new(diagnostic::Error::FailedToReadSourceCode { inner: err })),
         None => {
             eprintln!("error: no command provided");
             return ExitCode::FAILURE;
@@ -55,12 +51,10 @@ fn main() -> ExitCode {
 }
 
 fn real_main(opts: &Compile, code_map: &mut CodeMap) -> diagnostic::Result<()> {
-    let input = fs::read_to_string(&opts.file).map_err(|err| {
-        diagnostic::Error::FailedToReadSourceCode { inner: err }
-    })?;
+    let input = fs::read_to_string(&opts.file)
+        .map_err(|err| diagnostic::Error::FailedToReadSourceCode { inner: err })?;
 
-    let main_file =
-        code_map.add_file(opts.file.display().to_string(), input.clone());
+    let main_file = code_map.add_file(opts.file.display().to_string(), input.clone());
 
     let asts = parser::program(Input {
         input: Located::new(&input),

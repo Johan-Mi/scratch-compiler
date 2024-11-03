@@ -4,10 +4,9 @@ use std::fmt;
 
 pub fn format_stdin_to_stdout() -> Result<(), std::io::Error> {
     let source_code = std::io::read_to_string(std::io::stdin())?;
-    let mut tokens =
-        WrappedToken::lexer(&source_code).map(|token| match token.unwrap() {
-            WrappedToken::Of(inner) => inner,
-        });
+    let mut tokens = WrappedToken::lexer(&source_code).map(|token| match token.unwrap() {
+        WrappedToken::Of(inner) => inner,
+    });
     let output = lispfmt::format(&mut tokens, 2).unwrap();
     print!("{output}");
     Ok(())

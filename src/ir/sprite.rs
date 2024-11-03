@@ -19,9 +19,7 @@ pub struct Sprite {
 impl Sprite {
     pub fn from_ast(ast: Ast) -> Result<(String, Self)> {
         let (mut tail, span) = match ast {
-            Ast::Node(box Ast::Sym("sprite", ..), tail, span) => {
-                Ok((tail.into_iter(), span))
-            }
+            Ast::Node(box Ast::Sym("sprite", ..), tail, span) => Ok((tail.into_iter(), span)),
             _ => Err(Error::InvalidTopLevelItem { span: ast.span() }),
         }?;
 
@@ -57,11 +55,7 @@ impl Sprite {
                             .or_insert_with(|| Vec::with_capacity(1))
                             .push(proc);
                     }
-                    _ => {
-                        return Err(Box::new(Error::InvalidItemInSprite {
-                            span,
-                        }))
-                    }
+                    _ => return Err(Box::new(Error::InvalidItemInSprite { span })),
                 },
                 _ => return Err(Box::new(Error::InvalidItemInSprite { span })),
             }

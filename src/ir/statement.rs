@@ -67,9 +67,7 @@ impl Statement {
                 let times = tail.next().unwrap();
                 Self::Repeat {
                     times: Expr::from_ast(times)?,
-                    body: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    body: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                 }
             }
             "forever" => Self::Forever(Box::new(Self::Do(
@@ -79,18 +77,14 @@ impl Statement {
                 let condition = tail.next().unwrap();
                 Self::Until {
                     condition: Expr::from_ast(condition)?,
-                    body: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    body: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                 }
             }
             "while" => {
                 let condition = tail.next().unwrap();
                 Self::While {
                     condition: Expr::from_ast(condition)?,
-                    body: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    body: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                 }
             }
             "for" => {
@@ -103,18 +97,14 @@ impl Statement {
                 Self::For {
                     counter,
                     times: Expr::from_ast(times)?,
-                    body: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    body: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                 }
             }
             "when" => {
                 let condition = tail.next().unwrap();
                 Self::IfElse {
                     condition: Expr::from_ast(condition)?,
-                    then: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    then: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                     else_: Box::new(Self::Do(Vec::new())),
                     span: full_span,
                 }
@@ -124,9 +114,7 @@ impl Statement {
                 Self::IfElse {
                     condition: Expr::from_ast(condition)?,
                     then: Box::new(Self::Do(Vec::new())),
-                    else_: Box::new(Self::Do(
-                        tail.map(Self::from_ast).collect::<Result<_>>()?,
-                    )),
+                    else_: Box::new(Self::Do(tail.map(Self::from_ast).collect::<Result<_>>()?)),
                     span: full_span,
                 }
             }
@@ -135,22 +123,18 @@ impl Statement {
                 let mut else_branch = Self::Do(Vec::new());
                 while let Some(ast) = tail.next() {
                     match tail.next() {
-                        Some(body) => cases.push((
-                            Expr::from_ast(ast)?,
-                            Self::from_ast(body)?,
-                        )),
+                        Some(body) => cases.push((Expr::from_ast(ast)?, Self::from_ast(body)?)),
                         None => else_branch = Self::from_ast(ast)?,
                     }
                 }
-                cases.into_iter().rfold(
-                    else_branch,
-                    |acc, (condition, then)| Self::IfElse {
+                cases
+                    .into_iter()
+                    .rfold(else_branch, |acc, (condition, then)| Self::IfElse {
                         condition,
                         then: Box::new(then),
                         else_: Box::new(acc),
                         span: full_span,
-                    },
-                )
+                    })
             }
             _ => Self::ProcCall {
                 proc_name: sym,

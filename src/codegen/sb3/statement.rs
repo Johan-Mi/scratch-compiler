@@ -19,37 +19,27 @@ impl SerCtx<'_> {
                 proc_name,
                 proc_span,
                 args,
-            } => self.serialize_proc_call(
-                proc_name, args, parent, next, *proc_span,
-            )?,
+            } => self.serialize_proc_call(proc_name, args, parent, next, *proc_span)?,
             Statement::Do(stmts) => match &stmts[..] {
                 [] => (None, Some(parent)),
                 [single] => self.serialize_stmt(single, parent, next)?,
-                stmts => stmts.iter().try_rfold(
-                    (next, None),
-                    |(old_start, old_end), stmt| {
-                        let (new_start, new_end) =
-                            self.serialize_stmt(stmt, parent, old_start)?;
+                stmts => stmts
+                    .iter()
+                    .try_rfold((next, None), |(old_start, old_end), stmt| {
+                        let (new_start, new_end) = self.serialize_stmt(stmt, parent, old_start)?;
                         if let Some(old_start) = &old_start {
                             self.blocks
                                 .borrow_mut()
                                 .get_mut(old_start)
                                 .and_then(|block| {
-                                    block.as_object_mut()?.insert(
-                                        "parent".to_owned(),
-                                        json!(new_end),
-                                    )
+                                    block
+                                        .as_object_mut()?
+                                        .insert("parent".to_owned(), json!(new_end))
                                 })
-                                .expect(
-                                    "couldn't replace parent in `do` block",
-                                );
+                                .expect("couldn't replace parent in `do` block");
                         }
-                        Result::Ok((
-                            new_start.or(old_start),
-                            old_end.or(new_end),
-                        ))
-                    },
-                )?,
+                        Result::Ok((new_start.or(old_start), old_end.or(new_end)))
+                    })?,
             },
             Statement::IfElse {
                 condition,
@@ -58,8 +48,7 @@ impl SerCtx<'_> {
                 ..
             } => {
                 let this = self.new_uid();
-                let condition =
-                    self.serialize_expr(condition, this)?.without_shadow();
+                let condition = self.serialize_expr(condition, this)?.without_shadow();
                 let (then, _) = self.serialize_stmt(then, this, None)?;
                 let (else_, _) = self.serialize_stmt(else_, this, None)?;
 
@@ -212,9 +201,7 @@ impl SerCtx<'_> {
                             Expr::Imm(imm) => {
                                 json!([1, [11, imm.to_string(), ""]])
                             }
-                            _ => self
-                                .serialize_expr(name, parent)?
-                                .without_shadow(),
+                            _ => self.serialize_expr(name, parent)?.without_shadow(),
                         })
                     };
                     self.emit_stacking(
@@ -271,9 +258,7 @@ impl SerCtx<'_> {
             },
             "clone-myself" => todo!(),
             "reset-timer" => proc!(sensing_resettimer()),
-            _ => self.serialize_custom_proc_call(
-                proc_name, args, parent, next, span,
-            ),
+            _ => self.serialize_custom_proc_call(proc_name, args, parent, next, span),
         }
     }
 
@@ -285,12 +270,13 @@ impl SerCtx<'_> {
         next: Option<Uid>,
         span: Span,
     ) -> Result<(Option<Uid>, Option<Uid>)> {
-        let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
-            Error::UnknownProc {
+        let proc = self
+            .custom_procs
+            .get(proc_name)
+            .ok_or_else(|| Error::UnknownProc {
                 span,
                 proc_name: proc_name.to_owned(),
-            }
-        })?;
+            })?;
 
         if args.len() != proc.params.len() {
             return Err(Box::new(Error::CustomProcWrongArgCount {
@@ -308,13 +294,10 @@ impl SerCtx<'_> {
             .map(|arg| Ok(self.serialize_expr(arg, this)?.with_empty_shadow()))
             .collect::<Result<_>>()?;
 
-        let proccode =
-            format!("{proc_name}{}", " %s".repeat(proc.params.len()));
-        let param_ids: Vec<Uid> =
-            proc.params.iter().map(|(_, uid)| *uid).collect();
+        let proccode = format!("{proc_name}{}", " %s".repeat(proc.params.len()));
+        let param_ids: Vec<Uid> = proc.params.iter().map(|(_, uid)| *uid).collect();
         let argumentids = serde_json::to_string(&param_ids).unwrap();
-        let inputs: Json =
-            param_ids.iter().map(Uid::to_string).zip(args).collect();
+        let inputs: Json = param_ids.iter().map(Uid::to_string).zip(args).collect();
 
         self.emit_block(
             this,
@@ -358,8 +341,7 @@ impl SerCtx<'_> {
                 got: args.len(),
             }));
         }
-        let (inputs, fields) =
-            self.create_inputs_and_fields(params, args, this)?;
+        let (inputs, fields) = self.create_inputs_and_fields(params, args, this)?;
 
         self.emit_block(
             this,

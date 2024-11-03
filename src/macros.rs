@@ -8,11 +8,7 @@ use codemap::{CodeMap, Span};
 use std::{collections::HashMap, fs, mem};
 use winnow::stream::Located;
 
-pub fn expand(
-    program: Vec<Ast>,
-    opts: &opts::Compile,
-    code_map: &mut CodeMap,
-) -> Result<Vec<Ast>> {
+pub fn expand(program: Vec<Ast>, opts: &opts::Compile, code_map: &mut CodeMap) -> Result<Vec<Ast>> {
     let mut ctx = MacroContext {
         opts,
         code_map,
@@ -115,18 +111,14 @@ impl MacroContext<'_> {
         };
 
         match ast {
-            Ast::Node(box Ast::Sym("macro", ..), args, span) => {
-                self.define(args, span)
-            }
+            Ast::Node(box Ast::Sym("macro", ..), args, span) => self.define(args, span),
             Ast::Node(box Ast::Sym("include", ..), args, span) => {
                 for item in self.include(&args, span)? {
                     self.transform_top_level(item)?;
                 }
                 Ok(())
             }
-            Ast::Node(box Ast::Sym(sym, ..), mut args, _)
-                if sym == "when!" || sym == "unless!" =>
-            {
+            Ast::Node(box Ast::Sym(sym, ..), mut args, _) if sym == "when!" || sym == "unless!" => {
                 let Some(Ast::Bool(condition, _)) = args.first() else {
                     todo!();
                 };
@@ -215,9 +207,7 @@ impl MacroContext<'_> {
             }
             "sym-concat!" => {
                 if args.is_empty() {
-                    return Err(Box::new(Error::SymConcatEmptySymbol {
-                        span: *span,
-                    }));
+                    return Err(Box::new(Error::SymConcatEmptySymbol { span: *span }));
                 }
                 let Some(sym) = args
                     .iter()
@@ -251,8 +241,7 @@ impl MacroContext<'_> {
             },
             "include-str" => match &args[..] {
                 [Ast::String(path, ..)] => {
-                    *ast =
-                        Ast::String(fs::read_to_string(path).unwrap(), *span);
+                    *ast = Ast::String(fs::read_to_string(path).unwrap(), *span);
                     true
                 }
                 _ => false,
@@ -273,9 +262,7 @@ impl MacroContext<'_> {
         *tail = mem::take(tail)
             .into_iter()
             .map(|item| match &item {
-                Ast::Node(box Ast::Sym("include", ..), args, span) => {
-                    self.include(args, *span)
-                }
+                Ast::Node(box Ast::Sym("include", ..), args, span) => self.include(args, *span),
                 _ => Ok(vec![item]),
             })
             .collect::<Result<Vec<Vec<Ast>>>>()?
@@ -298,9 +285,7 @@ impl MacroContext<'_> {
         let (macro_name, Macro::Function(func_macro)) =
             Macro::parse(mem::take(macro_definition), *def_span)?
         else {
-            return Err(Box::new(Error::SymbolMacroInInlinePosition {
-                span: *span,
-            }));
+            return Err(Box::new(Error::SymbolMacroInInlinePosition { span: *span }));
         };
 
         let num_args = args.len();
@@ -375,19 +360,15 @@ impl Parameter {
     fn from_ast(ast: Ast) -> Result<Self> {
         match ast {
             Ast::Sym(var, _) => Ok(Self::Var(var)),
-            Ast::Node(box Ast::Sym(name, _), subparams, span) => {
-                Ok(Self::Constructor(
-                    name,
-                    subparams
-                        .into_iter()
-                        .map(Self::from_ast)
-                        .collect::<Result<_>>()?,
-                    span,
-                ))
-            }
-            _ => {
-                Err(Box::new(Error::InvalidMacroParameter { span: ast.span() }))
-            }
+            Ast::Node(box Ast::Sym(name, _), subparams, span) => Ok(Self::Constructor(
+                name,
+                subparams
+                    .into_iter()
+                    .map(Self::from_ast)
+                    .collect::<Result<_>>()?,
+                span,
+            )),
+            _ => Err(Box::new(Error::InvalidMacroParameter { span: ast.span() })),
         }
     }
 

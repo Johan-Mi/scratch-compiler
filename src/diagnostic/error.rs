@@ -201,10 +201,9 @@ impl Error {
                 "invalid arguments for `include`",
                 vec![primary(*span, None)],
             )],
-            InvalidItemInSprite { span } => vec![error(
-                "invalid item in sprite",
-                vec![primary(*span, None)],
-            )],
+            InvalidItemInSprite { span } => {
+                vec![error("invalid item in sprite", vec![primary(*span, None)])]
+            }
             InvalidMacroParameter { span } => vec![error(
                 "invalid macro parameter",
                 vec![primary(
@@ -214,10 +213,9 @@ impl Error {
                         .to_owned(),
                 )],
             )],
-            InvalidMacroSignature { span } => vec![error(
-                "invalid macro signature",
-                vec![primary(*span, None)],
-            )],
+            InvalidMacroSignature { span } => {
+                vec![error("invalid macro signature", vec![primary(*span, None)])]
+            }
             InvalidParameterForCustomProcDef { span } => vec![error(
                 "invalid parameter for custom procedure definition",
                 vec![primary(*span, "expected symbol".to_owned())],
@@ -247,10 +245,7 @@ impl Error {
                 span,
                 candidate_symbol,
             } => {
-                let mut diagnostic = error(
-                    "sprite is missing a name",
-                    vec![primary(*span, None)],
-                );
+                let mut diagnostic = error("sprite is missing a name", vec![primary(*span, None)]);
                 if let Some(candidate_symbol) = candidate_symbol {
                     diagnostic.spans.push(secondary(
                         *candidate_symbol,
@@ -312,13 +307,7 @@ impl Error {
     }
 }
 
-fn wrong_arg_count(
-    kind: &str,
-    name: &str,
-    expected: usize,
-    got: usize,
-    span: Span,
-) -> Diagnostic {
+fn wrong_arg_count(kind: &str, name: &str, expected: usize, got: usize, span: Span) -> Diagnostic {
     error(
         format!(
             "{kind} `{name}` expected {expected} {} but got {got}",

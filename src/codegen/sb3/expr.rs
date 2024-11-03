@@ -8,11 +8,7 @@ use sb3_stuff::Value;
 use serde_json::json;
 
 impl SerCtx<'_> {
-    pub(super) fn serialize_expr(
-        &self,
-        expr: &Expr,
-        parent: Uid,
-    ) -> Result<Reporter> {
+    pub(super) fn serialize_expr(&self, expr: &Expr, parent: Uid) -> Result<Reporter> {
         Ok(match expr {
             Expr::Imm(imm) => Reporter::Literal(imm.clone()),
             Expr::Sym(sym, span) => match &**sym {
@@ -58,15 +54,8 @@ impl SerCtx<'_> {
         denominators: &[Expr],
         parent: Uid,
     ) -> Result<Reporter> {
-        let multiplication = |terms, parent| {
-            self.associative1(
-                "operator_multiply",
-                "NUM1",
-                "NUM2",
-                terms,
-                parent,
-            )
-        };
+        let multiplication =
+            |terms, parent| self.associative1("operator_multiply", "NUM1", "NUM2", terms, parent);
         Ok(match (numerators.is_empty(), denominators.is_empty()) {
             (true, true) => Reporter::Literal(Value::Num(1.0)),
             (true, false) => self.emit_non_shadow(
@@ -75,8 +64,7 @@ impl SerCtx<'_> {
                 &[
                     ("NUM1", &|_| Ok(json!([1, [10, "1"]]))),
                     ("NUM2", &|parent| {
-                        Ok(multiplication(denominators, parent)?
-                            .with_empty_shadow())
+                        Ok(multiplication(denominators, parent)?.with_empty_shadow())
                     }),
                 ],
                 &[],
@@ -87,12 +75,10 @@ impl SerCtx<'_> {
                 parent,
                 &[
                     ("NUM1", &|parent| {
-                        Ok(multiplication(numerators, parent)?
-                            .with_empty_shadow())
+                        Ok(multiplication(numerators, parent)?.with_empty_shadow())
                     }),
                     ("NUM2", &|parent| {
-                        Ok(multiplication(denominators, parent)?
-                            .with_empty_shadow())
+                        Ok(multiplication(denominators, parent)?.with_empty_shadow())
                     }),
                 ],
                 &[],
@@ -106,9 +92,8 @@ impl SerCtx<'_> {
         negatives: &[Expr],
         parent: Uid,
     ) -> Result<Reporter> {
-        let addition = |terms, parent| {
-            self.associative1("operator_add", "NUM1", "NUM2", terms, parent)
-        };
+        let addition =
+            |terms, parent| self.associative1("operator_add", "NUM1", "NUM2", terms, parent);
         Ok(match (positives.is_empty(), negatives.is_empty()) {
             (true, true) => Reporter::Literal(Value::Num(0.0)),
             (true, false) => self.emit_non_shadow(
@@ -168,27 +153,9 @@ impl SerCtx<'_> {
         }
         match func_name {
             "!!" => func!(data_itemoflist(LIST: List, INDEX: Number)),
-            "++" => self.associative1(
-                "operator_join",
-                "STRING1",
-                "STRING2",
-                args,
-                parent,
-            ),
-            "and" => self.associative1(
-                "operator_and",
-                "OPERAND1",
-                "OPERAND2",
-                args,
-                parent,
-            ),
-            "or" => self.associative1(
-                "operator_or",
-                "OPERAND1",
-                "OPERAND2",
-                args,
-                parent,
-            ),
+            "++" => self.associative1("operator_join", "STRING1", "STRING2", args, parent),
+            "and" => self.associative1("operator_and", "OPERAND1", "OPERAND2", args, parent),
+            "or" => self.associative1("operator_or", "OPERAND1", "OPERAND2", args, parent),
             "not" => func!(operator_not(OPERAND: Bool)),
             "=" => func!(operator_equals(OPERAND1: String, OPERAND2: String)),
             "<" => func!(operator_lt(OPERAND1: String, OPERAND2: String)),
@@ -297,9 +264,7 @@ impl SerCtx<'_> {
                     (lhs_name, &self.empty_shadow_input(lhs)),
                     (rhs_name, &|parent| {
                         Ok(self
-                            .associative1(
-                                opcode, lhs_name, rhs_name, rhs, parent,
-                            )?
+                            .associative1(opcode, lhs_name, rhs_name, rhs, parent)?
                             .with_empty_shadow())
                     }),
                 ],
@@ -308,11 +273,7 @@ impl SerCtx<'_> {
         }
     }
 
-    fn simple_function(
-        &self,
-        call: Call<'static, '_>,
-        params: &[Param],
-    ) -> Result<Reporter> {
+    fn simple_function(&self, call: Call<'static, '_>, params: &[Param]) -> Result<Reporter> {
         let this = self.new_uid();
         let Call {
             name: func_name,
@@ -330,8 +291,7 @@ impl SerCtx<'_> {
                 got: args.len(),
             }));
         }
-        let (inputs, fields) =
-            self.create_inputs_and_fields(params, args, this)?;
+        let (inputs, fields) = self.create_inputs_and_fields(params, args, this)?;
 
         self.emit_block(
             this,

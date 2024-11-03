@@ -37,73 +37,64 @@ impl Expr {
             Ast::Bool(b, ..) => Self::Imm(Value::Bool(b)),
             Ast::String(s, ..) => Self::Imm(Value::String(s.into())),
             Ast::Sym(sym, span) => Self::Sym(sym.into(), span),
-            Ast::Node(box Ast::Sym(func_name, span), args, ..) => {
-                match &*func_name {
-                    "+" => {
-                        let positives = args
-                            .into_iter()
-                            .map(Self::from_ast)
-                            .collect::<Result<_>>()?;
-                        Self::AddSub(positives, Vec::new())
-                    }
-                    "-" => {
-                        let mut terms = args.into_iter().map(Self::from_ast);
-                        let positive_or_negated = terms.next().unwrap()?;
-                        let terms = terms.collect::<Result<Vec<_>>>()?;
-                        if terms.is_empty() {
-                            Self::AddSub(Vec::new(), vec![positive_or_negated])
-                        } else {
-                            Self::AddSub(vec![positive_or_negated], terms)
-                        }
-                    }
-                    "*" => {
-                        let numerators = args
-                            .into_iter()
-                            .map(Self::from_ast)
-                            .collect::<Result<_>>()?;
-                        Self::MulDiv(numerators, Vec::new())
-                    }
-                    "/" => {
-                        let mut terms = args.into_iter().map(Self::from_ast);
-                        let numerator_or_inverted = terms.next().unwrap()?;
-                        let terms = terms.collect::<Result<Vec<_>>>()?;
-                        if terms.is_empty() {
-                            Self::MulDiv(
-                                Vec::new(),
-                                vec![numerator_or_inverted],
-                            )
-                        } else {
-                            Self::MulDiv(vec![numerator_or_inverted], terms)
-                        }
-                    }
-                    _ => {
-                        let func_name =
-                            known_func_name! { &*func_name,
-                                "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
-                                "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
-                                "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
-                                "to-num", "random",
-                            }.ok_or(
-                                Error::UnknownFunction { span, func_name },
-                            )?;
-                        Self::FuncCall(
-                            func_name,
-                            span,
-                            args.into_iter()
-                                .map(Self::from_ast)
-                                .collect::<Result<_>>()?,
-                        )
+            Ast::Node(box Ast::Sym(func_name, span), args, ..) => match &*func_name {
+                "+" => {
+                    let positives = args
+                        .into_iter()
+                        .map(Self::from_ast)
+                        .collect::<Result<_>>()?;
+                    Self::AddSub(positives, Vec::new())
+                }
+                "-" => {
+                    let mut terms = args.into_iter().map(Self::from_ast);
+                    let positive_or_negated = terms.next().unwrap()?;
+                    let terms = terms.collect::<Result<Vec<_>>>()?;
+                    if terms.is_empty() {
+                        Self::AddSub(Vec::new(), vec![positive_or_negated])
+                    } else {
+                        Self::AddSub(vec![positive_or_negated], terms)
                     }
                 }
-            }
+                "*" => {
+                    let numerators = args
+                        .into_iter()
+                        .map(Self::from_ast)
+                        .collect::<Result<_>>()?;
+                    Self::MulDiv(numerators, Vec::new())
+                }
+                "/" => {
+                    let mut terms = args.into_iter().map(Self::from_ast);
+                    let numerator_or_inverted = terms.next().unwrap()?;
+                    let terms = terms.collect::<Result<Vec<_>>>()?;
+                    if terms.is_empty() {
+                        Self::MulDiv(Vec::new(), vec![numerator_or_inverted])
+                    } else {
+                        Self::MulDiv(vec![numerator_or_inverted], terms)
+                    }
+                }
+                _ => {
+                    let func_name = known_func_name! { &*func_name,
+                        "*", "/", "!!", "++", "and", "or", "not", "=", "<", ">", "length",
+                        "str-length", "char-at", "mod", "abs", "floor", "ceil", "sqrt", "ln", "log",
+                        "e^", "ten^", "sin", "cos", "tan", "asin", "acos", "atan", "pressing-key",
+                        "to-num", "random",
+                    }
+                    .ok_or(Error::UnknownFunction { span, func_name })?;
+                    Self::FuncCall(
+                        func_name,
+                        span,
+                        args.into_iter()
+                            .map(Self::from_ast)
+                            .collect::<Result<_>>()?,
+                    )
+                }
+            },
             Ast::Node(not_a_symbol, ..) => {
                 return Err(Box::new(Error::FunctionNameMustBeSymbol {
                     span: not_a_symbol.span(),
                 }))
             }
-            Ast::Unquote(_, span) => {
-                return Err(Box::new(Error::UnquoteOutsideOfMacro { span }))
-            }
+            Ast::Unquote(_, span) => return Err(Box::new(Error::UnquoteOutsideOfMacro { span })),
         })
     }
 

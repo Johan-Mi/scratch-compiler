@@ -31,10 +31,7 @@ impl Ast {
         f: &mut impl FnMut(&mut Self) -> Result<(), E>,
     ) -> Result<(), E> {
         match self {
-            Self::Num(..)
-            | Self::Bool(..)
-            | Self::String(..)
-            | Self::Sym(..) => {}
+            Self::Num(..) | Self::Bool(..) | Self::String(..) | Self::Sym(..) => {}
             Self::Node(head, tail, _) => {
                 head.traverse_postorder_mut(f)?;
                 for branch in tail {

@@ -33,8 +33,7 @@ impl Program<'_> {
             fb.switch_to_block(block);
             fb.seal_block(block);
             for receiver in receievers {
-                let receiver =
-                    self.object_module.declare_func_in_func(*receiver, fb.func);
+                let receiver = self.object_module.declare_func_in_func(*receiver, fb.func);
                 fb.ins().call(receiver, &[]);
             }
             fb.ins().return_(&[]);
@@ -66,11 +65,7 @@ impl Program<'_> {
             let yes_matched = fb.create_block();
             let next = fb.create_block();
             let name = self.allocate_static_str(Cow::Borrowed(name), &mut fb);
-            let did_match = self.call_extern(
-                "str_eq_str",
-                &[name.0, name.1, ptr, len],
-                &mut fb,
-            );
+            let did_match = self.call_extern("str_eq_str", &[name.0, name.1, ptr, len], &mut fb);
             let did_match = fb.inst_results(did_match)[0];
             fb.ins().brif(did_match, yes_matched, &[], next, &[]);
             fb.switch_to_block(yes_matched);

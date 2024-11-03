@@ -8,11 +8,7 @@ use serde_json::{json, Value as Json};
 use std::{borrow::Cow, collections::HashMap};
 
 impl<'a> SerCtx<'a> {
-    pub fn serialize_sprite(
-        &mut self,
-        name: &str,
-        sprite: &'a Sprite,
-    ) -> Result<Json> {
+    pub fn serialize_sprite(&mut self, name: &str, sprite: &'a Sprite) -> Result<Json> {
         let variables = sprite
             .variables
             .iter()
@@ -40,17 +36,11 @@ impl<'a> SerCtx<'a> {
             })
             .collect::<HashMap<_, _>>();
 
-        let mangled_var = |mangled: &Mangled| {
-            (mangled.id.to_string(), json!([mangled.name, 0]))
-        };
-        let mangled_list = |mangled: &Mangled| {
-            (mangled.id.to_string(), json!([mangled.name, []]))
-        };
+        let mangled_var = |mangled: &Mangled| (mangled.id.to_string(), json!([mangled.name, 0]));
+        let mangled_list = |mangled: &Mangled| (mangled.id.to_string(), json!([mangled.name, []]));
 
-        let mut var_initializers =
-            variables.values().map(mangled_var).collect::<Json>();
-        let mut list_initializers =
-            lists.values().map(mangled_list).collect::<Json>();
+        let mut var_initializers = variables.values().map(mangled_var).collect::<Json>();
+        let mut list_initializers = lists.values().map(mangled_list).collect::<Json>();
 
         if name != "Stage" {
             // Variables and lists belonging to the stage are considered global,
@@ -62,18 +52,14 @@ impl<'a> SerCtx<'a> {
         let costumes = sprite
             .costumes
             .iter()
-            .map(|(name, path)| {
-                serde_json::to_value(Asset::new(name.to_owned(), path)).unwrap()
-            })
+            .map(|(name, path)| serde_json::to_value(Asset::new(name.to_owned(), path)).unwrap())
             .collect::<Vec<_>>();
 
         self.custom_procs = sprite
             .procedures
             .iter()
             .map(|(name, proc)| match &**name {
-                "when-flag-clicked" | "when-cloned" | "when-received" => {
-                    Ok(None)
-                }
+                "when-flag-clicked" | "when-cloned" | "when-received" => Ok(None),
                 _ => {
                     assert_eq!(
                         1,
@@ -84,12 +70,8 @@ impl<'a> SerCtx<'a> {
                         .params
                         .iter()
                         .map(|(param, span)| match param {
-                            Expr::Sym(sym, ..) => {
-                                Ok((sym.clone(), self.new_uid()))
-                            }
-                            _ => Err(Error::InvalidParameterForCustomProcDef {
-                                span: *span,
-                            }),
+                            Expr::Sym(sym, ..) => Ok((sym.clone(), self.new_uid())),
+                            _ => Err(Error::InvalidParameterForCustomProcDef { span: *span }),
                         })
                         .collect::<std::result::Result<_, _>>()?;
                     Ok(Some((&**name, CustomProcedure { params })))

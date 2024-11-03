@@ -2,9 +2,7 @@ mod error;
 pub use error::Error;
 
 use codemap::{CodeMap, Span};
-use codemap_diagnostic::{
-    ColorConfig, Diagnostic, Emitter, SpanLabel as Label, SpanStyle,
-};
+use codemap_diagnostic::{ColorConfig, Diagnostic, Emitter, SpanLabel as Label, SpanStyle};
 
 pub type Result<T> = std::result::Result<T, Box<Error>>;
 

@@ -25,13 +25,13 @@ impl<'a> Program<'a> {
                 proc_span,
             } => self.generate_proc_call(proc_name, args, *proc_span, fb),
             Statement::Do(stmts) => {
-                match stmts.iter().try_for_each(|stmt| {
-                    match self.generate_statement(stmt, fb) {
+                match stmts
+                    .iter()
+                    .try_for_each(|stmt| match self.generate_statement(stmt, fb) {
                         Ok(CONTINUE) => ControlFlow::Continue(()),
                         Ok(BREAK) => ControlFlow::Break(Ok(())),
                         Err(err) => ControlFlow::Break(Err(err)),
-                    }
-                }) {
+                    }) {
                     ControlFlow::Continue(()) => Ok(CONTINUE),
                     ControlFlow::Break(Ok(())) => Ok(BREAK),
                     ControlFlow::Break(Err(err)) => Err(err),
@@ -97,8 +97,7 @@ impl<'a> Program<'a> {
                 fb.seal_block(loop_start);
                 Ok(BREAK)
             }
-            Statement::Until { condition, body }
-            | Statement::While { condition, body } => {
+            Statement::Until { condition, body } | Statement::While { condition, body } => {
                 let loop_start = fb.create_block();
                 let loop_body = fb.create_block();
                 let after = fb.create_block();
@@ -125,12 +124,12 @@ impl<'a> Program<'a> {
                 times,
                 body,
             } => {
-                let var = self.lookup_var(&counter.0, fb).ok_or_else(|| {
-                    Error::UnknownVar {
+                let var = self
+                    .lookup_var(&counter.0, fb)
+                    .ok_or_else(|| Error::UnknownVar {
                         span: counter.1,
                         var_name: (&*counter.0).into(),
-                    }
-                })?;
+                    })?;
 
                 let loop_start = fb.create_block();
                 let loop_body = fb.create_block();
@@ -144,8 +143,7 @@ impl<'a> Program<'a> {
                 fb.ins().jump(loop_start, &[]);
                 fb.switch_to_block(loop_start);
                 let old_count = fb.use_var(counter);
-                let should_break =
-                    fb.ins().icmp(IntCC::Equal, old_count, times);
+                let should_break = fb.ins().icmp(IntCC::Equal, old_count, times);
                 fb.ins().brif(should_break, after, &[], loop_body, &[]);
                 fb.seal_block(loop_body);
                 fb.switch_to_block(loop_body);
@@ -200,12 +198,11 @@ impl<'a> Program<'a> {
             },
             ":=" => match args {
                 [Expr::Sym(var_name, var_span), value] => {
-                    let var =
-                        self.lookup_var(var_name, fb).ok_or_else(|| {
-                            Error::UnknownVar {
-                                span: *var_span,
-                                var_name: var_name.clone(),
-                            }
+                    let var = self
+                        .lookup_var(var_name, fb)
+                        .ok_or_else(|| Error::UnknownVar {
+                            span: *var_span,
+                            var_name: var_name.clone(),
                         })?;
                     let new = self.generate_any_expr(value, fb)?;
                     let mem_flags = MemFlags::trusted();
@@ -219,22 +216,17 @@ impl<'a> Program<'a> {
             },
             "+=" => match args {
                 [Expr::Sym(var_name, var_span), amount] => {
-                    let var =
-                        self.lookup_var(var_name, fb).ok_or_else(|| {
-                            Error::UnknownVar {
-                                span: *var_span,
-                                var_name: var_name.clone(),
-                            }
+                    let var = self
+                        .lookup_var(var_name, fb)
+                        .ok_or_else(|| Error::UnknownVar {
+                            span: *var_span,
+                            var_name: var_name.clone(),
                         })?;
                     let amount = self.generate_double_expr(amount, fb)?;
                     let mem_flags = MemFlags::trusted();
                     let old_low = fb.ins().load(I64, mem_flags, var, 0);
                     let old_high = fb.ins().load(I64, mem_flags, var, 8);
-                    let old = self.call_extern(
-                        "any_to_double",
-                        &[old_low, old_high],
-                        fb,
-                    );
+                    let old = self.call_extern("any_to_double", &[old_low, old_high], fb);
                     let old = fb.inst_results(old)[0];
                     let new = fb.ins().fadd(old, amount);
                     let number_type_tag = fb.ins().iconst(I64, 2);
@@ -248,11 +240,7 @@ impl<'a> Program<'a> {
                 [Expr::Sym(list_name, list_span), value] => {
                     let list = self.lookup_list(list_name, *list_span, fb)?;
                     let value = self.generate_any_expr(value, fb)?;
-                    self.call_extern(
-                        "list_append",
-                        &[list, value.0, value.1],
-                        fb,
-                    );
+                    self.call_extern("list_append", &[list, value.0, value.1], fb);
                     Ok(CONTINUE)
                 }
                 _ => wrong_arg_count(2),
@@ -261,11 +249,7 @@ impl<'a> Program<'a> {
                 [Expr::Sym(list_name, list_span), value] => {
                     let list = self.lookup_list(list_name, *list_span, fb)?;
                     let value = self.generate_any_expr(value, fb)?;
-                    self.call_extern(
-                        "list_delete",
-                        &[value.0, value.1, list],
-                        fb,
-                    );
+                    self.call_extern("list_delete", &[value.0, value.1, list], fb);
                     Ok(CONTINUE)
                 }
                 _ => wrong_arg_count(2),
@@ -315,8 +299,7 @@ impl<'a> Program<'a> {
             "ask" => match args {
                 [question] => {
                     let question = self.generate_cow_expr(question, fb)?;
-                    let new =
-                        self.call_extern("ask", &<[_; 2]>::from(question), fb);
+                    let new = self.call_extern("ask", &<[_; 2]>::from(question), fb);
                     let new_ptr = fb.inst_results(new)[0];
                     let new_len = fb.inst_results(new)[1];
                     self.call_extern("drop_cow", &[question.0], fb);
@@ -332,22 +315,16 @@ impl<'a> Program<'a> {
             },
             "send-broadcast-sync" => match args {
                 [Expr::Imm(Immediate::String(name))] => {
-                    if let Some((handler, _)) =
-                        self.broadcasts.get(&*name.to_lowercase())
-                    {
-                        let handler = self
-                            .object_module
-                            .declare_func_in_func(*handler, fb.func);
+                    if let Some((handler, _)) = self.broadcasts.get(&*name.to_lowercase()) {
+                        let handler = self.object_module.declare_func_in_func(*handler, fb.func);
                         fb.ins().call(handler, &[]);
                     }
                     Ok(CONTINUE)
                 }
                 [name] => {
                     let name = self.generate_cow_expr(name, fb)?;
-                    let main_broadcast_handler =
-                        self.main_broadcast_handler(fb);
-                    fb.ins()
-                        .call(main_broadcast_handler, &<[_; 2]>::from(name));
+                    let main_broadcast_handler = self.main_broadcast_handler(fb);
+                    fb.ins().call(main_broadcast_handler, &<[_; 2]>::from(name));
                     self.call_extern("drop_cow", &[name.0], fb);
                     Ok(CONTINUE)
                 }
@@ -375,14 +352,14 @@ impl<'a> Program<'a> {
         span: Span,
         fb: &mut FunctionBuilder,
     ) -> Result<()> {
-        let proc = self.custom_procs.get(proc_name).ok_or_else(|| {
-            Error::UnknownProc {
+        let proc = self
+            .custom_procs
+            .get(proc_name)
+            .ok_or_else(|| Error::UnknownProc {
                 span,
                 proc_name: proc_name.to_owned(),
-            }
-        })?;
-        let func_ref =
-            self.object_module.declare_func_in_func(proc.id, fb.func);
+            })?;
+        let func_ref = self.object_module.declare_func_in_func(proc.id, fb.func);
 
         let param_count = proc.param_names.len();
         if args.len() != param_count {

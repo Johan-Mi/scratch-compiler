@@ -19,9 +19,7 @@ impl<'a> Program<'a> {
     ) -> Result<MixedSizeValue> {
         match expr {
             Expr::Imm(imm) => Ok(self.generate_imm(imm, fb)),
-            Expr::Sym(sym, sym_span) => {
-                self.generate_symbol(sym, *sym_span, fb)
-            }
+            Expr::Sym(sym, sym_span) => self.generate_symbol(sym, *sym_span, fb),
             Expr::FuncCall(func_name, span, args) => {
                 self.generate_func_call(func_name, args, *span, fb)
             }
@@ -138,11 +136,7 @@ impl<'a> Program<'a> {
                 [Expr::Sym(list_name, list_span), index] => {
                     let list = self.lookup_list(list_name, *list_span, fb)?;
                     let index = self.generate_any_expr(index, fb)?;
-                    let got = self.call_extern(
-                        "list_get",
-                        &[index.0, index.1, list],
-                        fb,
-                    );
+                    let got = self.call_extern("list_get", &[index.0, index.1, list], fb);
                     Ok(pair(fb.inst_results(got)).into())
                 }
                 _ => wrong_arg_count(2),
@@ -165,12 +159,7 @@ impl<'a> Program<'a> {
                 fb.def_var(dest, buf);
                 for (i, (ptr, len)) in args.iter().enumerate() {
                     let dest_value = fb.use_var(dest);
-                    fb.call_memcpy(
-                        self.target_frontend_config,
-                        dest_value,
-                        *ptr,
-                        *len,
-                    );
+                    fb.call_memcpy(self.target_frontend_config, dest_value, *ptr, *len);
                     if args.len() - i != 1 {
                         let next_dest = fb.ins().iadd(dest_value, *len);
                         fb.def_var(dest, next_dest);
@@ -189,21 +178,9 @@ impl<'a> Program<'a> {
                         let term = self.generate_bool_expr(term, fb)?;
                         let next_block = fb.create_block();
                         if func_name == "and" {
-                            fb.ins().brif(
-                                term,
-                                next_block,
-                                &[],
-                                last_block,
-                                &[term],
-                            );
+                            fb.ins().brif(term, next_block, &[], last_block, &[term]);
                         } else {
-                            fb.ins().brif(
-                                term,
-                                last_block,
-                                &[term],
-                                next_block,
-                                &[],
-                            );
+                            fb.ins().brif(term, last_block, &[term], next_block, &[]);
                         }
                         fb.switch_to_block(next_block);
                         fb.seal_block(next_block);
@@ -246,8 +223,7 @@ impl<'a> Program<'a> {
             "str-length" => match args {
                 [s] => {
                     let s = self.generate_cow_expr(s, fb)?;
-                    let len =
-                        self.call_extern("str_length", &<[_; 2]>::from(s), fb);
+                    let len = self.call_extern("str_length", &<[_; 2]>::from(s), fb);
                     let len = fb.inst_results(len)[0];
                     let len = fb.ins().fcvt_from_uint(F64, len);
                     self.call_extern("drop_cow", &[s.0], fb);
@@ -260,8 +236,7 @@ impl<'a> Program<'a> {
                     let s = self.generate_cow_expr(s, fb)?;
                     let index = self.generate_double_expr(index, fb)?;
                     let index = fb.ins().fcvt_to_uint_sat(I64, index);
-                    let res =
-                        self.call_extern("char_at", &[s.0, s.1, index], fb);
+                    let res = self.call_extern("char_at", &[s.0, s.1, index], fb);
                     self.call_extern("drop_cow", &[s.0], fb);
                     Ok(pair(fb.inst_results(res)).into())
                 }
@@ -308,13 +283,9 @@ impl<'a> Program<'a> {
             "log" => mathop("log10"),
             "e^" => mathop("exp"),
             "ten^" => mathop("exp10"),
-            "sin" | "cos" | "tan" | "asin" | "acos" | "atan" => {
-                mathop(func_name)
-            }
+            "sin" | "cos" | "tan" | "asin" | "acos" | "atan" => mathop(func_name),
             "to-num" => match args {
-                [operand] => {
-                    self.generate_double_expr(operand, fb).map(From::from)
-                }
+                [operand] => self.generate_double_expr(operand, fb).map(From::from),
                 _ => wrong_arg_count(1),
             },
             "random" => match args {
@@ -322,8 +293,7 @@ impl<'a> Program<'a> {
                     self.uses_drand48 = true;
                     let low = self.generate_double_expr(low, fb)?;
                     let high = self.generate_double_expr(high, fb)?;
-                    let res =
-                        self.call_extern("random_between", &[low, high], fb);
+                    let res = self.call_extern("random_between", &[low, high], fb);
                     Ok(fb.inst_results(res)[0].into())
                 }
                 _ => wrong_arg_count(2),
@@ -369,8 +339,7 @@ impl<'a> Program<'a> {
             Typ::StaticStr(_) => todo!(),
             Typ::OwnedString => todo!(),
             Typ::Any => {
-                let inst =
-                    self.call_extern("any_to_double", res.as_slice(), fb);
+                let inst = self.call_extern("any_to_double", res.as_slice(), fb);
                 Ok(fb.inst_results(inst)[0])
             }
         }
@@ -384,8 +353,7 @@ impl<'a> Program<'a> {
         let res = self.generate_expr(expr, fb)?;
         match expr_type(expr) {
             Typ::Double => {
-                let inst =
-                    self.call_extern("double_to_cow", &[res.single()], fb);
+                let inst = self.call_extern("double_to_cow", &[res.single()], fb);
                 Ok(pair(fb.inst_results(inst)))
             }
             Typ::Bool => {
@@ -419,16 +387,10 @@ impl<'a> Program<'a> {
         }
     }
 
-    fn generate_imm(
-        &mut self,
-        imm: &'a Immediate,
-        fb: &mut FunctionBuilder,
-    ) -> MixedSizeValue {
+    fn generate_imm(&mut self, imm: &'a Immediate, fb: &mut FunctionBuilder) -> MixedSizeValue {
         match imm {
             Immediate::Num(n) => fb.ins().f64const(*n).into(),
-            Immediate::String(s) => {
-                self.allocate_static_str(Cow::Borrowed(s), fb).into()
-            }
+            Immediate::String(s) => self.allocate_static_str(Cow::Borrowed(s), fb).into(),
             Immediate::Bool(b) => fb.ins().iconst(I8, i64::from(*b)).into(),
         }
     }
@@ -495,16 +457,13 @@ impl<'a> Program<'a> {
                     (true, true) => fb.ins().icmp(IntCC::Equal, lhs, rhs),
                     (true, false) => fb.ins().band_not(rhs, lhs),
                     (false, true) => fb.ins().fcmp(FloatCC::Equal, lhs, rhs),
-                    (false, false) => {
-                        fb.ins().fcmp(FloatCC::LessThan, lhs, rhs)
-                    }
+                    (false, false) => fb.ins().fcmp(FloatCC::LessThan, lhs, rhs),
                 }
             }
             (Typ::Bool, Typ::StaticStr(_), false) => {
                 todo!()
             }
-            (Typ::StaticStr(s), Typ::Bool, true)
-            | (Typ::Bool, Typ::StaticStr(s), true) => {
+            (Typ::StaticStr(s), Typ::Bool, true) | (Typ::Bool, Typ::StaticStr(s), true) => {
                 let the_bool = if matches!(lhs_type, Typ::Bool) {
                     lhs
                 } else {
@@ -523,8 +482,7 @@ impl<'a> Program<'a> {
             (Typ::StaticStr(lhs), Typ::StaticStr(rhs), _) => fb.ins().iconst(
                 I8,
                 i64::from(
-                    Immediate::String((*lhs).into())
-                        .compare(&Immediate::String((*rhs).into()))
+                    Immediate::String((*lhs).into()).compare(&Immediate::String((*rhs).into()))
                         == ordering,
                 ),
             ),
@@ -537,8 +495,7 @@ impl<'a> Program<'a> {
             (Typ::OwnedString, Typ::OwnedString, _) => todo!(),
             (Typ::OwnedString, Typ::Any, _) => todo!(),
             (Typ::Any, Typ::OwnedString, _) => todo!(),
-            (Typ::StaticStr(_), Typ::OwnedString, _)
-            | (Typ::OwnedString, Typ::StaticStr(_), _) => {
+            (Typ::StaticStr(_), Typ::OwnedString, _) | (Typ::OwnedString, Typ::StaticStr(_), _) => {
                 let lhs = self.generate_expr(lhs, fb)?.pair();
                 let rhs = self.generate_expr(rhs, fb)?.pair();
                 let inst = self.call_extern(
@@ -554,8 +511,7 @@ impl<'a> Program<'a> {
                 self.call_extern("free", &[to_free.0], fb);
                 fb.inst_results(inst)[0]
             }
-            (Typ::StaticStr(_), Typ::Any, _)
-            | (Typ::Any, Typ::StaticStr(_), _) => {
+            (Typ::StaticStr(_), Typ::Any, _) | (Typ::Any, Typ::StaticStr(_), _) => {
                 let lhs_is_str = matches!(lhs_type, Typ::StaticStr(_));
                 let lhs = self.generate_expr(lhs, fb)?.pair();
                 let rhs = self.generate_expr(rhs, fb)?.pair();
@@ -578,8 +534,7 @@ impl<'a> Program<'a> {
             }
             (Typ::Bool, Typ::Any, _) | (Typ::Any, Typ::Bool, _) => {
                 let lhs_is_bool = matches!(lhs_type, Typ::Bool);
-                let (the_bool, the_any) =
-                    if lhs_is_bool { (lhs, rhs) } else { (rhs, lhs) };
+                let (the_bool, the_any) = if lhs_is_bool { (lhs, rhs) } else { (rhs, lhs) };
                 let the_bool = self.generate_expr(the_bool, fb)?.single();
                 let the_any = self.generate_expr(the_any, fb)?.pair();
                 let inst = self.call_extern(

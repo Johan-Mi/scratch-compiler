@@ -49,10 +49,8 @@ fn const_add_sub(expr: &mut Expr) -> bool {
             .count()
             == 2
     {
-        let positive_sum: f64 =
-            drain_imms(positives).map(|term| term.to_num()).sum();
-        let negative_sum: f64 =
-            drain_imms(negatives).map(|term| term.to_num()).sum();
+        let positive_sum: f64 = drain_imms(positives).map(|term| term.to_num()).sum();
+        let negative_sum: f64 = drain_imms(negatives).map(|term| term.to_num()).sum();
         let sum = positive_sum - negative_sum;
         positives.push(Imm(Value::Num(sum)));
         true
@@ -72,10 +70,8 @@ fn const_mul_div(expr: &mut Expr) -> bool {
             .count()
             == 2
     {
-        let numerator: f64 =
-            drain_imms(numerators).map(|term| term.to_num()).product();
-        let denominator: f64 =
-            drain_imms(denominators).map(|term| term.to_num()).product();
+        let numerator: f64 = drain_imms(numerators).map(|term| term.to_num()).product();
+        let denominator: f64 = drain_imms(denominators).map(|term| term.to_num()).product();
         let product = numerator / denominator;
         numerators.push(Imm(Value::Num(product)));
         true
@@ -102,9 +98,10 @@ fn mul_zero(expr: &mut Expr) -> bool {
 fn mul_div_one(expr: &mut Expr) -> bool {
     if let MulDiv(numerators, denominators) = expr {
         for terms in &mut [numerators, denominators] {
-            if let Some(index) = terms.iter().position(
-                |arg| matches!(arg, Imm(Value::Num(num)) if *num == 1.0),
-            ) {
+            if let Some(index) = terms
+                .iter()
+                .position(|arg| matches!(arg, Imm(Value::Num(num)) if *num == 1.0))
+            {
                 terms.swap_remove(index);
                 return true;
             }
@@ -117,9 +114,10 @@ fn mul_div_one(expr: &mut Expr) -> bool {
 fn add_sub_zero(expr: &mut Expr) -> bool {
     if let AddSub(positives, negatives) = expr {
         for terms in &mut [positives, negatives] {
-            if let Some(index) = terms.iter().position(
-                |arg| matches!(arg, Imm(Value::Num(num)) if *num == 0.0),
-            ) {
+            if let Some(index) = terms
+                .iter()
+                .position(|arg| matches!(arg, Imm(Value::Num(num)) if *num == 0.0))
+            {
                 terms.swap_remove(index);
                 return true;
             }
@@ -164,30 +162,24 @@ fn flatten_add_sub(expr: &mut Expr) -> bool {
         *expr = positives.pop().unwrap_or(Expr::Imm(Value::Num(0.0)));
         true
     } else if positives.iter().any(|term| matches!(term, AddSub(..))) {
-        let (flat_positives, flat_negatives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
-            positives
-                .extract_if(|term| matches!(term, AddSub(..)))
-                .map(|term| match term {
-                    AddSub(flat_positives, flat_negatives) => {
-                        (flat_positives, flat_negatives)
-                    }
-                    _ => unreachable!(),
-                })
-                .unzip();
+        let (flat_positives, flat_negatives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) = positives
+            .extract_if(|term| matches!(term, AddSub(..)))
+            .map(|term| match term {
+                AddSub(flat_positives, flat_negatives) => (flat_positives, flat_negatives),
+                _ => unreachable!(),
+            })
+            .unzip();
         positives.extend(flat_positives.into_iter().flatten());
         negatives.extend(flat_negatives.into_iter().flatten());
         true
     } else if negatives.iter().any(|term| matches!(term, AddSub(..))) {
-        let (flat_negatives, flat_positives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) =
-            negatives
-                .extract_if(|term| matches!(term, AddSub(..)))
-                .map(|term| match term {
-                    AddSub(flat_negatives, flat_positives) => {
-                        (flat_negatives, flat_positives)
-                    }
-                    _ => unreachable!(),
-                })
-                .unzip();
+        let (flat_negatives, flat_positives): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) = negatives
+            .extract_if(|term| matches!(term, AddSub(..)))
+            .map(|term| match term {
+                AddSub(flat_negatives, flat_positives) => (flat_negatives, flat_positives),
+                _ => unreachable!(),
+            })
+            .unzip();
         positives.extend(flat_positives.into_iter().flatten());
         negatives.extend(flat_negatives.into_iter().flatten());
         true
@@ -205,15 +197,10 @@ fn flatten_mul_div(expr: &mut Expr) -> bool {
         *expr = numerators.pop().unwrap_or(Expr::Imm(Value::Num(1.0)));
         true
     } else if numerators.iter().any(|term| matches!(term, MulDiv(..))) {
-        let (flat_numerators, flat_denominators): (
-            Vec<Vec<Expr>>,
-            Vec<Vec<Expr>>,
-        ) = numerators
+        let (flat_numerators, flat_denominators): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) = numerators
             .extract_if(|term| matches!(term, MulDiv(..)))
             .map(|term| match term {
-                MulDiv(flat_numerators, flat_denominators) => {
-                    (flat_numerators, flat_denominators)
-                }
+                MulDiv(flat_numerators, flat_denominators) => (flat_numerators, flat_denominators),
                 _ => unreachable!(),
             })
             .unzip();
@@ -221,15 +208,10 @@ fn flatten_mul_div(expr: &mut Expr) -> bool {
         denominators.extend(flat_denominators.into_iter().flatten());
         true
     } else if denominators.iter().any(|term| matches!(term, MulDiv(..))) {
-        let (flat_denominators, flat_numerators): (
-            Vec<Vec<Expr>>,
-            Vec<Vec<Expr>>,
-        ) = denominators
+        let (flat_denominators, flat_numerators): (Vec<Vec<Expr>>, Vec<Vec<Expr>>) = denominators
             .extract_if(|term| matches!(term, MulDiv(..)))
             .map(|term| match term {
-                MulDiv(flat_denominators, flat_numerators) => {
-                    (flat_denominators, flat_numerators)
-                }
+                MulDiv(flat_denominators, flat_numerators) => (flat_denominators, flat_numerators),
                 _ => unreachable!(),
             })
             .unzip();
@@ -268,8 +250,7 @@ fn mul_div_negation(expr: &mut Expr) -> bool {
 /// Distributes multiplication by a constant into sums containing at least one
 /// other constant.
 fn distribute_mul_into_sum(expr: &mut Expr) -> bool {
-    let contains_an_imm =
-        |v: &[Expr]| v.iter().filter(|arg| arg.is_imm()).take(1).count() == 1;
+    let contains_an_imm = |v: &[Expr]| v.iter().filter(|arg| arg.is_imm()).take(1).count() == 1;
 
     if let MulDiv(args, _) = expr
       && let Some(sum_index) = args.iter().position(|arg| {
